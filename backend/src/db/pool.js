@@ -10,6 +10,7 @@ export const pool = new pg.Pool({
 export const query = (text, params) => pool.query(text, params);
 
 export async function tryQuery(text, params) {
+  if (!process.env.DATABASE_URL) return null;
   try {
     return await query(text, params);
   } catch (error) {

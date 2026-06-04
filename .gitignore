@@ -6,3 +6,4 @@ backend/.env
 .env
 .vercel
 *.log
+.vercel

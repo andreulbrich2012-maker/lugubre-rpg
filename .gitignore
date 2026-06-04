@@ -7,3 +7,5 @@ backend/.env
 .vercel
 *.log
 .vercel
+.env*
+data/

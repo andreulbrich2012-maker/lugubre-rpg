@@ -113,6 +113,25 @@ create table if not exists friend_messages (
   created_at timestamptz not null default now()
 );
 
+delete from races current
+using races duplicate
+where lower(current.name) = lower(duplicate.name)
+  and current.ctid < duplicate.ctid;
+
+delete from classes current
+using classes duplicate
+where lower(current.name) = lower(duplicate.name)
+  and current.ctid < duplicate.ctid;
+
+delete from origins current
+using origins duplicate
+where lower(current.name) = lower(duplicate.name)
+  and current.ctid < duplicate.ctid;
+
+create unique index if not exists races_name_unique on races (lower(name));
+create unique index if not exists classes_name_unique on classes (lower(name));
+create unique index if not exists origins_name_unique on origins (lower(name));
+
 insert into races (name, image, attribute_modifiers)
 values
   ('Humano Sombrio', '/assets/dark-castle.svg', '{"forca":1,"presenca":1}'),

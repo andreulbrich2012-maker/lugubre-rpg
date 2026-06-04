@@ -14,7 +14,7 @@ export async function tryQuery(text, params) {
   try {
     return await query(text, params);
   } catch (error) {
-    if (process.env.REQUIRE_POSTGRES === 'true') throw error;
+    if (process.env.REQUIRE_POSTGRES === 'true' || process.env.VERCEL || process.env.NODE_ENV === 'production') throw error;
     return null;
   }
 }

@@ -43,12 +43,26 @@ async function skillKeys() {
   return result?.rows?.map((skill) => skill.key) || (await getLocalCatalog('skills')).map((skill) => skill.key);
 }
 
+function parseJsonField(value, fallback) {
+  if (value == null) return fallback;
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function toJson(value) {
+  return JSON.stringify(value ?? null);
+}
+
 async function normalizeCharacter(body, currentSkills = null) {
   const data = characterSchema.parse(body);
   let modifiers = {};
   if (data.raceId) {
     const race = await tryQuery('select attribute_modifiers from races where id = $1', [data.raceId]);
-    if (race?.rows?.[0]) modifiers = race.rows[0].attribute_modifiers;
+    if (race?.rows?.[0]) modifiers = parseJsonField(race.rows[0].attribute_modifiers, {});
     else modifiers = (await getLocalCatalog('races')).find((item) => item.id === data.raceId)?.attribute_modifiers || {};
   }
   const attributes = applyRaceModifiers(data.attributes, modifiers);
@@ -57,7 +71,7 @@ async function normalizeCharacter(body, currentSkills = null) {
     const result = await tryQuery('select skill_modifiers from origins where id = $1', [data.originId]);
     origin = result?.rows?.[0] || (await getLocalCatalog('origins')).find((item) => item.id === data.originId);
   }
-  const originSkills = origin?.skill_modifiers || {};
+  const originSkills = parseJsonField(origin?.skill_modifiers, {});
   const base = baseSkills(await skillKeys());
   const createdSkills = Object.fromEntries(Object.keys(base).map((key) => [key, Number(base[key] || 0) + Number(originSkills[key] || 0)]));
   return {
@@ -80,16 +94,20 @@ async function enrich(row) {
     originsResult?.rows || getLocalCatalog('origins'),
     skillsResult?.rows || getLocalCatalog('skills')
   ]);
-  const skills = { ...baseSkills(skillsCatalog.map((skill) => skill.key)), ...(row.skills || {}) };
+  const attributes = parseJsonField(row.attributes, baseAttributes());
+  const inventory = parseJsonField(row.inventory, []);
+  const skills = { ...baseSkills(skillsCatalog.map((skill) => skill.key)), ...parseJsonField(row.skills, {}) };
   return {
     ...row,
+    attributes,
     skills,
+    inventory,
     skills_catalog: skillsCatalog,
     race_name: row.race_name || races.find((item) => item.id === row.race_id)?.name,
     class_name: row.class_name || classes.find((item) => item.id === row.class_id)?.name,
     origin_name: row.origin_name || origins.find((item) => item.id === row.origin_id)?.name || row.origin,
-    dodge: calculateDodge(row.attributes),
-    total_defense: calculateDefense(row.defense, row.inventory)
+    dodge: calculateDodge(attributes),
+    total_defense: calculateDefense(row.defense, inventory)
   };
 }
 
@@ -115,7 +133,7 @@ router.post('/', async (req, res) => {
      (owner_id, player_name, character_name, photo, race_id, class_id, origin_id, origin, level, mana, defense, attributes, skills, inventory)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
      returning *`,
-    [req.user.id, data.playerName, data.characterName, data.photo, data.raceId || null, data.classId || null, data.originId || null, data.origin, data.level, data.mana, data.defense, data.attributes, data.skills, data.inventory]
+    [req.user.id, data.playerName, data.characterName, data.photo, data.raceId || null, data.classId || null, data.originId || null, data.origin, data.level, data.mana, data.defense, toJson(data.attributes), toJson(data.skills), toJson(data.inventory)]
   );
   const row = result?.rows?.[0] || await createLocalCharacter(req.user.id, data);
   res.status(201).json(await enrich(row));
@@ -135,7 +153,7 @@ router.put('/:id', async (req, res) => {
     `update characters set player_name=$1, character_name=$2, photo=$3, race_id=$4, class_id=$5,
      origin_id=$6, origin=$7, level=$8, mana=$9, defense=$10, attributes=$11, skills=$12, inventory=$13, updated_at=now()
      where id=$14 and owner_id=$15 returning *`,
-    [data.playerName, data.characterName, data.photo, data.raceId || null, data.classId || null, data.originId || null, data.origin, data.level, data.mana, data.defense, data.attributes, data.skills, data.inventory, req.params.id, req.user.id]
+    [data.playerName, data.characterName, data.photo, data.raceId || null, data.classId || null, data.originId || null, data.origin, data.level, data.mana, data.defense, toJson(data.attributes), toJson(data.skills), toJson(data.inventory), req.params.id, req.user.id]
   );
   const row = result?.rows?.[0] || await updateLocalCharacter(req.params.id, req.user.id, data);
   if (!row) return res.status(404).json({ message: 'Ficha não encontrada.' });
@@ -161,12 +179,12 @@ router.patch('/:id/play', async (req, res) => {
     originId: row.origin_id || row.originId,
     mana: body.mana ?? row.mana,
     defense: body.defense ?? row.defense,
-    skills: { ...(row.skills || {}), ...(body.skills || {}) },
-    inventory: body.inventory ?? row.inventory
+    skills: { ...parseJsonField(row.skills, {}), ...(body.skills || {}) },
+    inventory: body.inventory ?? parseJsonField(row.inventory, [])
   };
   const updatedResult = await tryQuery(
     'update characters set mana=$1, defense=$2, skills=$3, inventory=$4, updated_at=now() where id=$5 and owner_id=$6 returning *',
-    [payload.mana, payload.defense, payload.skills, payload.inventory, req.params.id, req.user.id]
+    [payload.mana, payload.defense, toJson(payload.skills), toJson(payload.inventory), req.params.id, req.user.id]
   );
   const updated = updatedResult?.rows?.[0] || await updateLocalCharacter(req.params.id, req.user.id, payload);
   res.json(await enrich(updated));

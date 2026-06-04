@@ -21,6 +21,7 @@ export function calculateDodge(attributes) {
 }
 
 export function calculateDefense(baseDefense, inventory = []) {
-  const bonus = inventory.reduce((sum, item) => sum + Number(item.defenseBonus ?? 0), 0);
+  const items = Array.isArray(inventory) ? inventory : [];
+  const bonus = items.reduce((sum, item) => sum + Number(item.defenseBonus ?? 0), 0);
   return Number(baseDefense ?? 10) + bonus;
 }

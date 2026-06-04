@@ -35,17 +35,21 @@ const skillSchema = z.object({
   attribute: z.enum(['forca', 'agilidade', 'intelecto', 'vigor', 'presenca']).default('presenca')
 });
 
+function toJson(value) {
+  return JSON.stringify(value ?? null);
+}
+
 router.post('/races', async (req, res) => {
   const body = raceSchema.parse(req.body);
   const payload = { name: body.name, image: body.image || '', attribute_modifiers: body.attributeModifiers };
-  const result = await tryQuery('insert into races (name, image, attribute_modifiers) values ($1, $2, $3) returning *', [payload.name, payload.image, payload.attribute_modifiers]);
+  const result = await tryQuery('insert into races (name, image, attribute_modifiers) values ($1, $2, $3) returning *', [payload.name, payload.image, toJson(payload.attribute_modifiers)]);
   res.status(201).json(result?.rows?.[0] || await createLocalCatalogItem('races', payload));
 });
 
 router.put('/races/:id', async (req, res) => {
   const body = raceSchema.parse(req.body);
   const payload = { name: body.name, image: body.image || '', attribute_modifiers: body.attributeModifiers };
-  const result = await tryQuery('update races set name=$1, image=$2, attribute_modifiers=$3 where id=$4 returning *', [payload.name, payload.image, payload.attribute_modifiers, req.params.id]);
+  const result = await tryQuery('update races set name=$1, image=$2, attribute_modifiers=$3 where id=$4 returning *', [payload.name, payload.image, toJson(payload.attribute_modifiers), req.params.id]);
   res.json(result?.rows?.[0] || await updateLocalCatalogItem('races', req.params.id, payload));
 });
 
@@ -58,14 +62,14 @@ router.delete('/races/:id', async (req, res) => {
 router.post('/classes', async (req, res) => {
   const body = classSchema.parse(req.body);
   const payload = { name: body.name, image: body.image || '', progression: body.progression };
-  const result = await tryQuery('insert into classes (name, image, progression) values ($1, $2, $3) returning *', [payload.name, payload.image, payload.progression]);
+  const result = await tryQuery('insert into classes (name, image, progression) values ($1, $2, $3) returning *', [payload.name, payload.image, toJson(payload.progression)]);
   res.status(201).json(result?.rows?.[0] || await createLocalCatalogItem('classes', payload));
 });
 
 router.put('/classes/:id', async (req, res) => {
   const body = classSchema.parse(req.body);
   const payload = { name: body.name, image: body.image || '', progression: body.progression };
-  const result = await tryQuery('update classes set name=$1, image=$2, progression=$3 where id=$4 returning *', [payload.name, payload.image, payload.progression, req.params.id]);
+  const result = await tryQuery('update classes set name=$1, image=$2, progression=$3 where id=$4 returning *', [payload.name, payload.image, toJson(payload.progression), req.params.id]);
   res.json(result?.rows?.[0] || await updateLocalCatalogItem('classes', req.params.id, payload));
 });
 
@@ -78,14 +82,14 @@ router.delete('/classes/:id', async (req, res) => {
 router.post('/origins', async (req, res) => {
   const body = originSchema.parse(req.body);
   const payload = { name: body.name, description: body.description, skill_modifiers: body.skillModifiers };
-  const result = await tryQuery('insert into origins (name, description, skill_modifiers) values ($1, $2, $3) returning *', [payload.name, payload.description, payload.skill_modifiers]);
+  const result = await tryQuery('insert into origins (name, description, skill_modifiers) values ($1, $2, $3) returning *', [payload.name, payload.description, toJson(payload.skill_modifiers)]);
   res.status(201).json(result?.rows?.[0] || await createLocalCatalogItem('origins', payload));
 });
 
 router.put('/origins/:id', async (req, res) => {
   const body = originSchema.parse(req.body);
   const payload = { name: body.name, description: body.description, skill_modifiers: body.skillModifiers };
-  const result = await tryQuery('update origins set name=$1, description=$2, skill_modifiers=$3 where id=$4 returning *', [payload.name, payload.description, payload.skill_modifiers, req.params.id]);
+  const result = await tryQuery('update origins set name=$1, description=$2, skill_modifiers=$3 where id=$4 returning *', [payload.name, payload.description, toJson(payload.skill_modifiers), req.params.id]);
   res.json(result?.rows?.[0] || await updateLocalCatalogItem('origins', req.params.id, payload));
 });
 

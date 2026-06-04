@@ -62,6 +62,54 @@ describe('fluxo principal da API', () => {
       .expect(409);
   });
 
+  it('mantem a sessao estavel em logins repetidos e erros nao relacionados ao token', async () => {
+    const stamp = Date.now();
+    const email = `sessao-${stamp}@lugubre.local`;
+
+    const registered = await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Sessao Teste', email, password: 'adm123' })
+      .expect(201);
+
+    const firstLogin = await request(app)
+      .post('/api/auth/login')
+      .send({ email: `  ${email.toUpperCase()}  `, password: 'adm123' })
+      .expect(200);
+
+    const secondLogin = await request(app)
+      .post('/api/auth/login')
+      .send({ email, password: 'adm123' })
+      .expect(200);
+
+    expect(firstLogin.body.user.id).toBe(registered.body.user.id);
+    expect(secondLogin.body.user.id).toBe(registered.body.user.id);
+    expect(firstLogin.body.token).toBeTruthy();
+    expect(secondLogin.body.token).toBeTruthy();
+
+    await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${firstLogin.body.token}`)
+      .expect(200);
+
+    await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${secondLogin.body.token}`)
+      .expect(200);
+
+    await request(app)
+      .put('/api/users/password')
+      .set('Authorization', `Bearer ${secondLogin.body.token}`)
+      .send({ currentPassword: 'senha-errada', newPassword: 'nova123' })
+      .expect(401);
+
+    const sessionAfterError = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${secondLogin.body.token}`)
+      .expect(200);
+
+    expect(sessionAfterError.body.user.email).toBe(email);
+  });
+
   it('cobre auth, admin, ficha, bônus, inventário, campanha e mensagens', async () => {
     const adminToken = await loginAdmin();
     const stamp = Date.now();

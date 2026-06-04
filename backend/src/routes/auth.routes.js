@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { tryQuery } from '../db/pool.js';
-import { createLocalUser, findLocalUserByEmail, findLocalUserById } from '../db/localStore.js';
+import { createLocalUser, findLocalUserByEmail } from '../db/localStore.js';
 import { requireAuth, signToken } from '../middleware/auth.js';
 
 const router = Router();
@@ -60,10 +60,7 @@ router.post('/login', async (req, res) => {
 });
 
 router.get('/me', requireAuth, async (req, res) => {
-  const result = await tryQuery('select id, name, email, role, profile_image_url, theme, created_at, updated_at from users where id = $1', [req.user.id]);
-  const user = result?.rows?.[0] || await findLocalUserById(req.user.id);
-  if (!user) return res.status(404).json({ message: 'Usuario nao encontrado.' });
-  res.json({ user });
+  res.json({ user: req.user });
 });
 
 export default router;

@@ -323,6 +323,36 @@ export async function createLocalCampaign(masterId, campaign) {
   return row;
 }
 
+export async function updateLocalCampaign(campaignId, userId, role, campaign) {
+  const data = await ensureStore();
+  const index = data.campaigns.findIndex((row) => row.id === campaignId);
+  if (index === -1) return null;
+  if (data.campaigns[index].master_id !== userId && role !== 'admin') {
+    const error = new Error('Apenas o mestre pode editar a campanha.');
+    error.status = 403;
+    throw error;
+  }
+  data.campaigns[index] = { ...data.campaigns[index], ...campaign };
+  await writeStore(data);
+  return data.campaigns[index];
+}
+
+export async function deleteLocalCampaign(campaignId, userId, role) {
+  const data = await ensureStore();
+  const campaign = data.campaigns.find((row) => row.id === campaignId);
+  if (!campaign) return null;
+  if (campaign.master_id !== userId && role !== 'admin') {
+    const error = new Error('Apenas o mestre pode excluir a campanha.');
+    error.status = 403;
+    throw error;
+  }
+  data.campaigns = data.campaigns.filter((row) => row.id !== campaignId);
+  data.campaign_members = data.campaign_members.filter((row) => row.campaign_id !== campaignId);
+  data.messages = data.messages.filter((row) => row.campaign_id !== campaignId);
+  await writeStore(data);
+  return true;
+}
+
 export async function joinLocalCampaign(inviteCode, userId, characterId = null) {
   const data = await ensureStore();
   const campaign = data.campaigns.find((row) => row.invite_code === inviteCode.toUpperCase());

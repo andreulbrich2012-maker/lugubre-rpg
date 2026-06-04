@@ -38,7 +38,7 @@ router.put('/profile', async (req, res) => {
 
     const result = await tryQuery(
       `update users set name = coalesce($1, name), email = coalesce($2, email),
-       profile_image_url = coalesce($3, profile_image_url), updated_at = now()
+       profile_image_url = case when $3::text is null then profile_image_url else $3 end, updated_at = now()
        where id = $4 returning ${publicColumns}`,
       [body.name, body.email?.toLowerCase(), body.profileImageUrl ?? null, req.user.id]
     );
@@ -104,6 +104,17 @@ router.post('/profile-image', async (req, res) => {
   } catch {
     res.status(400).json({ message: 'Imagem invalida ou muito grande.' });
   }
+});
+
+router.delete('/profile-image', async (req, res) => {
+  const result = await tryQuery(
+    `update users set profile_image_url = '', updated_at = now()
+     where id = $1 returning ${publicColumns}`,
+    [req.user.id]
+  );
+  const user = result?.rows?.[0] || await updateLocalUserProfile(req.user.id, { profileImageUrl: '' });
+  if (!user) return res.status(404).json({ message: 'Usuario nao encontrado.' });
+  res.json({ user: publicUser(user), message: 'Foto removida com sucesso.' });
 });
 
 export default router;

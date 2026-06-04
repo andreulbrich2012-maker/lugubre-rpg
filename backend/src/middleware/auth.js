@@ -1,30 +1,54 @@
 import jwt from 'jsonwebtoken';
+import { tryQuery } from '../db/pool.js';
+import { findLocalUserById } from '../db/localStore.js';
 
 export function signToken(user) {
   return jwt.sign(
-    { id: user.id, role: user.role, email: user.email, name: user.name },
+    { id: user.id, email: user.email },
     process.env.JWT_SECRET || 'dev-secret',
     { expiresIn: '7d' }
   );
 }
 
-export function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
   const header = req.headers.authorization;
   const token = header?.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return res.status(401).json({ message: 'Token ausente.' });
 
   try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
+    const payload = jwt.verify(token, process.env.JWT_SECRET || 'dev-secret');
+    if (!payload?.id || !payload?.email) {
+      return res.status(401).json({ message: 'Sessao invalida. Faca login novamente.' });
+    }
+
+    const result = await tryQuery(
+      'select id, name, email, role, profile_image_url, theme, created_at, updated_at from users where id = $1',
+      [payload.id]
+    );
+    const user = result?.rows?.[0] || await findLocalUserById(payload.id);
+    if (!user) {
+      return res.status(401).json({ message: 'Nao foi possivel encontrar sua conta. Entre novamente.' });
+    }
+
+    req.user = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      profile_image_url: user.profile_image_url || '',
+      theme: user.theme || 'lugubre'
+    };
     return next();
-  } catch {
-    return res.status(401).json({ message: 'Token inválido.' });
+  } catch (error) {
+    const expired = error?.name === 'TokenExpiredError';
+    return res.status(401).json({ message: expired ? 'Sua sessao expirou. Faca login novamente.' : 'Token invalido.' });
   }
 }
 
 export function requireRole(...roles) {
   return (req, res, next) => {
     if (!roles.includes(req.user?.role)) {
-      return res.status(403).json({ message: 'Permissão insuficiente.' });
+      return res.status(403).json({ message: 'Permissao insuficiente.' });
     }
     return next();
   };

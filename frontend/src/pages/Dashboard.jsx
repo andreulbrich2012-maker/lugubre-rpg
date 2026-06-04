@@ -431,6 +431,23 @@ function SettingsTab() {
     }
   }
 
+  async function removeProfileImage() {
+    if (!window.confirm('Remover foto de perfil?')) return;
+    setProfileLoading(true);
+    setProfileMessage(null);
+    try {
+      const { data } = await api.delete('/users/profile-image');
+      setUser(data.user);
+      setPreview('');
+      setProfileMessage({ type: 'success', text: data.message || 'Foto removida com sucesso.' });
+    } catch (err) {
+      setProfileMessage({ type: 'error', text: err?.response?.data?.message || 'Nao foi possivel remover a foto.' });
+    } finally {
+      setProfileLoading(false);
+    }
+  }
+
+
   async function changePassword(event) {
     event.preventDefault();
     setPasswordMessage(null);
@@ -473,7 +490,7 @@ function SettingsTab() {
               <input className="hidden" type="file" accept="image/*" onChange={(event) => readImage(event.target.files?.[0])} />
             </label>
             {preview && (
-              <button type="button" className="mt-3 inline-flex items-center gap-2 text-sm text-mist hover:text-white" onClick={() => window.confirm('Remover foto de perfil?') && setPreview('')}>
+              <button type="button" className="mt-3 inline-flex items-center gap-2 text-sm text-mist hover:text-white" onClick={removeProfileImage}>
                 <X size={15} />
                 Remover foto
               </button>

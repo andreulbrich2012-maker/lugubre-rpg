@@ -5,9 +5,11 @@ import { query, tryQuery } from '../db/pool.js';
 import {
   createLocalCampaign,
   createLocalMessage,
+  deleteLocalCampaign,
   getLocalCampaignRoom,
   joinLocalCampaign,
-  listLocalCampaigns
+  listLocalCampaigns,
+  updateLocalCampaign
 } from '../db/localStore.js';
 import { requireAuth } from '../middleware/auth.js';
 
@@ -39,6 +41,40 @@ router.post('/', async (req, res) => {
     return res.status(201).json(result.rows[0]);
   }
   res.status(201).json(await createLocalCampaign(req.user.id, { ...body, invite_code: inviteCode }));
+});
+
+router.put('/:id', async (req, res) => {
+  try {
+    const body = z.object({ name: z.string().min(2), description: z.string().optional().default('') }).parse(req.body);
+    const result = await tryQuery(
+      `update campaigns set name = $1, description = $2
+       where id = $3 and (master_id = $4 or $5 = 'admin')
+       returning *`,
+      [body.name, body.description, req.params.id, req.user.id, req.user.role]
+    );
+    const campaign = result?.rows?.[0] || await updateLocalCampaign(req.params.id, req.user.id, req.user.role, body);
+    if (!campaign) return res.status(404).json({ message: 'Campanha nao encontrada.' });
+    res.json(campaign);
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message || 'Nao foi possivel editar a campanha.' });
+  }
+});
+
+router.delete('/:id', async (req, res) => {
+  try {
+    const result = await tryQuery(
+      `delete from campaigns
+       where id = $1 and (master_id = $2 or $3 = 'admin')`,
+      [req.params.id, req.user.id, req.user.role]
+    );
+    if (!result) {
+      const deleted = await deleteLocalCampaign(req.params.id, req.user.id, req.user.role);
+      if (!deleted) return res.status(404).json({ message: 'Campanha nao encontrada.' });
+    }
+    res.status(204).end();
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message || 'Nao foi possivel excluir a campanha.' });
+  }
 });
 
 router.post('/join', async (req, res) => {

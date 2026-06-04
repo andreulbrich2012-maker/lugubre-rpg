@@ -11,3 +11,20 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401) {
+      localStorage.removeItem('lugubre-token');
+      localStorage.removeItem('lugubre-user');
+      if (window.location.pathname !== '/login') {
+        window.dispatchEvent(new CustomEvent('lugubre:auth-error', {
+          detail: error.response.data?.message || 'Sua sessao expirou. Faca login novamente.'
+        }));
+        window.location.assign('/login');
+      }
+    }
+    return Promise.reject(error);
+  }
+);

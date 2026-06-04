@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app.js';
+import { signToken } from './middleware/auth.js';
 
 const app = createApp();
 
@@ -29,6 +30,12 @@ describe('fluxo principal da API', () => {
 
     expect(demo.body.user.role).toBe('player');
     expect(demo.body.token).toBeTruthy();
+
+    const ghostToken = signToken({ id: crypto.randomUUID(), email: 'fantasma@lugubre.local' });
+    await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${ghostToken}`)
+      .expect(401);
   });
 
   it('cobre auth, admin, ficha, bônus, inventário, campanha e mensagens', async () => {
@@ -92,6 +99,13 @@ describe('fluxo principal da API', () => {
     expect(profile.body.user.name).toBe('Jogador Editado');
     expect(profile.body.user.profile_image_url).toBe(profileImage);
 
+    const me = await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(me.body.user.id).toBe(user.body.user.id);
+
     const theme = await request(app)
       .put('/api/users/theme')
       .set('Authorization', `Bearer ${token}`)
@@ -99,6 +113,13 @@ describe('fluxo principal da API', () => {
       .expect(200);
 
     expect(theme.body.user.theme).toBe('daltonismo');
+
+    const removedImage = await request(app)
+      .delete('/api/users/profile-image')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(removedImage.body.user.profile_image_url).toBe('');
 
     await request(app)
       .put('/api/users/password')
@@ -157,6 +178,14 @@ describe('fluxo principal da API', () => {
 
     expect(message.body.content).toBe('Mensagem de teste');
 
+    const editedCampaign = await request(app)
+      .put(`/api/campaigns/${campaign.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: `Campanha Editada ${stamp}`, description: 'Editada' })
+      .expect(200);
+
+    expect(editedCampaign.body.name).toContain('Campanha Editada');
+
     const dashboard = await request(app)
       .get('/api/dashboard')
       .set('Authorization', `Bearer ${token}`)
@@ -191,6 +220,11 @@ describe('fluxo principal da API', () => {
 
     await request(app)
       .delete(`/api/characters/${character.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(204);
+
+    await request(app)
+      .delete(`/api/campaigns/${campaign.body.id}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(204);
 

@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router-dom';
+import { useEffect } from 'react';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home';
@@ -11,8 +12,16 @@ import CharacterSheet from './pages/CharacterSheet';
 import Campaigns from './pages/Campaigns';
 import CampaignRoom from './pages/CampaignRoom';
 import Admin from './pages/Admin';
+import { useAuth } from './store/authStore';
 
 export default function App() {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    const theme = user?.theme || localStorage.getItem('lugubre-theme') || 'lugubre';
+    document.documentElement.dataset.theme = theme;
+  }, [user?.theme]);
+
   return (
     <Layout>
       <Routes>

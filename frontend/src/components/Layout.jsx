@@ -6,7 +6,7 @@ import Button from './Button';
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#2a0d14_0,#07070a_42%)]">
+    <div className="min-h-screen" style={{ background: 'var(--bg-radial)' }}>
       <nav className="sticky top-0 z-20 border-b border-ember/10 bg-abyss/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <Link to="/" className="font-display text-2xl text-ember">Lúgubre RPG</Link>

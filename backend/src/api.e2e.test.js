@@ -71,6 +71,7 @@ describe('fluxo principal da API', () => {
       .expect(201);
 
     const token = user.body.token;
+    const profileImage = 'data:image/png;base64,iVBORw0KGgo=';
 
     await request(app)
       .post('/api/auth/login')
@@ -81,6 +82,40 @@ describe('fluxo principal da API', () => {
       .post('/api/auth/login')
       .send({ email: `jogador-${stamp}@lugubre.local`, password: 'senhaerrada' })
       .expect(401);
+
+    const profile = await request(app)
+      .put('/api/users/profile')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Jogador Editado', email: `jogador-editado-${stamp}@lugubre.local`, profileImageUrl: profileImage })
+      .expect(200);
+
+    expect(profile.body.user.name).toBe('Jogador Editado');
+    expect(profile.body.user.profile_image_url).toBe(profileImage);
+
+    const theme = await request(app)
+      .put('/api/users/theme')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ theme: 'daltonismo' })
+      .expect(200);
+
+    expect(theme.body.user.theme).toBe('daltonismo');
+
+    await request(app)
+      .put('/api/users/password')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ currentPassword: 'errada123', newPassword: 'nova123' })
+      .expect(401);
+
+    await request(app)
+      .put('/api/users/password')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ currentPassword: 'adm123', newPassword: 'nova123' })
+      .expect(200);
+
+    await request(app)
+      .post('/api/auth/login')
+      .send({ email: `jogador-editado-${stamp}@lugubre.local`, password: 'nova123' })
+      .expect(200);
 
     const character = await request(app)
       .post('/api/characters')

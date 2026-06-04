@@ -3,10 +3,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        abyss: '#07070a',
-        blood: '#8f1d2c',
-        ember: '#d6a65f',
-        mist: '#b8b0a1'
+        abyss: 'var(--color-abyss)',
+        blood: 'var(--color-blood)',
+        ember: 'var(--color-ember)',
+        mist: 'var(--color-mist)'
       },
       boxShadow: {
         glow: '0 0 40px rgba(143, 29, 44, .35)'

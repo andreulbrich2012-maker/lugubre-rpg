@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { tryQuery } from '../db/pool.js';
-import { createLocalUser, findLocalUserByEmail } from '../db/localStore.js';
+import { createLocalUser, findLocalUserByEmail, findLocalUserById } from '../db/localStore.js';
 import { requireAuth, signToken } from '../middleware/auth.js';
 
 const router = Router();
@@ -30,11 +30,11 @@ router.post('/register', async (req, res) => {
     const result = await tryQuery(
       `insert into users (name, email, password_hash, role)
        values ($1, $2, $3, $4)
-       returning id, name, email, role`,
+       returning id, name, email, role, profile_image_url, theme`,
       [body.name, body.email.toLowerCase(), passwordHash, role]
     );
     const user = result?.rows?.[0] || await createLocalUser({ ...body, role });
-    const publicUser = { id: user.id, name: user.name, email: user.email, role: user.role };
+    const publicUser = { id: user.id, name: user.name, email: user.email, role: user.role, profile_image_url: user.profile_image_url || '', theme: user.theme || 'lugubre' };
     res.status(201).json({ user: publicUser, token: signToken(publicUser) });
   } catch (error) {
     const status = error.status || (error.message?.toLowerCase().includes('duplicate') ? 409 : 400);
@@ -52,15 +52,18 @@ router.post('/login', async (req, res) => {
     if (!(await bcrypt.compare(body.password, user.password_hash))) {
       return res.status(401).json({ message: 'Senha incorreta.' });
     }
-    const publicUser = { id: user.id, name: user.name, email: user.email, role: user.role };
+    const publicUser = { id: user.id, name: user.name, email: user.email, role: user.role, profile_image_url: user.profile_image_url || '', theme: user.theme || 'lugubre' };
     res.json({ user: publicUser, token: signToken(publicUser) });
   } catch (error) {
     res.status(400).json({ message: authMessage(error, 'Email ou senha incorretos.') });
   }
 });
 
-router.get('/me', requireAuth, (req, res) => {
-  res.json({ user: req.user });
+router.get('/me', requireAuth, async (req, res) => {
+  const result = await tryQuery('select id, name, email, role, profile_image_url, theme, created_at, updated_at from users where id = $1', [req.user.id]);
+  const user = result?.rows?.[0] || await findLocalUserById(req.user.id);
+  if (!user) return res.status(404).json({ message: 'Usuario nao encontrado.' });
+  res.json({ user });
 });
 
 export default router;

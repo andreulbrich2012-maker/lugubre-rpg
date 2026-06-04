@@ -6,8 +6,15 @@ create table if not exists users (
   email text not null unique,
   password_hash text not null,
   role text not null default 'player' check (role in ('player', 'master', 'admin')),
-  created_at timestamptz not null default now()
+  profile_image_url text,
+  theme text not null default 'lugubre' check (theme in ('sombrio', 'lugubre', 'daltonismo')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
+
+alter table users add column if not exists profile_image_url text;
+alter table users add column if not exists theme text not null default 'lugubre';
+alter table users add column if not exists updated_at timestamptz not null default now();
 
 create table if not exists races (
   id uuid primary key default uuid_generate_v4(),

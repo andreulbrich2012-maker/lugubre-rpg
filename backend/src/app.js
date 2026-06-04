@@ -7,6 +7,7 @@ import campaignRoutes from './routes/campaign.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import friendRoutes from './routes/friend.routes.js';
+import userRoutes from './routes/user.routes.js';
 
 export function createApp() {
   const app = express();
@@ -20,6 +21,7 @@ export function createApp() {
   app.use('/api/characters', characterRoutes);
   app.use('/api/campaigns', campaignRoutes);
   app.use('/api/friends', friendRoutes);
+  app.use('/api/users', userRoutes);
   app.use('/api/admin', adminRoutes);
 
   app.use((err, req, res, next) => {

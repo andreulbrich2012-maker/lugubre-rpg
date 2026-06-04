@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, MessageCircle, ScrollText, Shield, Swords, Trash2, Users } from 'lucide-react';
+import { Camera, Eye, EyeOff, LayoutDashboard, MessageCircle, Palette, ScrollText, Settings, Shield, Swords, Trash2, Users, X } from 'lucide-react';
 import Alert from '../components/Alert';
+import Avatar from '../components/Avatar';
 import Button from '../components/Button';
 import LoadingButton from '../components/LoadingButton';
+import UserMenu from '../components/UserMenu';
 import { api } from '../lib/api';
 import { useAuth } from '../store/authStore';
 
@@ -11,11 +13,13 @@ const tabs = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'characters', label: 'Personagens', icon: ScrollText },
   { id: 'campaigns', label: 'Campanhas', icon: Swords },
-  { id: 'friends', label: 'Amigos', icon: Users }
+  { id: 'friends', label: 'Amigos', icon: Users },
+  { id: 'settings', label: 'Configuracoes', icon: Settings },
+  { id: 'personalization', label: 'Personalizacao', icon: Palette }
 ];
 
 export default function Dashboard() {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshMe } = useAuth();
   const navigate = useNavigate();
   const [active, setActive] = useState('dashboard');
   const [summary, setSummary] = useState(null);
@@ -46,15 +50,21 @@ export default function Dashboard() {
     navigate('/login');
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+    refreshMe().catch(() => null);
+  }, []);
 
   return (
     <main className="mx-auto grid max-w-7xl gap-6 px-4 py-8 lg:grid-cols-[260px_1fr]">
       <aside className="gothic-panel rounded-md p-4 lg:sticky lg:top-24 lg:h-[calc(100vh-140px)]">
-        <div className="border-b border-ember/10 pb-4">
-          <p className="text-xs uppercase tracking-[0.28em] text-ember/70">Conta</p>
-          <h1 className="mt-2 font-display text-3xl text-ember">{user?.name}</h1>
-          <p className="text-sm text-mist">{user?.email}</p>
+        <div className="flex items-center gap-3 border-b border-ember/10 pb-4">
+          <Avatar user={user} size="md" />
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-[0.28em] text-ember/70">Conta</p>
+            <h1 className="truncate font-display text-2xl text-ember">{user?.name}</h1>
+            <p className="truncate text-xs text-mist">{user?.email}</p>
+          </div>
         </div>
         <nav className="mt-4 space-y-2">
           {tabs.map((tab) => {
@@ -71,10 +81,10 @@ export default function Dashboard() {
             );
           })}
         </nav>
-        <Button variant="ghost" className="mt-6 w-full" onClick={signOut}>Sair</Button>
       </aside>
 
       <section className="min-h-[640px]">
+        <DashboardTopbar user={user} onSettings={() => setActive('settings')} onLogout={signOut} />
         {loading ? (
           <div className="gothic-panel grid min-h-80 place-items-center rounded-md">
             <span className="h-8 w-8 animate-spin rounded-full border-2 border-ember/30 border-t-ember" />
@@ -85,10 +95,24 @@ export default function Dashboard() {
             {active === 'characters' && <CharactersTab characters={characters} onRemove={removeCharacter} />}
             {active === 'campaigns' && <CampaignsTab campaigns={campaigns} onReload={load} />}
             {active === 'friends' && <FriendsTab />}
+            {active === 'settings' && <SettingsTab />}
+            {active === 'personalization' && <PersonalizationTab />}
           </>
         )}
       </section>
     </main>
+  );
+}
+
+function DashboardTopbar({ user, onSettings, onLogout }) {
+  return (
+    <div className="mb-5 flex items-center justify-between gap-4">
+      <div>
+        <p className="text-xs uppercase tracking-[0.28em] text-ember/70">Painel</p>
+        <h2 className="font-display text-3xl text-white">Conta e grimorio</h2>
+      </div>
+      <UserMenu user={user} onSettings={onSettings} onLogout={onLogout} />
+    </div>
   );
 }
 
@@ -345,6 +369,200 @@ function FriendsTab() {
         </section>
       </div>
     </div>
+  );
+}
+
+function SettingsTab() {
+  const { user, updateProfile, setUser } = useAuth();
+  const [profile, setProfile] = useState({ name: user?.name || '', email: user?.email || '' });
+  const [preview, setPreview] = useState(user?.profile_image_url || '');
+  const [profileMessage, setProfileMessage] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState(null);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+
+  function readImage(file) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setProfileMessage({ type: 'error', text: 'Envie um arquivo de imagem.' });
+      return;
+    }
+    if (file.size > 900_000) {
+      setProfileMessage({ type: 'error', text: 'Use uma imagem menor que 900 KB.' });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setPreview(String(reader.result));
+    reader.readAsDataURL(file);
+  }
+
+  async function saveProfile(event) {
+    event.preventDefault();
+    setProfileMessage(null);
+    if (!profile.name.trim() || !profile.email.trim()) {
+      setProfileMessage({ type: 'error', text: 'Nome e email sao obrigatorios.' });
+      return;
+    }
+    setProfileLoading(true);
+    try {
+      const updated = await updateProfile({ name: profile.name, email: profile.email, profileImageUrl: preview });
+      setPreview(updated.profile_image_url || '');
+      setProfileMessage({ type: 'success', text: 'Perfil salvo com sucesso.' });
+    } catch (err) {
+      setProfileMessage({ type: 'error', text: err?.response?.data?.message || 'Nao foi possivel salvar o perfil.' });
+    } finally {
+      setProfileLoading(false);
+    }
+  }
+
+  async function uploadProfileImage() {
+    setProfileLoading(true);
+    setProfileMessage(null);
+    try {
+      const { data } = await api.post('/users/profile-image', { image: preview });
+      setUser(data.user);
+      setProfileMessage({ type: 'success', text: 'Foto de perfil salva.' });
+    } catch (err) {
+      setProfileMessage({ type: 'error', text: err?.response?.data?.message || 'Nao foi possivel salvar a foto.' });
+    } finally {
+      setProfileLoading(false);
+    }
+  }
+
+  async function changePassword(event) {
+    event.preventDefault();
+    setPasswordMessage(null);
+    if (!passwords.currentPassword || !passwords.newPassword || !passwords.confirmPassword) {
+      setPasswordMessage({ type: 'error', text: 'Preencha todos os campos de senha.' });
+      return;
+    }
+    if (passwords.newPassword.length < 6) {
+      setPasswordMessage({ type: 'error', text: 'A nova senha deve ter pelo menos 6 caracteres.' });
+      return;
+    }
+    if (passwords.newPassword !== passwords.confirmPassword) {
+      setPasswordMessage({ type: 'error', text: 'Nova senha e confirmacao precisam ser iguais.' });
+      return;
+    }
+    setPasswordLoading(true);
+    try {
+      const { data } = await api.put('/users/password', { currentPassword: passwords.currentPassword, newPassword: passwords.newPassword });
+      setPasswords({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setPasswordMessage({ type: 'success', text: data.message || 'Senha alterada com sucesso.' });
+    } catch (err) {
+      setPasswordMessage({ type: 'error', text: err?.response?.data?.message || 'Erro ao alterar senha.' });
+    } finally {
+      setPasswordLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <section className="gothic-panel rounded-md p-6">
+        <Header title="Configuracoes" />
+        <form onSubmit={saveProfile} className="mt-5 grid gap-6 lg:grid-cols-[220px_1fr]">
+          <div className="rounded-md border border-ember/15 bg-black/25 p-4 text-center">
+            <div className="mx-auto w-fit">
+              <Avatar user={{ ...user, profile_image_url: preview }} size="lg" />
+            </div>
+            <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-md border border-ember/30 px-3 py-2 text-sm text-ember hover:bg-ember/10">
+              <Camera size={16} />
+              Trocar foto
+              <input className="hidden" type="file" accept="image/*" onChange={(event) => readImage(event.target.files?.[0])} />
+            </label>
+            {preview && (
+              <button type="button" className="mt-3 inline-flex items-center gap-2 text-sm text-mist hover:text-white" onClick={() => window.confirm('Remover foto de perfil?') && setPreview('')}>
+                <X size={15} />
+                Remover foto
+              </button>
+            )}
+            {preview !== (user?.profile_image_url || '') && (
+              <Button type="button" variant="ghost" className="mt-3 w-full" onClick={uploadProfileImage}>Salvar so a foto</Button>
+            )}
+          </div>
+          <div className="space-y-4">
+            <DashboardField label="Nome do usuario" value={profile.name} onChange={(name) => setProfile({ ...profile, name })} />
+            <DashboardField label="Email do usuario" type="email" value={profile.email} onChange={(email) => setProfile({ ...profile, email })} />
+            {profileMessage && <Alert type={profileMessage.type}>{profileMessage.text}</Alert>}
+            <LoadingButton loading={profileLoading} loadingText="Salvando...">Salvar perfil</LoadingButton>
+          </div>
+        </form>
+      </section>
+
+      <section className="gothic-panel rounded-md p-6">
+        <Header title="Trocar senha" />
+        <form onSubmit={changePassword} className="mt-5 max-w-xl space-y-4">
+          <DashboardField label="Senha atual" type={showPassword ? 'text' : 'password'} value={passwords.currentPassword} onChange={(currentPassword) => setPasswords({ ...passwords, currentPassword })} />
+          <DashboardField label="Nova senha" type={showPassword ? 'text' : 'password'} value={passwords.newPassword} onChange={(newPassword) => setPasswords({ ...passwords, newPassword })} />
+          <DashboardField label="Confirmar nova senha" type={showPassword ? 'text' : 'password'} value={passwords.confirmPassword} onChange={(confirmPassword) => setPasswords({ ...passwords, confirmPassword })} />
+          <button type="button" className="inline-flex items-center gap-2 text-sm text-ember hover:text-white" onClick={() => setShowPassword((value) => !value)}>
+            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            {showPassword ? 'Esconder senha' : 'Mostrar senha'}
+          </button>
+          {passwordMessage && <Alert type={passwordMessage.type}>{passwordMessage.text}</Alert>}
+          <LoadingButton loading={passwordLoading} loadingText="Alterando...">Alterar senha</LoadingButton>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+const themeOptions = [
+  { id: 'sombrio', name: 'Tema Sombrio', text: 'Preto, cinza escuro e roxo fechado.', swatches: ['#050509', '#171523', '#5c3b8f'] },
+  { id: 'lugubre', name: 'Tema Lugubre', text: 'Vermelho escuro, roxo, preto e branco suave.', swatches: ['#07070a', '#8f1d2c', '#d6a65f'] },
+  { id: 'daltonismo', name: 'Tema Daltonismo', text: 'Alto contraste com azul, amarelo e branco.', swatches: ['#061826', '#1f9bd1', '#ffd166'] }
+];
+
+function PersonalizationTab() {
+  const { user, updateTheme } = useAuth();
+  const [message, setMessage] = useState(null);
+  const [loadingTheme, setLoadingTheme] = useState('');
+
+  async function chooseTheme(theme) {
+    setLoadingTheme(theme);
+    setMessage(null);
+    try {
+      await updateTheme(theme);
+      document.documentElement.dataset.theme = theme;
+      setMessage({ type: 'success', text: 'Tema alterado com sucesso.' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err?.response?.data?.message || 'Nao foi possivel alterar o tema.' });
+    } finally {
+      setLoadingTheme('');
+    }
+  }
+
+  return (
+    <section className="gothic-panel rounded-md p-6">
+      <Header title="Personalizacao" />
+      <p className="mt-2 text-sm text-mist">Escolha um tema visual. A mudanca aparece na hora e fica salva na sua conta.</p>
+      <div className="mt-6 grid gap-4 md:grid-cols-3">
+        {themeOptions.map((theme) => (
+          <article key={theme.id} className={`rounded-md border p-4 soft-motion ${user?.theme === theme.id ? 'border-ember/70 bg-ember/10' : 'border-ember/15 bg-black/25'}`}>
+            <div className="flex gap-2">
+              {theme.swatches.map((color) => <span key={color} className="h-8 w-8 rounded-full border border-white/15" style={{ backgroundColor: color }} />)}
+            </div>
+            <h3 className="mt-4 font-display text-2xl text-white">{theme.name}</h3>
+            <p className="mt-2 text-sm text-mist">{theme.text}</p>
+            <LoadingButton loading={loadingTheme === theme.id} loadingText="Aplicando..." className="mt-4 w-full" variant={user?.theme === theme.id ? 'ghost' : 'primary'} onClick={() => chooseTheme(theme.id)}>
+              {user?.theme === theme.id ? 'Tema atual' : 'Usar tema'}
+            </LoadingButton>
+          </article>
+        ))}
+      </div>
+      {message && <div className="mt-5"><Alert type={message.type}>{message.text}</Alert></div>}
+    </section>
+  );
+}
+
+function DashboardField({ label, value, onChange, type = 'text' }) {
+  return (
+    <label className="block text-sm text-mist">
+      {label}
+      <input className="mt-1 w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2 outline-none transition-colors focus:border-ember" type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+    </label>
   );
 }
 

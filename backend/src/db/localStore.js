@@ -6,6 +6,20 @@ const dataDir = process.env.VERCEL ? '/tmp/lugubre-data' : path.resolve('data');
 const dataFile = path.join(dataDir, 'local-db.json');
 const seedVersion = '2026-06-auth-seeds-v1';
 
+function publicUser(user) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    profile_image_url: user.profile_image_url || '',
+    theme: user.theme || 'lugubre',
+    created_at: user.created_at,
+    updated_at: user.updated_at
+  };
+}
+
 const defaultSkills = [
   { id: 'skill-luta', key: 'luta', name: 'Luta', attribute: 'forca' },
   { id: 'skill-pontaria', key: 'pontaria', name: 'Pontaria', attribute: 'agilidade' },
@@ -69,6 +83,8 @@ async function createSeedUser(seed) {
     email: seed.email,
     password_hash: await bcrypt.hash(seed.password, 10),
     role: seed.role,
+    profile_image_url: '',
+    theme: 'lugubre',
     created_at: new Date().toISOString()
   };
 }
@@ -82,7 +98,9 @@ async function ensureSeedUsers(data) {
         ...data.users[index],
         name: seed.name,
         email: seed.email,
-        role: seed.role
+        role: seed.role,
+        profile_image_url: data.users[index].profile_image_url || '',
+        theme: data.users[index].theme || 'lugubre'
       };
       if (shouldRefreshSeeds) {
         data.users[index].password_hash = await bcrypt.hash(seed.password, 10);
@@ -128,6 +146,11 @@ export async function findLocalUserByEmail(email) {
   return data.users.find((user) => user.email === email.toLowerCase());
 }
 
+export async function findLocalUserById(id) {
+  const data = await ensureStore();
+  return publicUser(data.users.find((user) => user.id === id));
+}
+
 export async function createLocalUser({ name, email, password, role = 'player' }) {
   const data = await ensureStore();
   if (data.users.some((user) => user.email === email.toLowerCase())) {
@@ -135,10 +158,58 @@ export async function createLocalUser({ name, email, password, role = 'player' }
     error.status = 409;
     throw error;
   }
-  const user = { id: crypto.randomUUID(), name, email: email.toLowerCase(), password_hash: await bcrypt.hash(password, 10), role, created_at: new Date().toISOString() };
+  const user = { id: crypto.randomUUID(), name, email: email.toLowerCase(), password_hash: await bcrypt.hash(password, 10), role, profile_image_url: '', theme: 'lugubre', created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
   data.users.push(user);
   await writeStore(data);
   return user;
+}
+
+export async function updateLocalUserProfile(id, { name, email, profileImageUrl }) {
+  const data = await ensureStore();
+  const index = data.users.findIndex((user) => user.id === id);
+  if (index === -1) return null;
+  if (email && data.users.some((user) => user.id !== id && user.email === email.toLowerCase())) {
+    const error = new Error('Este email ja esta cadastrado.');
+    error.status = 409;
+    throw error;
+  }
+  data.users[index] = {
+    ...data.users[index],
+    name: name ?? data.users[index].name,
+    email: email?.toLowerCase() ?? data.users[index].email,
+    profile_image_url: profileImageUrl ?? data.users[index].profile_image_url ?? '',
+    updated_at: new Date().toISOString()
+  };
+  await writeStore(data);
+  return publicUser(data.users[index]);
+}
+
+export async function updateLocalUserTheme(id, theme) {
+  const data = await ensureStore();
+  const index = data.users.findIndex((user) => user.id === id);
+  if (index === -1) return null;
+  data.users[index] = { ...data.users[index], theme, updated_at: new Date().toISOString() };
+  await writeStore(data);
+  return publicUser(data.users[index]);
+}
+
+export async function updateLocalUserPassword(id, currentPassword, newPassword) {
+  const data = await ensureStore();
+  const index = data.users.findIndex((user) => user.id === id);
+  if (index === -1) return null;
+  const ok = await bcrypt.compare(currentPassword, data.users[index].password_hash);
+  if (!ok) {
+    const error = new Error('Senha atual incorreta.');
+    error.status = 401;
+    throw error;
+  }
+  data.users[index] = {
+    ...data.users[index],
+    password_hash: await bcrypt.hash(newPassword, 10),
+    updated_at: new Date().toISOString()
+  };
+  await writeStore(data);
+  return publicUser(data.users[index]);
 }
 
 export async function getLocalCatalog(type) {

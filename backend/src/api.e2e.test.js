@@ -71,6 +71,17 @@ describe('fluxo principal da API', () => {
       .expect(201);
 
     const token = user.body.token;
+
+    await request(app)
+      .post('/api/auth/login')
+      .send({ email: `nao-existe-${stamp}@lugubre.local`, password: 'adm123' })
+      .expect(404);
+
+    await request(app)
+      .post('/api/auth/login')
+      .send({ email: `jogador-${stamp}@lugubre.local`, password: 'senhaerrada' })
+      .expect(401);
+
     const character = await request(app)
       .post('/api/characters')
       .set('Authorization', `Bearer ${token}`)
@@ -110,6 +121,38 @@ describe('fluxo principal da API', () => {
       .expect(201);
 
     expect(message.body.content).toBe('Mensagem de teste');
+
+    const dashboard = await request(app)
+      .get('/api/dashboard')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(dashboard.body.characters_count).toBeGreaterThanOrEqual(1);
+    expect(dashboard.body.campaigns_count).toBeGreaterThanOrEqual(1);
+
+    const friend = await request(app)
+      .post('/api/friends/add')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ email: 'demo@lugubre.local' })
+      .expect(201);
+
+    await request(app)
+      .get('/api/friends')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const friendMessage = await request(app)
+      .post('/api/friends/messages')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ friendId: friend.body.friend.id, message: 'Ola, demo.' })
+      .expect(201);
+
+    expect(friendMessage.body.message).toBe('Ola, demo.');
+
+    await request(app)
+      .get(`/api/friends/messages/${friend.body.friend.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
 
     await request(app)
       .delete(`/api/characters/${character.body.id}`)

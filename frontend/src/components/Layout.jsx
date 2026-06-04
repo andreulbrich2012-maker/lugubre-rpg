@@ -11,6 +11,7 @@ export default function Layout({ children }) {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <Link to="/" className="font-display text-2xl text-ember">Lúgubre RPG</Link>
           <div className="flex items-center gap-3 text-sm">
+            {user && <NavLink to="/dashboard" className="text-mist hover:text-white">Dashboard</NavLink>}
             <NavLink to="/characters" className="text-mist hover:text-white">Personagens</NavLink>
             <NavLink to="/campaigns" className="text-mist hover:text-white">Campanhas</NavLink>
             {user?.role === 'admin' && <NavLink to="/admin" className="text-mist hover:text-white">Admin</NavLink>}

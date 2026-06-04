@@ -5,6 +5,8 @@ import catalogRoutes from './routes/catalog.routes.js';
 import characterRoutes from './routes/character.routes.js';
 import campaignRoutes from './routes/campaign.routes.js';
 import adminRoutes from './routes/admin.routes.js';
+import dashboardRoutes from './routes/dashboard.routes.js';
+import friendRoutes from './routes/friend.routes.js';
 
 export function createApp() {
   const app = express();
@@ -14,8 +16,10 @@ export function createApp() {
   app.get('/health', (_, res) => res.json({ ok: true, name: 'Lúgubre RPG API' }));
   app.use('/api/auth', authRoutes);
   app.use('/api/catalog', catalogRoutes);
+  app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/characters', characterRoutes);
   app.use('/api/campaigns', campaignRoutes);
+  app.use('/api/friends', friendRoutes);
   app.use('/api/admin', adminRoutes);
 
   app.use((err, req, res, next) => {

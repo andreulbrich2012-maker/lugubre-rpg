@@ -22,6 +22,8 @@ const defaultData = {
   campaigns: [],
   campaign_members: [],
   messages: [],
+  friends: [],
+  friend_messages: [],
   skills: defaultSkills,
   origins: [
     { id: 'origin-initiated', name: 'Iniciado do Véu', description: 'Conhece rumores, símbolos e presságios.', skill_modifiers: { arcana: 1, religiao: 1 } },
@@ -129,7 +131,7 @@ export async function findLocalUserByEmail(email) {
 export async function createLocalUser({ name, email, password, role = 'player' }) {
   const data = await ensureStore();
   if (data.users.some((user) => user.email === email.toLowerCase())) {
-    const error = new Error('Email já cadastrado.');
+    const error = new Error('Este email ja esta cadastrado.');
     error.status = 409;
     throw error;
   }
@@ -287,4 +289,95 @@ export async function createLocalMessage(campaignId, userId, content) {
   data.messages.push(row);
   await writeStore(data);
   return { ...row, user_name: data.users.find((user) => user.id === userId)?.name || 'Jogador' };
+}
+
+export async function getLocalDashboard(userId) {
+  const data = await ensureStore();
+  const characters = data.characters.filter((character) => character.owner_id === userId);
+  const campaigns = data.campaign_members
+    .filter((member) => member.user_id === userId)
+    .map((member) => data.campaigns.find((campaign) => campaign.id === member.campaign_id))
+    .filter(Boolean);
+  return {
+    characters_count: characters.length,
+    campaigns_count: campaigns.length,
+    recent_characters: characters.slice(-3).reverse(),
+    recent_campaigns: campaigns.slice(-3).reverse()
+  };
+}
+
+export async function searchLocalUsers(term, userId) {
+  const data = await ensureStore();
+  const normalized = term.toLowerCase();
+  return data.users
+    .filter((user) => user.id !== userId)
+    .filter((user) => user.name.toLowerCase().includes(normalized) || user.email.toLowerCase().includes(normalized))
+    .slice(0, 12)
+    .map((user) => ({ id: user.id, name: user.name, email: user.email, role: user.role }));
+}
+
+export async function listLocalFriends(userId) {
+  const data = await ensureStore();
+  return data.friends
+    .filter((friendship) => friendship.user_id === userId || friendship.friend_id === userId)
+    .map((friendship) => {
+      const friendId = friendship.user_id === userId ? friendship.friend_id : friendship.user_id;
+      const friend = data.users.find((user) => user.id === friendId);
+      return friend ? { ...friendship, friend: { id: friend.id, name: friend.name, email: friend.email, role: friend.role } } : null;
+    })
+    .filter(Boolean);
+}
+
+export async function addLocalFriend(userId, friendEmail) {
+  const data = await ensureStore();
+  const friend = data.users.find((user) => user.email === friendEmail.toLowerCase());
+  if (!friend || friend.id === userId) return null;
+  const existing = data.friends.find((row) => (
+    (row.user_id === userId && row.friend_id === friend.id) ||
+    (row.user_id === friend.id && row.friend_id === userId)
+  ));
+  if (existing) {
+    existing.status = 'accepted';
+    await writeStore(data);
+    return { ...existing, friend: { id: friend.id, name: friend.name, email: friend.email, role: friend.role } };
+  }
+  const row = {
+    id: crypto.randomUUID(),
+    user_id: userId,
+    friend_id: friend.id,
+    status: 'accepted',
+    created_at: new Date().toISOString()
+  };
+  data.friends.push(row);
+  await writeStore(data);
+  return { ...row, friend: { id: friend.id, name: friend.name, email: friend.email, role: friend.role } };
+}
+
+export async function listLocalFriendMessages(userId, friendId) {
+  const data = await ensureStore();
+  return data.friend_messages
+    .filter((message) => (
+      (message.sender_id === userId && message.receiver_id === friendId) ||
+      (message.sender_id === friendId && message.receiver_id === userId)
+    ))
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+}
+
+export async function createLocalFriendMessage(userId, friendId, message) {
+  const data = await ensureStore();
+  const areFriends = data.friends.some((row) => (
+    row.status === 'accepted' &&
+    ((row.user_id === userId && row.friend_id === friendId) || (row.user_id === friendId && row.friend_id === userId))
+  ));
+  if (!areFriends) return null;
+  const row = {
+    id: crypto.randomUUID(),
+    sender_id: userId,
+    receiver_id: friendId,
+    message,
+    created_at: new Date().toISOString()
+  };
+  data.friend_messages.push(row);
+  await writeStore(data);
+  return row;
 }

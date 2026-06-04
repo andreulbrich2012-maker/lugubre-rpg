@@ -88,6 +88,24 @@ create table if not exists messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists friends (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid not null references users(id) on delete cascade,
+  friend_id uuid not null references users(id) on delete cascade,
+  status text not null default 'accepted' check (status in ('pending', 'accepted', 'blocked')),
+  created_at timestamptz not null default now(),
+  unique (user_id, friend_id),
+  check (user_id <> friend_id)
+);
+
+create table if not exists friend_messages (
+  id uuid primary key default uuid_generate_v4(),
+  sender_id uuid not null references users(id) on delete cascade,
+  receiver_id uuid not null references users(id) on delete cascade,
+  message text not null,
+  created_at timestamptz not null default now()
+);
+
 insert into races (name, image, attribute_modifiers)
 values
   ('Humano Sombrio', '/assets/dark-castle.svg', '{"forca":1,"presenca":1}'),

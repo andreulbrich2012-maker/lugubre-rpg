@@ -1,53 +1,90 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import Button from '../components/Button';
+import Alert from '../components/Alert';
+import LoadingButton from '../components/LoadingButton';
 import { useAuth } from '../store/authStore';
+
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState({});
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  function validate() {
+    const next = {};
+    if (!form.email.trim()) next.email = 'Email obrigatorio.';
+    else if (!emailPattern.test(form.email)) next.email = 'Informe um email valido.';
+    if (!form.password) next.password = 'Senha obrigatoria.';
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
   async function submit(event) {
     event.preventDefault();
+    setMessage('');
+    if (!validate()) {
+      setMessage('Preencha todos os campos obrigatorios.');
+      return;
+    }
+    setLoading(true);
     try {
       await login(form.email, form.password);
-      navigate('/characters');
-    } catch {
-      setError('Credenciais inválidas.');
+      navigate('/dashboard');
+    } catch (err) {
+      setMessage(err?.response?.data?.message || 'Email ou senha incorretos.');
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <AuthShell title="Entrar">
-      <form onSubmit={submit} className="space-y-4">
-        <Field label="Email" type="email" value={form.email} onChange={(email) => setForm({ ...form, email })} />
-        <Field label="Senha" type="password" value={form.password} onChange={(password) => setForm({ ...form, password })} />
-        {error && <p className="text-sm text-red-300">{error}</p>}
-        <Button className="w-full">Acessar</Button>
-        <p className="text-sm text-mist">Sem conta? <Link className="text-ember" to="/register">Registrar</Link></p>
+    <AuthShell title="Entrar" subtitle="Volte para suas fichas, campanhas e pactos pendentes.">
+      <form onSubmit={submit} className="space-y-4 motion-safe:animate-[fadeIn_.25s_ease]">
+        <Field label="Email" type="email" value={form.email} error={errors.email} onChange={(email) => setForm({ ...form, email })} />
+        <Field label="Senha" type="password" value={form.password} error={errors.password} onChange={(password) => setForm({ ...form, password })} />
+        {message && <Alert type="error">{message}</Alert>}
+        <LoadingButton loading={loading} loadingText="Entrando..." className="w-full">Acessar</LoadingButton>
+        <p className="text-sm text-mist">Sem conta? <Link className="text-ember hover:text-white" to="/register">Registrar</Link></p>
       </form>
     </AuthShell>
   );
 }
 
-export function AuthShell({ title, children }) {
+export function AuthShell({ title, subtitle, children }) {
   return (
-    <main className="mx-auto max-w-md px-4 py-20">
-      <section className="gothic-panel rounded-md p-6">
-        <h1 className="font-display text-3xl text-ember">{title}</h1>
+    <main className="grid min-h-[calc(100vh-144px)] place-items-center px-4 py-12">
+      <section className="gothic-panel w-full max-w-md rounded-md p-6 shadow-2xl">
+        <p className="text-xs uppercase tracking-[0.3em] text-ember/70">Lugubre RPG</p>
+        <h1 className="mt-2 font-display text-4xl text-ember">{title}</h1>
+        {subtitle && <p className="mt-2 text-sm text-mist">{subtitle}</p>}
         <div className="mt-6">{children}</div>
       </section>
     </main>
   );
 }
 
-export function Field({ label, value, onChange, type = 'text' }) {
+export function Field({ label, value, onChange, type = 'text', error }) {
+  const valid = value && !error;
+  const state = error
+    ? 'border-red-400/70 focus:border-red-300'
+    : valid
+      ? 'border-emerald-500/60 focus:border-emerald-300'
+      : 'border-ember/20 focus:border-ember';
+
   return (
     <label className="block text-sm text-mist">
       {label}
-      <input className="mt-1 w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2 outline-none focus:border-ember" type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+      <input
+        className={`mt-1 w-full rounded-md border bg-black/30 px-3 py-2 outline-none transition-colors ${state}`}
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      {error && <span className="mt-1 block text-xs text-red-300">{error}</span>}
     </label>
   );
 }

@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 
 const dataDir = process.env.VERCEL ? '/tmp/lugubre-data' : path.resolve('data');
 const dataFile = path.join(dataDir, 'local-db.json');
+const seedVersion = '2026-06-auth-seeds-v1';
 
 const defaultSkills = [
   { id: 'skill-luta', key: 'luta', name: 'Luta', attribute: 'forca' },
@@ -38,15 +39,57 @@ const defaultData = {
   ]
 };
 
-async function createSeedAdmin() {
-  return {
-    id: crypto.randomUUID(),
+const seedUsers = [
+  {
     name: 'Andre Admin',
     email: 'andreulbrich2012@gmail.com',
-    password_hash: await bcrypt.hash('adm123', 10),
-    role: 'admin',
+    password: 'adm123',
+    role: 'admin'
+  },
+  {
+    name: 'Administrador',
+    email: 'adm@lugubre.local',
+    password: 'adm123',
+    role: 'admin'
+  },
+  {
+    name: 'Jogador Demo',
+    email: 'demo@lugubre.local',
+    password: 'demo123',
+    role: 'player'
+  }
+];
+
+async function createSeedUser(seed) {
+  return {
+    id: crypto.randomUUID(),
+    name: seed.name,
+    email: seed.email,
+    password_hash: await bcrypt.hash(seed.password, 10),
+    role: seed.role,
     created_at: new Date().toISOString()
   };
+}
+
+async function ensureSeedUsers(data) {
+  const shouldRefreshSeeds = data.seed_version !== seedVersion;
+  for (const seed of seedUsers) {
+    const index = data.users.findIndex((user) => user.email === seed.email);
+    if (index >= 0) {
+      data.users[index] = {
+        ...data.users[index],
+        name: seed.name,
+        email: seed.email,
+        role: seed.role
+      };
+      if (shouldRefreshSeeds) {
+        data.users[index].password_hash = await bcrypt.hash(seed.password, 10);
+      }
+    } else {
+      data.users.push(await createSeedUser(seed));
+    }
+  }
+  data.seed_version = seedVersion;
 }
 
 async function writeStore(data) {
@@ -67,13 +110,12 @@ async function ensureStore() {
         else data[key].push(item);
       }
     }
-    if (!data.users.some((user) => user.email === 'andreulbrich2012@gmail.com')) {
-      data.users.push(await createSeedAdmin());
-    }
+    await ensureSeedUsers(data);
     await writeStore(data);
     return data;
   } catch {
-    const data = { ...defaultData, users: [await createSeedAdmin()] };
+    const data = { ...defaultData, users: [] };
+    await ensureSeedUsers(data);
     await writeStore(data);
     return data;
   }

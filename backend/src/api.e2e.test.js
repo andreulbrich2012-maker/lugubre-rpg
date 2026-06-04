@@ -13,6 +13,24 @@ async function loginAdmin() {
 }
 
 describe('fluxo principal da API', () => {
+  it('autentica os perfis seed admin e demo', async () => {
+    const admin = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'adm@lugubre.local', password: 'adm123' })
+      .expect(200);
+
+    expect(admin.body.user.role).toBe('admin');
+    expect(admin.body.token).toBeTruthy();
+
+    const demo = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'demo@lugubre.local', password: 'demo123' })
+      .expect(200);
+
+    expect(demo.body.user.role).toBe('player');
+    expect(demo.body.token).toBeTruthy();
+  });
+
   it('cobre auth, admin, ficha, bônus, inventário, campanha e mensagens', async () => {
     const adminToken = await loginAdmin();
     const stamp = Date.now();

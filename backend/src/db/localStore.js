@@ -2,7 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import bcrypt from 'bcryptjs';
 
-const dataDir = path.resolve('data');
+const dataDir = process.env.VERCEL ? '/tmp/lugubre-data' : path.resolve('data');
 const dataFile = path.join(dataDir, 'local-db.json');
 
 const defaultSkills = [

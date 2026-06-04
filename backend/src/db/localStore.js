@@ -28,13 +28,13 @@ const defaultData = {
     { id: 'origin-scholar', name: 'Erudito Oculto', description: 'Estudou textos que deveriam permanecer fechados.', skill_modifiers: { arcana: 2 } }
   ],
   races: [
-    { id: 'race-human', name: 'Humano Sombrio', image: '', attribute_modifiers: { forca: 1, presenca: 1 } },
-    { id: 'race-elf', name: 'Elfo Crepuscular', image: '', attribute_modifiers: { agilidade: 2, vigor: -1 } },
-    { id: 'race-dwarf', name: 'Anão de Cripta', image: '', attribute_modifiers: { vigor: 2, agilidade: -1 } }
+    { id: 'race-human', name: 'Humano Sombrio', image: '/assets/dark-castle.svg', attribute_modifiers: { forca: 1, presenca: 1 } },
+    { id: 'race-elf', name: 'Elfo Crepuscular', image: '/assets/haunted-ruins.svg', attribute_modifiers: { agilidade: 2, vigor: -1 } },
+    { id: 'race-dwarf', name: 'Anão de Cripta', image: '/assets/crypt-gate.svg', attribute_modifiers: { vigor: 2, agilidade: -1 } }
   ],
   classes: [
-    { id: 'class-blade', name: 'Lâmina Funesta', image: '', progression: [{ level: 1, mana: 2, feature: 'Golpe sombrio' }, { level: 10, mana: 12, feature: 'Corte sepulcral' }, { level: 20, mana: 25, feature: 'Executor do abismo' }] },
-    { id: 'class-occultist', name: 'Ocultista', image: '', progression: [{ level: 1, mana: 6, feature: 'Ritual menor' }, { level: 10, mana: 22, feature: 'Pacto profano' }, { level: 20, mana: 45, feature: 'Arquimago lúgubre' }] }
+    { id: 'class-blade', name: 'Lâmina Funesta', image: '/assets/crypt-gate.svg', progression: [{ level: 1, mana: 2, feature: 'Golpe sombrio' }, { level: 10, mana: 12, feature: 'Corte sepulcral' }, { level: 20, mana: 25, feature: 'Executor do abismo' }] },
+    { id: 'class-occultist', name: 'Ocultista', image: '/assets/dark-castle.svg', progression: [{ level: 1, mana: 6, feature: 'Ritual menor' }, { level: 10, mana: 22, feature: 'Pacto profano' }, { level: 20, mana: 45, feature: 'Arquimago lúgubre' }] }
   ]
 };
 

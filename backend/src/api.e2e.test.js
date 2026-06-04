@@ -20,8 +20,17 @@ describe('fluxo principal da API', () => {
       .send({ email: 'adm@lugubre.local', password: 'adm123' })
       .expect(200);
 
+    expect(admin.body.success).toBe(true);
     expect(admin.body.user.role).toBe('admin');
     expect(admin.body.token).toBeTruthy();
+
+    const andre = await request(app)
+      .post('/api/auth/login')
+      .send({ email: '  ANDREULBRICH2012@GMAIL.COM  ', password: 'adm123' })
+      .expect(200);
+
+    expect(andre.body.success).toBe(true);
+    expect(andre.body.user.email).toBe('andreulbrich2012@gmail.com');
 
     const demo = await request(app)
       .post('/api/auth/login')
@@ -36,6 +45,21 @@ describe('fluxo principal da API', () => {
       .get('/api/auth/me')
       .set('Authorization', `Bearer ${ghostToken}`)
       .expect(401);
+
+    await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'andreulbrich2012@gmail.com', password: 'senhaerrada' })
+      .expect(401);
+
+    await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'conta-inexistente@lugubre.local', password: 'adm123' })
+      .expect(404);
+
+    await request(app)
+      .post('/api/auth/register')
+      .send({ name: 'Duplicado', email: '  ANDREULBRICH2012@GMAIL.COM  ', password: 'adm123' })
+      .expect(409);
   });
 
   it('cobre auth, admin, ficha, bônus, inventário, campanha e mensagens', async () => {

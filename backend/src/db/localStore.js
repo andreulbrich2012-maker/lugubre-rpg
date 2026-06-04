@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 
 const dataDir = process.env.VERCEL ? '/tmp/lugubre-data' : path.resolve('data');
 const dataFile = path.join(dataDir, 'local-db.json');
-const seedVersion = '2026-06-auth-seeds-v1';
+const seedVersion = '2026-06-auth-seeds-v2';
 
 function publicUser(user) {
   if (!user) return null;
@@ -76,6 +76,14 @@ const seedUsers = [
   }
 ];
 
+export function getSeedPassword(email) {
+  return seedUsers.find((seed) => seed.email === email.trim().toLowerCase())?.password || null;
+}
+
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
 async function createSeedUser(seed) {
   return {
     id: crypto.randomUUID(),
@@ -92,7 +100,7 @@ async function createSeedUser(seed) {
 async function ensureSeedUsers(data) {
   const shouldRefreshSeeds = data.seed_version !== seedVersion;
   for (const seed of seedUsers) {
-    const index = data.users.findIndex((user) => user.email === seed.email);
+    const index = data.users.findIndex((user) => normalizeEmail(user.email) === seed.email);
     if (index >= 0) {
       data.users[index] = {
         ...data.users[index],
@@ -123,6 +131,16 @@ async function ensureStore() {
     for (const [key, value] of Object.entries(defaultData)) {
       if (!Array.isArray(data[key])) data[key] = value;
     }
+    for (const user of data.users) {
+      user.email = normalizeEmail(user.email);
+      if (!user.password_hash && user.password) {
+        user.password_hash = await bcrypt.hash(user.password, 10);
+        delete user.password;
+      }
+      user.profile_image_url = user.profile_image_url || '';
+      user.theme = user.theme || 'lugubre';
+      user.updated_at = user.updated_at || user.created_at || new Date().toISOString();
+    }
     for (const key of ['origins', 'races', 'classes', 'skills']) {
       for (const item of defaultData[key]) {
         const index = data[key].findIndex((row) => row.id === item.id);
@@ -143,7 +161,7 @@ async function ensureStore() {
 
 export async function findLocalUserByEmail(email) {
   const data = await ensureStore();
-  return data.users.find((user) => user.email === email.toLowerCase());
+  return data.users.find((user) => normalizeEmail(user.email) === normalizeEmail(email));
 }
 
 export async function findLocalUserById(id) {
@@ -153,15 +171,30 @@ export async function findLocalUserById(id) {
 
 export async function createLocalUser({ name, email, password, role = 'player' }) {
   const data = await ensureStore();
-  if (data.users.some((user) => user.email === email.toLowerCase())) {
+  const normalizedEmail = normalizeEmail(email);
+  if (data.users.some((user) => normalizeEmail(user.email) === normalizedEmail)) {
     const error = new Error('Este email ja esta cadastrado.');
     error.status = 409;
     throw error;
   }
-  const user = { id: crypto.randomUUID(), name, email: email.toLowerCase(), password_hash: await bcrypt.hash(password, 10), role, profile_image_url: '', theme: 'lugubre', created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  const user = { id: crypto.randomUUID(), name: name.trim(), email: normalizedEmail, password_hash: await bcrypt.hash(password, 10), role, profile_image_url: '', theme: 'lugubre', created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
   data.users.push(user);
   await writeStore(data);
   return user;
+}
+
+export async function repairLocalUserPasswordByEmail(email, password) {
+  const data = await ensureStore();
+  const index = data.users.findIndex((user) => normalizeEmail(user.email) === normalizeEmail(email));
+  if (index === -1) return null;
+  data.users[index] = {
+    ...data.users[index],
+    email: normalizeEmail(data.users[index].email),
+    password_hash: await bcrypt.hash(password, 10),
+    updated_at: new Date().toISOString()
+  };
+  await writeStore(data);
+  return data.users[index];
 }
 
 export async function updateLocalUserProfile(id, { name, email, profileImageUrl }) {

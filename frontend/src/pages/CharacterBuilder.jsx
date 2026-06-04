@@ -86,10 +86,10 @@ export default function CharacterBuilder() {
   return (
     <main className="min-h-[calc(100vh-64px)] bg-[radial-gradient(circle_at_top_left,rgba(143,29,44,.28),transparent_34%),#050507]">
       <section className="mx-auto flex min-h-[calc(100vh-64px)] max-w-7xl flex-col px-4 py-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[.32em] text-ember">Criação de ficha</p>
-            <h1 className="font-display text-4xl">{steps[step]}</h1>
+            <h1 className="font-display text-3xl sm:text-4xl">{steps[step]}</h1>
           </div>
           <div className="text-right text-sm text-mist"><span className="text-ember">{step + 1}</span> / {steps.length}</div>
         </div>
@@ -99,7 +99,7 @@ export default function CharacterBuilder() {
         </div>
 
         <div className="grid flex-1 items-center gap-8 py-8 lg:grid-cols-[1fr_360px]">
-          <section className="gothic-panel min-h-[520px] rounded-md p-6 md:p-10">
+          <section className="gothic-panel min-h-[420px] rounded-md p-4 sm:p-6 md:min-h-[520px] md:p-10">
             {step === 0 && <BigInput label="Nome do jogador" value={form.playerName} onChange={(playerName) => setForm({ ...form, playerName })} />}
             {step === 1 && <BigInput label="Nome do personagem" value={form.characterName} onChange={(characterName) => setForm({ ...form, characterName })} />}
             {step === 2 && <PhotoStep form={form} setForm={setForm} />}
@@ -117,7 +117,7 @@ export default function CharacterBuilder() {
           </aside>
         </div>
 
-        <div className="flex justify-between pb-4">
+        <div className="flex flex-col-reverse gap-3 pb-4 sm:flex-row sm:justify-between">
           <Button variant="ghost" disabled={step === 0} onClick={() => setStep((current) => Math.max(current - 1, 0))}>
             <ArrowLeft size={18} className="inline" /> Voltar
           </Button>
@@ -133,7 +133,7 @@ export default function CharacterBuilder() {
 }
 
 function BigInput({ label, value, onChange }) {
-  return <label className="block"><span className="text-sm uppercase tracking-[.22em] text-ember">{label}</span><input autoFocus className="mt-5 w-full border-0 border-b border-ember/30 bg-transparent px-0 py-4 text-4xl font-semibold outline-none focus:border-ember" value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+  return <label className="block"><span className="text-sm uppercase tracking-[.22em] text-ember">{label}</span><input autoFocus className="mt-5 w-full border-0 border-b border-ember/30 bg-transparent px-0 py-4 text-3xl font-semibold outline-none focus:border-ember sm:text-4xl" value={value} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
 function PhotoStep({ form, setForm }) {
@@ -144,7 +144,7 @@ function PhotoStep({ form, setForm }) {
     reader.onload = () => setForm({ ...form, photo: String(reader.result) });
     reader.readAsDataURL(file);
   }
-  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">Foto do personagem</p><label className="mt-8 flex min-h-72 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-ember/35 bg-black/20 text-mist soft-motion">{form.photo ? <img src={form.photo} className="h-72 w-full rounded-md object-cover" /> : <><Upload className="text-ember" /><span className="mt-3">Selecionar arquivo</span></>}<input type="file" accept="image/*" className="hidden" onChange={loadFile} /></label></div>;
+  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">Foto do personagem</p><label className="mt-8 flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-ember/35 bg-black/20 text-mist soft-motion sm:min-h-72">{form.photo ? <img src={form.photo} className="h-56 w-full rounded-md object-cover sm:h-72" /> : <><Upload className="text-ember" /><span className="mt-3">Selecionar arquivo</span></>}<input type="file" accept="image/*" className="hidden" onChange={loadFile} /></label></div>;
 }
 
 function PickList({ title, items, value, onChange }) {

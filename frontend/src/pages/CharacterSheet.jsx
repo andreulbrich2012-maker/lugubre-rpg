@@ -51,7 +51,7 @@ export default function CharacterSheet() {
     <main className="min-h-[calc(100vh-64px)] bg-[#050506] px-3 py-4">
       <section className="mx-auto grid max-w-7xl gap-4 border border-ember/40 bg-[#101011] p-3 shadow-glow lg:grid-cols-[1fr_1.05fr]">
         <div className="space-y-4">
-          <header className="grid gap-3 md:grid-cols-[96px_1fr_1fr]">
+          <header className="grid gap-3 sm:grid-cols-[96px_1fr] lg:grid-cols-[96px_1fr_1fr]">
             <div className="h-24 overflow-hidden border border-ember/30 bg-black/40">
               {sheet.photo ? <img src={sheet.photo} className="h-full w-full object-cover" /> : <div className="h-full bg-[radial-gradient(circle,rgba(143,29,44,.38),transparent_58%)]" />}
             </div>
@@ -61,7 +61,7 @@ export default function CharacterSheet() {
 
           <section className="rounded-md border border-white/10 bg-black/20 p-5">
             <h2 className="text-center font-display text-2xl text-white">Atributos</h2>
-            <div className="mt-5 grid grid-cols-5 gap-2">
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
               {attributes.map(([key, short]) => (
                 <div key={key} className="rounded-full border-2 border-white/70 bg-white p-2 text-center text-black">
                   <div className="text-3xl font-black">{sheet.attributes?.[key] ?? 2}</div>
@@ -77,7 +77,7 @@ export default function CharacterSheet() {
             <Bar label="Mana" value={`${editing ? draft.mana : sheet.mana} / ${editing ? draft.mana : sheet.mana}`} color="bg-orange-600" />
           </section>
 
-          <section className="grid grid-cols-3 gap-3">
+          <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Metric label="Defesa" value={totalDefense} />
             <Metric label="Bloqueio" value="10" />
             <Metric label="Esquiva" value={sheet.dodge} />
@@ -104,7 +104,7 @@ export default function CharacterSheet() {
         <section className="rounded-md border border-white/10 bg-black/25 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="font-display text-2xl text-ember">Ficha de jogo</h2>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Link to={`/characters/${sheet.id}/edit`}><Button variant="ghost"><Edit size={16} className="inline" /> Base</Button></Link>
               {editing ? (
                 <>
@@ -182,12 +182,12 @@ function SkillTable({ sheet, skills, skillsCatalog }) {
   const rows = [...skillsCatalog, ...customKeys.map((key) => ({ key, name: key, attribute: 'presenca' }))];
   return (
     <>
-      <div className="mt-4 grid grid-cols-[1fr_64px_64px_64px] gap-x-3 text-xs uppercase text-mist">
+      <div className="mt-4 grid grid-cols-[minmax(120px,1fr)_52px_52px_52px] gap-x-2 text-xs uppercase text-mist sm:grid-cols-[1fr_64px_64px_64px] sm:gap-x-3">
         <span>Perícia</span><span>Dado</span><span>Treino</span><span>Outros</span>
       </div>
       <div className="mt-2 space-y-1">
         {rows.map((skill) => (
-          <div key={skill.key} className="grid grid-cols-[1fr_64px_64px_64px] gap-x-3 border-b border-white/10 py-1 text-sm">
+          <div key={skill.key} className="grid grid-cols-[minmax(120px,1fr)_52px_52px_52px] gap-x-2 border-b border-white/10 py-1 text-sm sm:grid-cols-[1fr_64px_64px_64px] sm:gap-x-3">
             <span className="capitalize text-white">{skill.name}</span>
             <span className="text-ember">({sheet.attributes?.[skill.attribute] ?? 2})</span>
             <span className="text-blue-400">{skills?.[skill.key] ?? 0}</span>

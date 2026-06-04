@@ -15,12 +15,16 @@ import Admin from './pages/Admin';
 import { useAuth } from './store/authStore';
 
 export default function App() {
-  const { user } = useAuth();
+  const { user, initAuth } = useAuth();
 
   useEffect(() => {
     const theme = user?.theme || localStorage.getItem('lugubre-theme') || 'lugubre';
     document.documentElement.dataset.theme = theme;
   }, [user?.theme]);
+
+  useEffect(() => {
+    initAuth();
+  }, [initAuth]);
 
   return (
     <Layout>

@@ -9,7 +9,7 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -25,18 +25,18 @@ export default function Login() {
 
   async function submit(event) {
     event.preventDefault();
-    setMessage('');
+    setMessage(null);
     if (!validate()) {
-      setMessage('Preencha todos os campos obrigatorios.');
+      setMessage({ type: 'error', text: 'Preencha todos os campos obrigatorios.' });
       return;
     }
     setLoading(true);
     try {
       await login(form.email, form.password);
-      navigate('/dashboard');
+      setMessage({ type: 'success', text: 'Login realizado com sucesso!' });
+      setTimeout(() => navigate('/dashboard'), 350);
     } catch (err) {
-      setMessage(err?.response?.data?.message || 'Email ou senha incorretos.');
-    } finally {
+      setMessage({ type: 'error', text: err?.response?.data?.message || 'Email ou senha incorretos.' });
       setLoading(false);
     }
   }
@@ -46,7 +46,7 @@ export default function Login() {
       <form onSubmit={submit} className="space-y-4 motion-safe:animate-[fadeIn_.25s_ease]">
         <Field label="Email" type="email" value={form.email} error={errors.email} onChange={(email) => setForm({ ...form, email })} />
         <Field label="Senha" type="password" value={form.password} error={errors.password} onChange={(password) => setForm({ ...form, password })} />
-        {message && <Alert type="error">{message}</Alert>}
+        {message && <Alert type={message.type}>{message.text}</Alert>}
         <LoadingButton loading={loading} loadingText="Entrando..." className="w-full">Acessar</LoadingButton>
         <p className="text-sm text-mist">Sem conta? <Link className="text-ember hover:text-white" to="/register">Registrar</Link></p>
       </form>

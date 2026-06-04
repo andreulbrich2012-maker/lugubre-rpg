@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Camera, Eye, EyeOff, LayoutDashboard, MessageCircle, Palette, ScrollText, Settings, Shield, Swords, Trash2, Users, X } from 'lucide-react';
+import { Camera, Eye, EyeOff, LayoutDashboard, Menu, MessageCircle, Palette, ScrollText, Settings, Shield, Swords, Trash2, Users, X } from 'lucide-react';
 import Alert from '../components/Alert';
 import Avatar from '../components/Avatar';
 import Button from '../components/Button';
@@ -26,6 +26,7 @@ export default function Dashboard() {
   const [characters, setCharacters] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -56,8 +57,9 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-6 px-4 py-8 lg:grid-cols-[260px_1fr]">
-      <aside className="gothic-panel rounded-md p-4 lg:sticky lg:top-24 lg:h-[calc(100vh-140px)]">
+    <main className="mx-auto grid max-w-7xl gap-6 px-3 py-5 sm:px-4 sm:py-8 lg:grid-cols-[260px_1fr]">
+      {sidebarOpen && <button className="fixed inset-0 z-30 bg-black/70 lg:hidden" onClick={() => setSidebarOpen(false)} />}
+      <aside className={`gothic-panel fixed left-3 right-3 top-20 z-40 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-md p-4 lg:sticky lg:left-auto lg:right-auto lg:top-24 lg:z-auto lg:block lg:h-[calc(100vh-140px)] ${sidebarOpen ? 'block' : 'hidden'}`}>
         <div className="flex items-center gap-3 border-b border-ember/10 pb-4">
           <Avatar user={user} size="md" />
           <div className="min-w-0">
@@ -72,7 +74,7 @@ export default function Dashboard() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActive(tab.id)}
+                onClick={() => { setActive(tab.id); setSidebarOpen(false); }}
                 className={`flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors ${active === tab.id ? 'border-ember/50 bg-ember/15 text-white' : 'border-transparent text-mist hover:border-ember/20 hover:text-white'}`}
               >
                 <Icon size={17} />
@@ -83,8 +85,8 @@ export default function Dashboard() {
         </nav>
       </aside>
 
-      <section className="min-h-[640px]">
-        <DashboardTopbar user={user} onSettings={() => setActive('settings')} onLogout={signOut} />
+      <section className="min-h-[640px] min-w-0">
+        <DashboardTopbar user={user} onMenu={() => setSidebarOpen(true)} onSettings={() => setActive('settings')} onLogout={signOut} />
         {loading ? (
           <div className="gothic-panel grid min-h-80 place-items-center rounded-md">
             <span className="h-8 w-8 animate-spin rounded-full border-2 border-ember/30 border-t-ember" />
@@ -104,14 +106,17 @@ export default function Dashboard() {
   );
 }
 
-function DashboardTopbar({ user, onSettings, onLogout }) {
+function DashboardTopbar({ user, onMenu, onSettings, onLogout }) {
   return (
     <div className="mb-5 flex items-center justify-between gap-4">
-      <div>
+      <div className="min-w-0">
         <p className="text-xs uppercase tracking-[0.28em] text-ember/70">Painel</p>
-        <h2 className="font-display text-3xl text-white">Conta e grimorio</h2>
+        <h2 className="truncate font-display text-2xl text-white sm:text-3xl">Conta e grimorio</h2>
       </div>
-      <UserMenu user={user} onSettings={onSettings} onLogout={onLogout} />
+      <div className="flex shrink-0 items-center gap-2">
+        <Button variant="ghost" className="px-3 lg:hidden" onClick={onMenu}><Menu size={18} /></Button>
+        <UserMenu user={user} onSettings={onSettings} onLogout={onLogout} />
+      </div>
     </div>
   );
 }
@@ -264,6 +269,7 @@ function FriendsTab() {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [notice, setNotice] = useState(null);
+  const [mobileChatOpen, setMobileChatOpen] = useState(false);
   const { user } = useAuth();
 
   const activeFriend = useMemo(() => selected || friends[0]?.friend || null, [selected, friends]);
@@ -285,6 +291,7 @@ function FriendsTab() {
       const { data } = await api.post('/friends/add', { email });
       setNotice({ type: 'success', text: 'Amigo adicionado.' });
       setSelected(data.friend);
+      setMobileChatOpen(true);
       setQuery('');
       setResults([]);
       loadFriends();
@@ -319,7 +326,7 @@ function FriendsTab() {
     <div className="gothic-panel rounded-md p-6">
       <Header title="Amigos" />
       <div className="mt-5 grid gap-5 lg:grid-cols-[280px_1fr]">
-        <aside className="space-y-4">
+        <aside className={`space-y-4 ${mobileChatOpen ? 'hidden lg:block' : 'block'}`}>
           <div>
             <input className="w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" placeholder="Pesquisar usuario ou email" value={query} onChange={(event) => search(event.target.value)} />
             {results.length > 0 && (
@@ -338,18 +345,19 @@ function FriendsTab() {
             {friends.length === 0 ? (
               <Empty text="Pesquise usuarios para adicionar amigos." compact />
             ) : friends.map((friendship) => (
-              <button key={friendship.id} onClick={() => setSelected(friendship.friend)} className={`w-full rounded-md border px-3 py-2 text-left ${activeFriend?.id === friendship.friend.id ? 'border-ember/50 bg-ember/15' : 'border-ember/15 bg-black/25'}`}>
+              <button key={friendship.id} onClick={() => { setSelected(friendship.friend); setMobileChatOpen(true); }} className={`w-full rounded-md border px-3 py-2 text-left ${activeFriend?.id === friendship.friend.id ? 'border-ember/50 bg-ember/15' : 'border-ember/15 bg-black/25'}`}>
                 <span className="block text-sm text-white">{friendship.friend.name}</span>
                 <span className="text-xs text-mist">{friendship.friend.email}</span>
               </button>
             ))}
           </div>
         </aside>
-        <section className="rounded-md border border-ember/15 bg-black/25">
-          <div className="border-b border-ember/10 p-4">
+        <section className={`rounded-md border border-ember/15 bg-black/25 ${mobileChatOpen ? 'block' : 'hidden lg:block'}`}>
+          <div className="flex items-center gap-3 border-b border-ember/10 p-4">
+            <Button variant="ghost" className="px-3 lg:hidden" onClick={() => setMobileChatOpen(false)}>Voltar</Button>
             <h3 className="font-display text-2xl">{activeFriend?.name || 'Conversa'}</h3>
           </div>
-          <div className="h-80 space-y-2 overflow-y-auto p-4">
+          <div className="h-[55vh] space-y-2 overflow-y-auto p-4 lg:h-80">
             {!activeFriend && <Empty text="Selecione ou adicione um amigo para conversar." compact />}
             {messages.map((message) => {
               const mine = message.sender_id === user?.id;

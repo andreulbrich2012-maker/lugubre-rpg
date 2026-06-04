@@ -50,7 +50,7 @@ export default function CampaignRoom() {
   if (!room) return <main className="px-4 py-10 text-mist">Carregando...</main>;
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-6 px-4 py-10 md:grid-cols-[280px_1fr]">
+    <main className="mx-auto grid max-w-7xl gap-6 px-3 py-5 sm:px-4 sm:py-10 md:grid-cols-[280px_1fr]">
       <aside className="gothic-panel rounded-md p-5">
         <h1 className="font-display text-3xl text-ember">{room.campaign.name}</h1>
         <p className="mt-2 text-sm text-mist">{room.campaign.description}</p>
@@ -59,7 +59,7 @@ export default function CampaignRoom() {
           {room.members.map((member) => <li key={member.id}>{member.name} · {member.character_name || 'sem ficha'}</li>)}
         </ul>
       </aside>
-      <section className="gothic-panel flex min-h-[560px] flex-col rounded-md p-5">
+      <section className="gothic-panel flex min-h-[70vh] min-w-0 flex-col rounded-md p-4 sm:p-5 md:min-h-[560px]">
         <div className="flex-1 space-y-3 overflow-auto">
           {messages.map((message) => (
             <div key={message.id} className="rounded-md bg-black/30 p-3">
@@ -68,7 +68,7 @@ export default function CampaignRoom() {
             </div>
           ))}
         </div>
-        <form onSubmit={send} className="mt-4 flex gap-2">
+        <form onSubmit={send} className="mt-4 flex flex-col gap-2 sm:flex-row">
           <input className="flex-1 rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={content} onChange={(e) => setContent(e.target.value)} placeholder="Escreva no chat..." />
           <Button>Enviar</Button>
         </form>

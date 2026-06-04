@@ -1,0 +1,22 @@
+{
+    "name":  "lugubre-rpg",
+    "version":  "1.0.0",
+    "private":  true,
+    "description":  "Sistema web completo para LÃºgubre RPG.",
+    "scripts":  {
+                    "dev":  "concurrently \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
+                    "build":  "npm run build --workspace frontend",
+                    "test":  "npm run test --workspaces --if-present",
+                    "install:all":  "npm install",
+                    "vercel-build":  "npm run build",
+                    "db:init":  "npm run db:init --workspace backend"
+                },
+    "workspaces":  [
+                       "backend",
+                       "frontend"
+                   ],
+    "devDependencies":  {
+                            "concurrently":  "^9.1.2"
+                        },
+    "type":  "module"
+}

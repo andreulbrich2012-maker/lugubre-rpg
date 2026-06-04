@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+      <stop stop-color="#2a0d14"/>
+      <stop offset=".55" stop-color="#09090d"/>
+      <stop offset="1" stop-color="#0f1118"/>
+    </linearGradient>
+    <radialGradient id="r" cx=".5" cy=".22" r=".55">
+      <stop stop-color="#d6a65f" stop-opacity=".35"/>
+      <stop offset=".52" stop-color="#8f1d2c" stop-opacity=".14"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="700" fill="url(#g)"/>
+  <rect width="1200" height="700" fill="url(#r)"/>
+  <path fill="#050506" d="M0 520h1200v180H0z"/>
+  <path fill="#111017" d="M230 520V280h70v-70h52v70h72v240zm180 0V230h70v-80h55v80h72v290zm190 0V250h82v-95h58v95h80v270zm210 0V310h70v-70h50v70h70v210z"/>
+  <path fill="#050506" d="M260 520V330h34v190zm185 0V280h38v240zm196 0V310h42v210zm212 0V355h34v165z"/>
+  <path stroke="#d6a65f" stroke-opacity=".35" stroke-width="3" fill="none" d="M80 560c180-90 340-90 520 0s340 90 520 0"/>
+</svg>

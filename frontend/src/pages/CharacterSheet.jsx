@@ -1,15 +1,15 @@
-import { Dice5, Edit, Plus, Save, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Dice5, Edit, Save, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Button from '../components/Button';
 import { api } from '../lib/api';
 
 const attributes = [
-  ['forca', 'FOR'],
-  ['agilidade', 'AGI'],
-  ['intelecto', 'INT'],
-  ['presenca', 'PRE'],
-  ['vigor', 'VIG']
+  ['forca', 'Força'],
+  ['agilidade', 'Agilidade'],
+  ['intelecto', 'Intelecto'],
+  ['presenca', 'Presença'],
+  ['vigor', 'Vigor']
 ];
 
 function formatSaveDate(value) {
@@ -72,6 +72,35 @@ export default function CharacterSheet() {
     setSkillRoll({ name: skill.name, die, bonus, total: die + bonus });
   }
 
+  async function adjustVital(field, direction, event) {
+    const step = event.shiftKey ? 5 : 1;
+    const current = Number(draft[field] ?? 0);
+    const nextValue = Math.max(0, current + direction * step);
+    const nextDraft = { ...draft, [field]: nextValue };
+    const columnByField = { lifeCurrent: 'life_current', sanityCurrent: 'sanity_current', mana: 'mana' };
+
+    setDraft(nextDraft);
+    setSheet({ ...sheet, [columnByField[field]]: nextValue });
+
+    try {
+      const { data } = await api.patch(`/characters/${id}/play`, nextDraft);
+      setSheet(data);
+      setDraft({
+        lifeCurrent: data.life_current ?? 63,
+        lifeMax: data.life_max ?? 63,
+        sanityCurrent: data.sanity_current ?? 52,
+        sanityMax: data.sanity_max ?? 52,
+        mana: data.mana,
+        manaMax: data.mana_max ?? data.mana,
+        defense: data.defense,
+        skills: data.skills || {},
+        inventory: data.inventory || []
+      });
+    } catch {
+      await load();
+    }
+  }
+
   if (notFound) return <main className="mx-auto max-w-3xl px-4 py-16 text-center text-mist"><h1 className="font-display text-4xl text-ember">Ficha não encontrada</h1><p className="mt-3">Ela pode ter sido removida ou pertencer a outro armazenamento local.</p><Link className="mt-6 inline-block text-ember" to="/characters">Voltar para personagens</Link></main>;
   if (!sheet || !draft) return <main className="px-4 py-10 text-mist">Carregando ficha...</main>;
 
@@ -104,9 +133,9 @@ export default function CharacterSheet() {
           </section>
 
           <section className="grid gap-3">
-            <Bar label="Vida" value={`${editing ? draft.lifeCurrent : (sheet.life_current ?? 63)} / ${editing ? draft.lifeMax : (sheet.life_max ?? 63)}`} color="bg-red-700" />
-            <Bar label="Sanidade" value={`${editing ? draft.sanityCurrent : (sheet.sanity_current ?? 52)} / ${editing ? draft.sanityMax : (sheet.sanity_max ?? 52)}`} color="bg-purple-700" />
-            <Bar label="Mana" value={`${editing ? draft.mana : sheet.mana} / ${editing ? draft.manaMax : (sheet.mana_max ?? sheet.mana)}`} color="bg-orange-600" />
+            <VitalsBar label="Vida" current={draft.lifeCurrent} max={draft.lifeMax} tone="red" onDecrease={(event) => adjustVital('lifeCurrent', -1, event)} onIncrease={(event) => adjustVital('lifeCurrent', 1, event)} />
+            <VitalsBar label="Sanidade" current={draft.sanityCurrent} max={draft.sanityMax} tone="purple" onDecrease={(event) => adjustVital('sanityCurrent', -1, event)} onIncrease={(event) => adjustVital('sanityCurrent', 1, event)} />
+            <VitalsBar label="Mana" current={draft.mana} max={draft.manaMax} tone="orange" onDecrease={(event) => adjustVital('mana', -1, event)} onIncrease={(event) => adjustVital('mana', 1, event)} />
           </section>
 
           <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -158,30 +187,14 @@ export default function CharacterSheet() {
 }
 
 function PlayEditor({ draft, setDraft, skillsCatalog, onRoll, roll }) {
-  const [customSkill, setCustomSkill] = useState({ key: '', name: '' });
   const rows = useMemo(() => {
-    const catalogRows = skillsCatalog.map((skill) => ({ ...skill, value: draft.skills?.[skill.key] ?? 0, custom: false }));
-    const customRows = Object.keys(draft.skills || {})
-      .filter((key) => !skillsCatalog.some((skill) => skill.key === key))
-      .map((key) => ({ key, name: key, attribute: 'presenca', value: draft.skills[key], custom: true }));
-    return [...catalogRows, ...customRows];
+    return skillsCatalog.map((skill) => ({ ...skill, value: draft.skills?.[skill.key] ?? 0 }));
   }, [draft.skills, skillsCatalog]);
 
   function updateSkill(key, value) {
-    setDraft({ ...draft, skills: { ...draft.skills, [key]: Number(value) } });
-  }
-
-  function removeSkill(key) {
-    const next = { ...draft.skills };
-    delete next[key];
-    setDraft({ ...draft, skills: next });
-  }
-
-  function addCustomSkill() {
-    const key = customSkill.key.trim().toLowerCase().replace(/\s+/g, '_');
-    if (!key) return;
-    setDraft({ ...draft, skills: { ...draft.skills, [key]: 0 } });
-    setCustomSkill({ key: '', name: '' });
+    const rounded = Math.round(Number(value || 0) / 5) * 5;
+    const next = Math.max(0, Math.min(15, rounded));
+    setDraft({ ...draft, skills: { ...draft.skills, [key]: next } });
   }
 
   return (
@@ -200,27 +213,21 @@ function PlayEditor({ draft, setDraft, skillsCatalog, onRoll, roll }) {
         <h3 className="font-display text-xl text-ember">Perícias</h3>
         <div className="mt-3 space-y-2">
           {rows.map((skill) => (
-            <div key={skill.key} className="grid grid-cols-[1fr_72px_36px_36px] items-center gap-2 border-b border-white/10 pb-2 text-sm">
+            <div key={skill.key} className="grid grid-cols-[1fr_72px_36px] items-center gap-2 border-b border-white/10 pb-2 text-sm">
               <span className="capitalize text-white">{skill.name}</span>
-              <input type="number" className="rounded border border-ember/20 bg-black/30 px-2 py-1 text-center" value={skill.value} onChange={(event) => updateSkill(skill.key, event.target.value)} />
+              <input type="number" min="0" max="15" step="5" className="rounded border border-ember/20 bg-black/30 px-2 py-1 text-center" value={skill.value} onChange={(event) => updateSkill(skill.key, event.target.value)} />
               <button type="button" className="grid h-8 w-8 place-items-center rounded border border-ember/30 text-ember" onClick={() => onRoll(skill, skill.value)}><Dice5 size={16} /></button>
-              <button type="button" className="text-red-300" onClick={() => removeSkill(skill.key)}><Trash2 size={16} /></button>
             </div>
           ))}
         </div>
         <RollFeedback roll={roll} />
-        <div className="mt-3 flex gap-2">
-          <input className="min-w-0 flex-1 rounded-md border border-ember/20 bg-black/30 px-3 py-2" placeholder="Nova perícia" value={customSkill.key} onChange={(event) => setCustomSkill({ key: event.target.value, name: event.target.value })} />
-          <Button type="button" variant="ghost" onClick={addCustomSkill}><Plus size={16} /></Button>
-        </div>
       </div>
     </div>
   );
 }
 
 function SkillTable({ sheet, skills, skillsCatalog, onRoll, roll }) {
-  const customKeys = Object.keys(skills).filter((key) => !skillsCatalog.some((skill) => skill.key === key));
-  const rows = [...skillsCatalog, ...customKeys.map((key) => ({ key, name: key, attribute: 'presenca' }))];
+  const rows = skillsCatalog;
   return (
     <>
       <div className="mt-4 grid grid-cols-[minmax(120px,1fr)_52px_52px_52px_44px] gap-x-2 text-xs uppercase text-mist sm:grid-cols-[1fr_64px_64px_64px_44px] sm:gap-x-3">
@@ -276,8 +283,32 @@ function InfoBlock({ label, value, subLabel, subValue }) {
   return <div className="space-y-2 text-sm"><div className="grid grid-cols-[90px_1fr] gap-2"><span className="text-xs font-bold uppercase text-mist">{label}</span><span className="border-b border-white/50 pb-1 text-white">{value}</span></div><div className="grid grid-cols-[90px_1fr] gap-2"><span className="text-xs font-bold uppercase text-mist">{subLabel}</span><span className="border-b border-white/50 pb-1 text-white">{subValue}</span></div></div>;
 }
 
-function Bar({ label, value, color }) {
-  return <div><p className="mb-1 text-center text-xs font-bold uppercase text-mist">{label}</p><div className={`${color} px-4 py-2 text-center font-bold text-white`}>{value}</div></div>;
+function VitalsBar({ label, current, max, tone, onDecrease, onIncrease }) {
+  const safeCurrent = Number(current ?? 0);
+  const safeMax = Number(max ?? 0);
+  const width = safeMax > 0 ? Math.min(100, (safeCurrent / safeMax) * 100) : safeCurrent > 0 ? 100 : 0;
+  const tones = {
+    red: 'from-red-950 via-red-800 to-red-600 border-red-500/40 shadow-red-950/40',
+    purple: 'from-purple-950 via-purple-800 to-fuchsia-600 border-purple-400/40 shadow-purple-950/40',
+    orange: 'from-orange-950 via-orange-700 to-amber-500 border-orange-400/40 shadow-orange-950/40'
+  };
+  return (
+    <div>
+      <p className="mb-1 text-center text-xs font-bold uppercase tracking-[.18em] text-mist">{label}</p>
+      <div className={`relative grid min-h-12 grid-cols-[48px_1fr_48px] overflow-hidden rounded border bg-black/50 shadow-lg ${tones[tone]}`}>
+        <div className={`pointer-events-none absolute inset-y-0 left-0 bg-gradient-to-r ${tones[tone]} opacity-80 transition-all duration-200`} style={{ width: `${width}%` }} />
+        <button type="button" className="relative grid place-items-center border-r border-white/15 text-white soft-motion hover:bg-white/10" onClick={onDecrease} aria-label={`Diminuir ${label}`}>
+          <ChevronLeft size={22} />
+        </button>
+        <div className="relative grid place-items-center px-3 text-lg font-black text-white drop-shadow">
+          {safeCurrent} / {safeMax}
+        </div>
+        <button type="button" className="relative grid place-items-center border-l border-white/15 text-white soft-motion hover:bg-white/10" onClick={onIncrease} aria-label={`Aumentar ${label}`}>
+          <ChevronRight size={22} />
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function Metric({ label, value }) {

@@ -62,6 +62,13 @@ function toJson(value) {
   return JSON.stringify(value ?? null);
 }
 
+function normalizeSkillTraining(skills = {}, keys = []) {
+  return Object.fromEntries(keys.map((key) => {
+    const rounded = Math.round(Number(skills?.[key] || 0) / 5) * 5;
+    return [key, Math.max(0, Math.min(15, rounded))];
+  }));
+}
+
 function characterSnapshot(row) {
   return {
     character_name: row.character_name,
@@ -109,6 +116,7 @@ async function recordCharacterSave(row, label = 'Salvamento') {
 
 async function normalizeCharacter(body, currentSkills = null) {
   const data = characterSchema.parse(body);
+  const keys = await skillKeys();
   let modifiers = {};
   if (data.raceId) {
     const race = await tryQuery('select attribute_modifiers from races where id = $1', [data.raceId]);
@@ -122,13 +130,13 @@ async function normalizeCharacter(body, currentSkills = null) {
     origin = result?.rows?.[0] || (await getLocalCatalog('origins')).find((item) => item.id === data.originId);
   }
   const originSkills = parseJsonField(origin?.skill_modifiers, {});
-  const base = baseSkills(await skillKeys());
+  const base = baseSkills(keys);
   const createdSkills = Object.fromEntries(Object.keys(base).map((key) => [key, Number(base[key] || 0) + Number(originSkills[key] || 0)]));
   return {
     ...data,
     manaMax: data.manaMax ?? data.mana,
     attributes,
-    skills: currentSkills || data.skills || createdSkills
+    skills: normalizeSkillTraining(currentSkills || data.skills || createdSkills, keys)
   };
 }
 
@@ -248,7 +256,7 @@ router.patch('/:id/play', async (req, res) => {
     mana: body.mana ?? row.mana,
     manaMax: body.manaMax ?? row.mana_max ?? row.mana,
     defense: body.defense ?? row.defense,
-    skills: { ...parseJsonField(row.skills, {}), ...(body.skills || {}) },
+    skills: normalizeSkillTraining({ ...parseJsonField(row.skills, {}), ...(body.skills || {}) }, await skillKeys()),
     inventory: body.inventory ?? parseJsonField(row.inventory, [])
   };
   const updatedResult = await tryQuery(

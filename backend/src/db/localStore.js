@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 
 const dataDir = process.env.VERCEL ? '/tmp/lugubre-data' : path.resolve('data');
 const dataFile = path.join(dataDir, 'local-db.json');
-const seedVersion = '2026-06-auth-seeds-v2';
+const seedVersion = '2026-06-rpg-data-v3';
 
 function publicUser(user) {
   if (!user) return null;
@@ -21,13 +21,19 @@ function publicUser(user) {
 }
 
 const defaultSkills = [
-  { id: 'skill-luta', key: 'luta', name: 'Luta', attribute: 'forca' },
-  { id: 'skill-pontaria', key: 'pontaria', name: 'Pontaria', attribute: 'agilidade' },
+  { id: 'skill-acrobacia', key: 'acrobacia', name: 'Acrobacia', attribute: 'agilidade' },
+  { id: 'skill-atletismo', key: 'atletismo', name: 'Atletismo', attribute: 'forca' },
+  { id: 'skill-crime', key: 'crime', name: 'Crime', attribute: 'agilidade' },
+  { id: 'skill-enganacao', key: 'enganacao', name: 'Enganação', attribute: 'presenca' },
   { id: 'skill-furtividade', key: 'furtividade', name: 'Furtividade', attribute: 'agilidade' },
-  { id: 'skill-arcana', key: 'arcana', name: 'Arcana', attribute: 'intelecto' },
-  { id: 'skill-religiao', key: 'religiao', name: 'Religião', attribute: 'presenca' },
+  { id: 'skill-iniciativa', key: 'iniciativa', name: 'Iniciativa', attribute: 'agilidade' },
+  { id: 'skill-intimidacao', key: 'intimidacao', name: 'Intimidação', attribute: 'presenca' },
+  { id: 'skill-investigacao', key: 'investigacao', name: 'Investigação', attribute: 'intelecto' },
+  { id: 'skill-medicina', key: 'medicina', name: 'Medicina', attribute: 'intelecto' },
   { id: 'skill-percepcao', key: 'percepcao', name: 'Percepção', attribute: 'presenca' },
-  { id: 'skill-sobrevivencia', key: 'sobrevivencia', name: 'Sobrevivência', attribute: 'vigor' }
+  { id: 'skill-pontaria', key: 'pontaria', name: 'Pontaria', attribute: 'agilidade' },
+  { id: 'skill-reflexos', key: 'reflexos', name: 'Reflexos', attribute: 'agilidade' },
+  { id: 'skill-vontade', key: 'vontade', name: 'Vontade', attribute: 'presenca' }
 ];
 
 const defaultData = {
@@ -40,18 +46,25 @@ const defaultData = {
   friend_messages: [],
   skills: defaultSkills,
   origins: [
-    { id: 'origin-initiated', name: 'Iniciado do Véu', description: 'Conhece rumores, símbolos e presságios.', skill_modifiers: { arcana: 1, religiao: 1 } },
-    { id: 'origin-survivor', name: 'Sobrevivente', description: 'Escapou de algo que ainda sussurra seu nome.', skill_modifiers: { sobrevivencia: 2 } },
-    { id: 'origin-scholar', name: 'Erudito Oculto', description: 'Estudou textos que deveriam permanecer fechados.', skill_modifiers: { arcana: 2 } }
+    { id: 'origin-initiated', name: 'Iniciado do Véu', description: 'Conhece rumores, símbolos e presságios.', skill_modifiers: { investigacao: 5, vontade: 5 } },
+    { id: 'origin-survivor', name: 'Sobrevivente', description: 'Escapou de algo que ainda sussurra seu nome.', skill_modifiers: { atletismo: 5, percepcao: 5 } },
+    { id: 'origin-scholar', name: 'Erudito Oculto', description: 'Estudou textos que deveriam permanecer fechados.', skill_modifiers: { medicina: 5, investigacao: 5 } }
   ],
   races: [
-    { id: 'race-human', name: 'Humano Sombrio', image: '/assets/dark-castle.svg', attribute_modifiers: { forca: 1, presenca: 1 } },
-    { id: 'race-elf', name: 'Elfo Crepuscular', image: '/assets/haunted-ruins.svg', attribute_modifiers: { agilidade: 2, vigor: -1 } },
-    { id: 'race-dwarf', name: 'Anão de Cripta', image: '/assets/crypt-gate.svg', attribute_modifiers: { vigor: 2, agilidade: -1 } }
+    { id: 'race-human', name: 'Humano', image: '', attribute_modifiers: {} },
+    { id: 'race-elf', name: 'Elfo', image: '', attribute_modifiers: { forca: -1, intelecto: 1 } },
+    { id: 'race-dark-elf', name: 'Elfo Negro', image: '', attribute_modifiers: { forca: -1, agilidade: 1 } },
+    { id: 'race-dwarf', name: 'Anão', image: '', attribute_modifiers: { forca: 1, agilidade: -1, intelecto: 1 } },
+    { id: 'race-warforged', name: 'Warforged', image: '', attribute_modifiers: { agilidade: -1, vigor: 1 } }
   ],
   classes: [
-    { id: 'class-blade', name: 'Lâmina Funesta', image: '/assets/crypt-gate.svg', progression: [{ level: 1, mana: 2, feature: 'Golpe sombrio' }, { level: 10, mana: 12, feature: 'Corte sepulcral' }, { level: 20, mana: 25, feature: 'Executor do abismo' }] },
-    { id: 'class-occultist', name: 'Ocultista', image: '/assets/dark-castle.svg', progression: [{ level: 1, mana: 6, feature: 'Ritual menor' }, { level: 10, mana: 22, feature: 'Pacto profano' }, { level: 20, mana: 45, feature: 'Arquimago lúgubre' }] }
+    { id: 'class-cavaleiro', name: 'Cavaleiro', description: 'Espadas, escudos, defesa e combate corpo a corpo.', image: '', progression: [{ level: 1, mana: 0, feature: 'Postura defensiva' }, { level: 5, mana: 0, feature: 'Mestre de escudo' }, { level: 10, mana: 0, feature: 'Golpe de guarda' }, { level: 15, mana: 0, feature: 'Muralha viva' }, { level: 20, mana: 0, feature: 'Campeão de aço' }] },
+    { id: 'class-mago', name: 'Mago', description: 'Cajados, magia, conhecimento e mana.', image: '', progression: [{ level: 1, mana: 2, feature: 'Grimório inicial' }, { level: 5, mana: 4, feature: 'Canalização arcana' }, { level: 10, mana: 6, feature: 'Círculo ampliado' }, { level: 15, mana: 8, feature: 'Domínio ritual' }, { level: 20, mana: 10, feature: 'Arquimago' }] },
+    { id: 'class-atirador', name: 'Atirador', description: 'Armas à distância, pontaria e precisão.', image: '', progression: [{ level: 1, mana: 0, feature: 'Mira calma' }, { level: 5, mana: 0, feature: 'Disparo preciso' }, { level: 10, mana: 0, feature: 'Olho de caçador' }, { level: 15, mana: 0, feature: 'Tiro impossível' }, { level: 20, mana: 0, feature: 'Lenda da mira' }] },
+    { id: 'class-ladino', name: 'Ladino', description: 'Furtividade, crime, agilidade e ataques rápidos.', image: '', progression: [{ level: 1, mana: 0, feature: 'Passos leves' }, { level: 5, mana: 0, feature: 'Ataque oportunista' }, { level: 10, mana: 0, feature: 'Sombra viva' }, { level: 15, mana: 0, feature: 'Mãos invisíveis' }, { level: 20, mana: 0, feature: 'Mestre das sombras' }] },
+    { id: 'class-paladino', name: 'Paladino', description: 'Defesa, fé, espada, proteção e habilidades sagradas.', image: '', progression: [{ level: 1, mana: 1, feature: 'Juramento sagrado' }, { level: 5, mana: 2, feature: 'Proteção divina' }, { level: 10, mana: 3, feature: 'Lâmina consagrada' }, { level: 15, mana: 4, feature: 'Aura protetora' }, { level: 20, mana: 5, feature: 'Guardião santo' }] },
+    { id: 'class-sacerdote', name: 'Sacerdote', description: 'Cura, suporte, fé e proteção espiritual.', image: '', progression: [{ level: 1, mana: 2, feature: 'Prece de cura' }, { level: 5, mana: 4, feature: 'Benção protetora' }, { level: 10, mana: 6, feature: 'Rito de purificação' }, { level: 15, mana: 8, feature: 'Milagre menor' }, { level: 20, mana: 10, feature: 'Voz do santuário' }] },
+    { id: 'class-feiticeiro', name: 'Feiticeiro', description: 'Magia instável, poder bruto e presença arcana.', image: '', progression: [{ level: 1, mana: 3, feature: 'Surto arcano' }, { level: 5, mana: 5, feature: 'Energia instável' }, { level: 10, mana: 7, feature: 'Poder bruto' }, { level: 15, mana: 9, feature: 'Ruptura mística' }, { level: 20, mana: 12, feature: 'Cataclisma pessoal' }] }
   ]
 };
 
@@ -69,10 +82,16 @@ const seedUsers = [
     role: 'admin'
   },
   {
+    name: 'Joao Admin',
+    email: 'joaogames9909@gmail.com',
+    password: 'adm123',
+    role: 'admin'
+  },
+  {
     name: 'Jogador Demo',
     email: 'demo@lugubre.local',
     password: 'demo123',
-    role: 'player'
+    role: 'user'
   }
 ];
 
@@ -128,6 +147,7 @@ async function ensureStore() {
   await fs.mkdir(dataDir, { recursive: true });
   try {
     const data = JSON.parse(await fs.readFile(dataFile, 'utf8'));
+    const shouldRefreshCatalog = data.seed_version !== seedVersion;
     for (const [key, value] of Object.entries(defaultData)) {
       if (!Array.isArray(data[key])) data[key] = value;
     }
@@ -150,12 +170,29 @@ async function ensureStore() {
       character.save_history = Array.isArray(character.save_history) ? character.save_history.slice(0, 3) : [];
       character.updated_at = character.updated_at || character.created_at || new Date().toISOString();
     }
-    for (const key of ['origins', 'races', 'classes', 'skills']) {
-      for (const item of defaultData[key]) {
-        const index = data[key].findIndex((row) => row.id === item.id);
-        if (index >= 0) data[key][index] = { ...data[key][index], ...item };
-        else data[key].push(item);
+    if (shouldRefreshCatalog) {
+      const allowedRaceIds = new Set(defaultData.races.map((item) => item.id));
+      const allowedClassIds = new Set(defaultData.classes.map((item) => item.id));
+      data.races = defaultData.races;
+      data.classes = defaultData.classes;
+      data.skills = defaultData.skills;
+      for (const character of data.characters) {
+        if (character.race_id && !allowedRaceIds.has(character.race_id)) character.race_id = '';
+        if (character.class_id && !allowedClassIds.has(character.class_id)) character.class_id = '';
       }
+    } else {
+      for (const key of ['races', 'classes', 'skills']) {
+        for (const item of defaultData[key]) {
+          const index = data[key].findIndex((row) => row.id === item.id);
+          if (index >= 0) data[key][index] = { ...data[key][index], ...item };
+          else data[key].push(item);
+        }
+      }
+    }
+    for (const item of defaultData.origins) {
+      const index = data.origins.findIndex((row) => row.id === item.id || normalizeEmail(row.name) === normalizeEmail(item.name));
+      if (index >= 0) data.origins[index] = { ...data.origins[index], ...item };
+      else data.origins.push(item);
     }
     await ensureSeedUsers(data);
     await writeStore(data);
@@ -185,7 +222,7 @@ export async function findLocalUserById(id) {
   return publicUser(data.users.find((user) => user.id === id));
 }
 
-export async function createLocalUser({ name, email, password, role = 'player' }) {
+export async function createLocalUser({ name, email, password, role = 'user' }) {
   const data = await ensureStore();
   const normalizedEmail = normalizeEmail(email);
   if (data.users.some((user) => normalizeEmail(user.email) === normalizedEmail)) {

@@ -91,13 +91,15 @@ try {
     }
   }
 
-  const adminEmails = (process.env.ADMIN_EMAILS || 'andreulbrich2012@gmail.com')
+  const builtInAdminEmails = ['andreulbrich2012@gmail.com', 'adm@lugubre.local', 'joaogames9909@gmail.com'];
+  const envAdminEmails = (process.env.ADMIN_EMAILS || '')
     .split(',')
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean);
+  const adminEmails = [...new Set([...builtInAdminEmails, ...envAdminEmails])];
   const seedUsers = [
     ...adminEmails.map((email) => ({ name: 'Administrador Lugubre', email, password: 'adm123', role: 'admin' })),
-    { name: 'Demo Jogador', email: 'demo@lugubre.local', password: 'demo123', role: 'player' }
+    { name: 'Demo Jogador', email: 'demo@lugubre.local', password: 'demo123', role: 'user' }
   ];
 
   for (const user of seedUsers) {

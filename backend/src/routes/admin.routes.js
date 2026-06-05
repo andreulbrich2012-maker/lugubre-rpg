@@ -15,6 +15,7 @@ const raceSchema = z.object({
 
 const classSchema = z.object({
   name: z.string().min(2),
+  description: z.string().optional().default(''),
   image: z.string().optional().nullable(),
   progression: z.array(z.object({
     level: z.coerce.number().min(1).max(20),
@@ -61,15 +62,15 @@ router.delete('/races/:id', async (req, res) => {
 
 router.post('/classes', async (req, res) => {
   const body = classSchema.parse(req.body);
-  const payload = { name: body.name, image: body.image || '', progression: body.progression };
-  const result = await tryQuery('insert into classes (name, image, progression) values ($1, $2, $3) returning *', [payload.name, payload.image, toJson(payload.progression)]);
+  const payload = { name: body.name, description: body.description, image: body.image || '', progression: body.progression };
+  const result = await tryQuery('insert into classes (name, description, image, progression) values ($1, $2, $3, $4) returning *', [payload.name, payload.description, payload.image, toJson(payload.progression)]);
   res.status(201).json(result?.rows?.[0] || await createLocalCatalogItem('classes', payload));
 });
 
 router.put('/classes/:id', async (req, res) => {
   const body = classSchema.parse(req.body);
-  const payload = { name: body.name, image: body.image || '', progression: body.progression };
-  const result = await tryQuery('update classes set name=$1, image=$2, progression=$3 where id=$4 returning *', [payload.name, payload.image, toJson(payload.progression), req.params.id]);
+  const payload = { name: body.name, description: body.description, image: body.image || '', progression: body.progression };
+  const result = await tryQuery('update classes set name=$1, description=$2, image=$3, progression=$4 where id=$5 returning *', [payload.name, payload.description, payload.image, toJson(payload.progression), req.params.id]);
   res.json(result?.rows?.[0] || await updateLocalCatalogItem('classes', req.params.id, payload));
 });
 

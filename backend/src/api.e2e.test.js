@@ -1,9 +1,19 @@
-import { describe, expect, it } from 'vitest';
+import fs from 'fs/promises';
+import path from 'path';
+import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app.js';
 import { signToken } from './middleware/auth.js';
 
 const app = createApp();
+
+beforeAll(async () => {
+  if (process.env.DATABASE_URL) return;
+  await Promise.all([
+    fs.rm(path.resolve('data/local-db.json'), { force: true }),
+    fs.rm(path.resolve('../data/local-db.json'), { force: true })
+  ]);
+});
 
 async function loginAdmin() {
   const { body } = await request(app)
@@ -37,8 +47,15 @@ describe('fluxo principal da API', () => {
       .send({ email: 'demo@lugubre.local', password: 'demo123' })
       .expect(200);
 
-    expect(demo.body.user.role).toBe('player');
+    expect(demo.body.user.role).toBe('user');
     expect(demo.body.token).toBeTruthy();
+
+    const joao = await request(app)
+      .post('/api/auth/login')
+      .send({ email: 'joaogames9909@gmail.com', password: 'adm123' })
+      .expect(200);
+
+    expect(joao.body.user.role).toBe('admin');
 
     const ghostToken = signToken({ id: crypto.randomUUID(), email: 'fantasma@lugubre.local' });
     await request(app)
@@ -114,6 +131,26 @@ describe('fluxo principal da API', () => {
     const adminToken = await loginAdmin();
     const stamp = Date.now();
 
+    const officialSkills = await request(app)
+      .get('/api/catalog/skills')
+      .expect(200);
+
+    expect(officialSkills.body.map((item) => item.key).sort()).toEqual([
+      'acrobacia',
+      'atletismo',
+      'crime',
+      'enganacao',
+      'furtividade',
+      'iniciativa',
+      'intimidacao',
+      'investigacao',
+      'medicina',
+      'percepcao',
+      'pontaria',
+      'reflexos',
+      'vontade'
+    ].sort());
+
     const skill = await request(app)
       .post('/api/admin/skills')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -141,7 +178,7 @@ describe('fluxo principal da API', () => {
     const origin = await request(app)
       .post('/api/admin/origins')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: `Origem ${stamp}`, description: 'Teste', skillModifiers: { [skill.body.key]: 2 } })
+      .send({ name: `Origem ${stamp}`, description: 'Teste', skillModifiers: { [skill.body.key]: 5 } })
       .expect(201);
 
     const user = await request(app)
@@ -232,7 +269,7 @@ describe('fluxo principal da API', () => {
       .expect(201);
 
     expect(character.body.attributes.forca).toBe(5);
-    expect(character.body.skills[skill.body.key]).toBe(2);
+    expect(character.body.skills[skill.body.key]).toBe(5);
     expect(character.body.total_defense).toBe(11);
     expect(character.body.life_current).toBe(63);
     expect(character.body.sanity_current).toBe(52);

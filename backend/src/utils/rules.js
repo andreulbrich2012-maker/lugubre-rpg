@@ -1,5 +1,5 @@
 export const ATTRIBUTE_KEYS = ['forca', 'agilidade', 'intelecto', 'vigor', 'presenca'];
-export const SKILL_KEYS = ['luta', 'pontaria', 'furtividade', 'arcana', 'religiao', 'percepcao', 'sobrevivencia'];
+export const SKILL_KEYS = ['acrobacia', 'atletismo', 'crime', 'enganacao', 'furtividade', 'iniciativa', 'intimidacao', 'investigacao', 'medicina', 'percepcao', 'pontaria', 'reflexos', 'vontade'];
 
 export function baseAttributes() {
   return Object.fromEntries(ATTRIBUTE_KEYS.map((key) => [key, 2]));

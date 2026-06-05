@@ -5,7 +5,7 @@ create table if not exists users (
   name text not null,
   email text not null unique,
   password_hash text not null,
-  role text not null default 'player' check (role in ('player', 'master', 'admin')),
+  role text not null default 'user' check (role in ('user', 'player', 'master', 'admin')),
   profile_image_url text,
   theme text not null default 'lugubre' check (theme in ('sombrio', 'lugubre', 'daltonismo')),
   created_at timestamptz not null default now(),
@@ -15,6 +15,9 @@ create table if not exists users (
 alter table users add column if not exists profile_image_url text;
 alter table users add column if not exists theme text not null default 'lugubre';
 alter table users add column if not exists updated_at timestamptz not null default now();
+alter table users alter column role set default 'user';
+alter table users drop constraint if exists users_role_check;
+alter table users add constraint users_role_check check (role in ('user', 'player', 'master', 'admin'));
 
 create table if not exists races (
   id uuid primary key default uuid_generate_v4(),
@@ -27,10 +30,13 @@ create table if not exists races (
 create table if not exists classes (
   id uuid primary key default uuid_generate_v4(),
   name text not null,
+  description text,
   image text,
   progression jsonb not null default '[]',
   created_at timestamptz not null default now()
 );
+
+alter table classes add column if not exists description text;
 
 create table if not exists origins (
   id uuid primary key default uuid_generate_v4(),
@@ -154,33 +160,58 @@ create unique index if not exists races_name_unique on races (lower(name));
 create unique index if not exists classes_name_unique on classes (lower(name));
 create unique index if not exists origins_name_unique on origins (lower(name));
 
+update characters set race_id = null where race_id in (select id from races where name not in ('Humano','Elfo','Elfo Negro','Anão','Warforged'));
+update characters set class_id = null where class_id in (select id from classes where name not in ('Cavaleiro','Mago','Atirador','Ladino','Paladino','Sacerdote','Feiticeiro'));
+
+delete from races where name not in ('Humano','Elfo','Elfo Negro','Anão','Warforged');
+delete from classes where name not in ('Cavaleiro','Mago','Atirador','Ladino','Paladino','Sacerdote','Feiticeiro');
+delete from skills where "key" not in ('acrobacia','atletismo','crime','enganacao','furtividade','iniciativa','intimidacao','investigacao','medicina','percepcao','pontaria','reflexos','vontade');
+
 insert into races (name, image, attribute_modifiers)
 values
-  ('Humano Sombrio', '/assets/dark-castle.svg', '{"forca":1,"presenca":1}'),
-  ('Elfo Crepuscular', '/assets/haunted-ruins.svg', '{"agilidade":2,"vigor":-1}'),
-  ('Anão de Cripta', '/assets/crypt-gate.svg', '{"vigor":2,"agilidade":-1}')
-on conflict do nothing;
+  ('Humano', '', '{}'),
+  ('Elfo', '', '{"forca":-1,"intelecto":1}'),
+  ('Elfo Negro', '', '{"forca":-1,"agilidade":1}'),
+  ('Anão', '', '{"forca":1,"agilidade":-1,"intelecto":1}'),
+  ('Warforged', '', '{"agilidade":-1,"vigor":1}')
+on conflict ((lower(name))) do update set image = excluded.image, attribute_modifiers = excluded.attribute_modifiers;
 
 insert into origins (name, description, skill_modifiers)
 values
-  ('Iniciado do Véu', 'Conhece rumores, símbolos e presságios.', '{"arcana":1,"religiao":1}'),
-  ('Sobrevivente', 'Escapou de algo que ainda sussurra seu nome.', '{"sobrevivencia":2}'),
-  ('Erudito Oculto', 'Estudou textos que deveriam permanecer fechados.', '{"arcana":2}')
-on conflict do nothing;
+  ('Iniciado do Véu', 'Conhece rumores, símbolos e presságios.', '{"investigacao":5,"vontade":5}'),
+  ('Sobrevivente', 'Escapou de algo que ainda sussurra seu nome.', '{"atletismo":5,"percepcao":5}'),
+  ('Erudito Oculto', 'Estudou textos que deveriam permanecer fechados.', '{"medicina":5,"investigacao":5}')
+on conflict ((lower(name))) do update set description = excluded.description, skill_modifiers = excluded.skill_modifiers;
 
 insert into skills ("key", name, attribute)
 values
-  ('luta', 'Luta', 'forca'),
-  ('pontaria', 'Pontaria', 'agilidade'),
+  ('acrobacia', 'Acrobacia', 'agilidade'),
+  ('atletismo', 'Atletismo', 'forca'),
+  ('crime', 'Crime', 'agilidade'),
+  ('enganacao', 'Enganação', 'presenca'),
   ('furtividade', 'Furtividade', 'agilidade'),
-  ('arcana', 'Arcana', 'intelecto'),
-  ('religiao', 'Religião', 'presenca'),
+  ('iniciativa', 'Iniciativa', 'agilidade'),
+  ('intimidacao', 'Intimidação', 'presenca'),
+  ('investigacao', 'Investigação', 'intelecto'),
+  ('medicina', 'Medicina', 'intelecto'),
   ('percepcao', 'Percepção', 'presenca'),
-  ('sobrevivencia', 'Sobrevivência', 'vigor')
-on conflict do nothing;
+  ('pontaria', 'Pontaria', 'agilidade'),
+  ('reflexos', 'Reflexos', 'agilidade'),
+  ('vontade', 'Vontade', 'presenca')
+on conflict ("key") do update set name = excluded.name, attribute = excluded.attribute;
 
-insert into classes (name, image, progression)
+insert into classes (name, description, image, progression)
 values
-  ('Lâmina Funesta', '/assets/crypt-gate.svg', '[{"level":1,"mana":2,"feature":"Golpe sombrio"},{"level":10,"mana":12,"feature":"Corte sepulcral"},{"level":20,"mana":25,"feature":"Executor do abismo"}]'),
-  ('Ocultista', '/assets/dark-castle.svg', '[{"level":1,"mana":6,"feature":"Ritual menor"},{"level":10,"mana":22,"feature":"Pacto profano"},{"level":20,"mana":45,"feature":"Arquimago lúgubre"}]')
-on conflict do nothing;
+  ('Cavaleiro', 'Espadas, escudos, defesa e combate corpo a corpo.', '', '[{"level":1,"mana":0,"feature":"Postura defensiva"},{"level":5,"mana":0,"feature":"Mestre de escudo"},{"level":10,"mana":0,"feature":"Golpe de guarda"},{"level":15,"mana":0,"feature":"Muralha viva"},{"level":20,"mana":0,"feature":"Campeão de aço"}]'),
+  ('Mago', 'Cajados, magia, conhecimento e mana.', '', '[{"level":1,"mana":2,"feature":"Grimório inicial"},{"level":5,"mana":4,"feature":"Canalização arcana"},{"level":10,"mana":6,"feature":"Círculo ampliado"},{"level":15,"mana":8,"feature":"Domínio ritual"},{"level":20,"mana":10,"feature":"Arquimago"}]'),
+  ('Atirador', 'Armas à distância, pontaria e precisão.', '', '[{"level":1,"mana":0,"feature":"Mira calma"},{"level":5,"mana":0,"feature":"Disparo preciso"},{"level":10,"mana":0,"feature":"Olho de caçador"},{"level":15,"mana":0,"feature":"Tiro impossível"},{"level":20,"mana":0,"feature":"Lenda da mira"}]'),
+  ('Ladino', 'Furtividade, crime, agilidade e ataques rápidos.', '', '[{"level":1,"mana":0,"feature":"Passos leves"},{"level":5,"mana":0,"feature":"Ataque oportunista"},{"level":10,"mana":0,"feature":"Sombra viva"},{"level":15,"mana":0,"feature":"Mãos invisíveis"},{"level":20,"mana":0,"feature":"Mestre das sombras"}]'),
+  ('Paladino', 'Defesa, fé, espada, proteção e habilidades sagradas.', '', '[{"level":1,"mana":1,"feature":"Juramento sagrado"},{"level":5,"mana":2,"feature":"Proteção divina"},{"level":10,"mana":3,"feature":"Lâmina consagrada"},{"level":15,"mana":4,"feature":"Aura protetora"},{"level":20,"mana":5,"feature":"Guardião santo"}]'),
+  ('Sacerdote', 'Cura, suporte, fé e proteção espiritual.', '', '[{"level":1,"mana":2,"feature":"Prece de cura"},{"level":5,"mana":4,"feature":"Benção protetora"},{"level":10,"mana":6,"feature":"Rito de purificação"},{"level":15,"mana":8,"feature":"Milagre menor"},{"level":20,"mana":10,"feature":"Voz do santuário"}]'),
+  ('Feiticeiro', 'Magia instável, poder bruto e presença arcana.', '', '[{"level":1,"mana":3,"feature":"Surto arcano"},{"level":5,"mana":5,"feature":"Energia instável"},{"level":10,"mana":7,"feature":"Poder bruto"},{"level":15,"mana":9,"feature":"Ruptura mística"},{"level":20,"mana":12,"feature":"Cataclisma pessoal"}]')
+on conflict ((lower(name))) do update set description = excluded.description, image = excluded.image, progression = excluded.progression;
+
+insert into users (name, email, password_hash, role)
+values
+  ('Joao Admin', 'joaogames9909@gmail.com', '$2a$10$Cyj/jAp.xt9hJiv9mO1cUOw.xB6x2AeKIm9c5ZDiZ/5517JtvfvBC', 'admin')
+on conflict (email) do update set role = 'admin', updated_at = now();

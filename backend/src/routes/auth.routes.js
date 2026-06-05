@@ -31,15 +31,20 @@ function authMessage(error, fallback) {
   return error?.message || fallback;
 }
 
+function adminEmails() {
+  const builtInAdminEmails = ['andreulbrich2012@gmail.com', 'adm@lugubre.local', 'joaogames9909@gmail.com'];
+  const envAdminEmails = (process.env.ADMIN_EMAILS || '')
+    .split(',')
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+  return new Set([...builtInAdminEmails, ...envAdminEmails]);
+}
+
 router.post('/register', async (req, res) => {
   try {
     const body = credentials.extend({ name: z.string().trim().min(2) }).parse(req.body);
     const passwordHash = await bcrypt.hash(body.password, 10);
-    const adminEmails = (process.env.ADMIN_EMAILS || 'andreulbrich2012@gmail.com')
-      .split(',')
-      .map((email) => email.trim().toLowerCase())
-      .filter(Boolean);
-    const role = adminEmails.includes(body.email) ? 'admin' : 'player';
+    const role = adminEmails().has(body.email) ? 'admin' : 'user';
     const result = await tryQuery(
       `insert into users (name, email, password_hash, role)
        values ($1, $2, $3, $4)

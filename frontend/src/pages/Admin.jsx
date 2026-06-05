@@ -7,7 +7,7 @@ const attributes = ['forca', 'agilidade', 'intelecto', 'vigor', 'presenca'];
 export default function Admin() {
   const [catalog, setCatalog] = useState({ races: [], classes: [], origins: [], skills: [] });
   const [race, setRace] = useState(blankRace());
-  const [klass, setKlass] = useState({ name: '', image: '', progression: [{ level: 1, mana: 0, feature: '' }] });
+  const [klass, setKlass] = useState({ name: '', description: '', image: '', progression: [{ level: 1, mana: 0, feature: '' }] });
   const [origin, setOrigin] = useState(blankOrigin());
   const [skill, setSkill] = useState({ name: '', key: '', attribute: 'presenca' });
   const [editor, setEditor] = useState(null);
@@ -34,7 +34,7 @@ export default function Admin() {
   async function addClass(event) {
     event.preventDefault();
     await api.post('/admin/classes', klass);
-    setKlass({ name: '', image: '', progression: [{ level: 1, mana: 0, feature: '' }] });
+    setKlass({ name: '', description: '', image: '', progression: [{ level: 1, mana: 0, feature: '' }] });
     load();
   }
 
@@ -77,6 +77,7 @@ export default function Admin() {
     if (type === 'classes') {
       await api.put(`/admin/classes/${item.id}`, {
         name: item.name,
+        description: item.description || '',
         image: item.image || '',
         progression: item.progression || []
       });
@@ -105,6 +106,7 @@ export default function Admin() {
 
         <Panel title="Classes" onSubmit={addClass}>
           <Input placeholder="Nome" value={klass.name} onChange={(name) => setKlass({ ...klass, name })} />
+          <Input placeholder="Descrição curta" value={klass.description} onChange={(description) => setKlass({ ...klass, description })} />
           <textarea className="w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" placeholder="Progressão nível 1" value={klass.progression[0].feature} onChange={(event) => setKlass({ ...klass, progression: [{ level: 1, mana: 0, feature: event.target.value }] })} />
           <Button>Adicionar classe</Button>
           <List items={catalog.classes} endpoint="classes" onEdit={(item) => setEditor({ type: 'classes', item: { ...item } })} onRemove={remove} />
@@ -136,6 +138,7 @@ export default function Admin() {
             <div className="mt-5 space-y-4">
               <Input placeholder="Nome" value={editor.item.name} onChange={(name) => setEditor({ ...editor, item: { ...editor.item, name } })} />
               {editor.type === 'origins' && <textarea className="w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={editor.item.description || ''} onChange={(event) => setEditor({ ...editor, item: { ...editor.item, description: event.target.value } })} />}
+              {editor.type === 'classes' && <Input placeholder="Descrição curta" value={editor.item.description || ''} onChange={(description) => setEditor({ ...editor, item: { ...editor.item, description } })} />}
               {editor.type === 'races' && <ModifierGrid title="Modificadores de atributos" keysList={attributes} values={editor.item.attribute_modifiers || {}} onChange={(attribute_modifiers) => setEditor({ ...editor, item: { ...editor.item, attribute_modifiers } })} />}
               {editor.type === 'origins' && <ModifierGrid title="Bônus de perícias" keysList={catalog.skills.map((item) => item.key)} labels={catalog.skills} values={editor.item.skill_modifiers || {}} onChange={(skill_modifiers) => setEditor({ ...editor, item: { ...editor.item, skill_modifiers } })} />}
               {editor.type === 'skills' && (

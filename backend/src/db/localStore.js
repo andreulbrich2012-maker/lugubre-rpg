@@ -141,6 +141,15 @@ async function ensureStore() {
       user.theme = user.theme || 'lugubre';
       user.updated_at = user.updated_at || user.created_at || new Date().toISOString();
     }
+    for (const character of data.characters) {
+      character.life_current = Number(character.life_current ?? character.lifeCurrent ?? 63);
+      character.life_max = Number(character.life_max ?? character.lifeMax ?? 63);
+      character.sanity_current = Number(character.sanity_current ?? character.sanityCurrent ?? 52);
+      character.sanity_max = Number(character.sanity_max ?? character.sanityMax ?? 52);
+      character.mana_max = Number(character.mana_max ?? character.manaMax ?? character.mana ?? 0);
+      character.save_history = Array.isArray(character.save_history) ? character.save_history.slice(0, 3) : [];
+      character.updated_at = character.updated_at || character.created_at || new Date().toISOString();
+    }
     for (const key of ['origins', 'races', 'classes', 'skills']) {
       for (const item of defaultData[key]) {
         const index = data[key].findIndex((row) => row.id === item.id);
@@ -157,6 +166,13 @@ async function ensureStore() {
     await writeStore(data);
     return data;
   }
+}
+
+function nextSaveHistory(existing = [], label = 'Salvamento') {
+  return [
+    { id: crypto.randomUUID(), label, saved_at: new Date().toISOString() },
+    ...existing
+  ].slice(0, 3);
 }
 
 export async function findLocalUserByEmail(email) {
@@ -285,6 +301,7 @@ export async function getLocalCharacter(id, ownerId) {
 
 export async function createLocalCharacter(ownerId, character) {
   const data = await ensureStore();
+  const now = new Date().toISOString();
   const row = {
     ...character,
     id: crypto.randomUUID(),
@@ -294,9 +311,15 @@ export async function createLocalCharacter(ownerId, character) {
     race_id: character.raceId || null,
     class_id: character.classId || null,
     origin_id: character.originId || null,
+    life_current: character.lifeCurrent ?? 63,
+    life_max: character.lifeMax ?? 63,
+    sanity_current: character.sanityCurrent ?? 52,
+    sanity_max: character.sanityMax ?? 52,
+    mana_max: character.manaMax ?? character.mana ?? 0,
     share_token: crypto.randomUUID(),
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    save_history: [{ id: crypto.randomUUID(), label: 'Criacao da ficha', saved_at: now }],
+    created_at: now,
+    updated_at: now
   };
   data.characters.push(row);
   await writeStore(data);
@@ -307,14 +330,21 @@ export async function updateLocalCharacter(id, ownerId, character) {
   const data = await ensureStore();
   const index = data.characters.findIndex((row) => row.id === id && row.owner_id === ownerId);
   if (index === -1) return null;
+  const label = character.characterName ? 'Edicao da base' : 'Ajuste de jogo';
   data.characters[index] = {
     ...data.characters[index],
     ...character,
-    player_name: character.playerName,
-    character_name: character.characterName,
-    race_id: character.raceId || null,
-    class_id: character.classId || null,
-    origin_id: character.originId || null,
+    player_name: character.playerName ?? data.characters[index].player_name,
+    character_name: character.characterName ?? data.characters[index].character_name,
+    race_id: character.raceId ?? data.characters[index].race_id ?? null,
+    class_id: character.classId ?? data.characters[index].class_id ?? null,
+    origin_id: character.originId ?? data.characters[index].origin_id ?? null,
+    life_current: character.lifeCurrent ?? data.characters[index].life_current ?? 63,
+    life_max: character.lifeMax ?? data.characters[index].life_max ?? 63,
+    sanity_current: character.sanityCurrent ?? data.characters[index].sanity_current ?? 52,
+    sanity_max: character.sanityMax ?? data.characters[index].sanity_max ?? 52,
+    mana_max: character.manaMax ?? data.characters[index].mana_max ?? character.mana ?? 0,
+    save_history: nextSaveHistory(data.characters[index].save_history, label),
     updated_at: new Date().toISOString()
   };
   await writeStore(data);

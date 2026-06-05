@@ -59,7 +59,12 @@ create table if not exists characters (
   origin_id uuid references origins(id),
   origin text,
   level int not null default 1 check (level between 1 and 20),
+  life_current int not null default 63,
+  life_max int not null default 63,
+  sanity_current int not null default 52,
+  sanity_max int not null default 52,
   mana int not null default 0,
+  mana_max int not null default 0,
   defense int not null default 10,
   attributes jsonb not null,
   skills jsonb not null,
@@ -68,6 +73,23 @@ create table if not exists characters (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table characters add column if not exists life_current int not null default 63;
+alter table characters add column if not exists life_max int not null default 63;
+alter table characters add column if not exists sanity_current int not null default 52;
+alter table characters add column if not exists sanity_max int not null default 52;
+alter table characters add column if not exists mana_max int not null default 0;
+update characters set mana_max = mana where mana_max = 0 and mana > 0;
+
+create table if not exists character_saves (
+  id uuid primary key default uuid_generate_v4(),
+  character_id uuid not null references characters(id) on delete cascade,
+  label text not null,
+  snapshot jsonb not null,
+  saved_at timestamptz not null default now()
+);
+
+create index if not exists character_saves_recent_idx on character_saves (character_id, saved_at desc);
 
 create table if not exists campaigns (
   id uuid primary key default uuid_generate_v4(),

@@ -2,9 +2,11 @@ import { ArrowLeft, ArrowRight, Save, Upload } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../components/Button';
+import EntityImage from '../components/EntityImage';
 import { api } from '../lib/api';
 
 const attributeKeys = ['forca', 'agilidade', 'intelecto', 'vigor', 'presenca'];
+const baseAttributes = Object.fromEntries(attributeKeys.map((key) => [key, 2]));
 const steps = ['Jogador', 'Personagem', 'Foto', 'Raça', 'Classe', 'Origem', 'Atributos', 'Inventário', 'Resumo'];
 const initial = {
   playerName: '',
@@ -15,9 +17,14 @@ const initial = {
   originId: '',
   origin: '',
   level: 1,
+  lifeCurrent: 63,
+  lifeMax: 63,
+  sanityCurrent: 52,
+  sanityMax: 52,
   mana: 10,
+  manaMax: 10,
   defense: 10,
-  attributes: Object.fromEntries(attributeKeys.map((key) => [key, 2])),
+  attributes: baseAttributes,
   skills: {},
   inventory: []
 };
@@ -33,8 +40,8 @@ export default function CharacterBuilder() {
   const selectedRace = catalog.races.find((race) => race.id === form.raceId);
   const finalAttributes = useMemo(() => {
     const modifiers = selectedRace?.attribute_modifiers || {};
-    return Object.fromEntries(attributeKeys.map((key) => [key, Number(form.attributes[key] || 2) + Number(modifiers[key] || 0)]));
-  }, [form.attributes, selectedRace]);
+    return Object.fromEntries(attributeKeys.map((key) => [key, Number(baseAttributes[key] || 2) + Number(modifiers[key] || 0)]));
+  }, [selectedRace]);
 
   useEffect(() => {
     Promise.all([api.get('/catalog/races'), api.get('/catalog/classes'), api.get('/catalog/origins')])
@@ -48,9 +55,14 @@ export default function CharacterBuilder() {
       originId: data.origin_id || '',
       origin: data.origin || '',
       level: data.level,
+      lifeCurrent: data.life_current ?? 63,
+      lifeMax: data.life_max ?? 63,
+      sanityCurrent: data.sanity_current ?? 52,
+      sanityMax: data.sanity_max ?? 52,
       mana: data.mana,
+      manaMax: data.mana_max ?? data.mana,
       defense: data.defense,
-      attributes: data.attributes,
+      attributes: baseAttributes,
       skills: data.skills || {},
       inventory: data.inventory || []
     }));
@@ -103,10 +115,10 @@ export default function CharacterBuilder() {
             {step === 0 && <BigInput label="Nome do jogador" value={form.playerName} onChange={(playerName) => setForm({ ...form, playerName })} />}
             {step === 1 && <BigInput label="Nome do personagem" value={form.characterName} onChange={(characterName) => setForm({ ...form, characterName })} />}
             {step === 2 && <PhotoStep form={form} setForm={setForm} />}
-            {step === 3 && <PickList title="Escolha a raça" items={catalog.races} value={form.raceId} onChange={(raceId) => setForm({ ...form, raceId })} />}
-            {step === 4 && <PickList title="Escolha a classe" items={catalog.classes} value={form.classId} onChange={(classId) => setForm({ ...form, classId })} />}
+            {step === 3 && <PickList title="Escolha a raça" label="Raça" items={catalog.races} value={form.raceId} onChange={(raceId) => setForm({ ...form, raceId })} />}
+            {step === 4 && <PickList title="Escolha a classe" label="Classe" items={catalog.classes} value={form.classId} onChange={(classId) => setForm({ ...form, classId })} />}
             {step === 5 && <OriginStep catalog={catalog} form={form} setForm={setForm} />}
-            {step === 6 && <NumberGrid title="Atributos" keysList={attributeKeys} values={form.attributes} onChange={(attributes) => setForm({ ...form, attributes })} finalValues={finalAttributes} />}
+            {step === 6 && <AttributePreview attributes={finalAttributes} selectedRace={selectedRace} />}
             {step === 7 && <Inventory form={form} setForm={setForm} />}
             {step === 8 && <Summary form={form} attributes={finalAttributes} catalog={catalog} />}
             {error && <p className="mt-6 text-sm text-red-300">{error}</p>}
@@ -147,16 +159,17 @@ function PhotoStep({ form, setForm }) {
   return <div><p className="text-sm uppercase tracking-[.22em] text-ember">Foto do personagem</p><label className="mt-8 flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-ember/35 bg-black/20 text-mist soft-motion sm:min-h-72">{form.photo ? <img src={form.photo} className="h-56 w-full rounded-md object-cover sm:h-72" /> : <><Upload className="text-ember" /><span className="mt-3">Selecionar arquivo</span></>}<input type="file" accept="image/*" className="hidden" onChange={loadFile} /></label></div>;
 }
 
-function PickList({ title, items, value, onChange }) {
-  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">{title}</p><div className="mt-6 grid gap-4 md:grid-cols-3">{items.map((item) => <button key={item.id} onClick={() => onChange(item.id)} className={`gothic-panel rounded-md p-5 text-left soft-motion ${value === item.id ? 'border-ember bg-ember/10' : ''}`}><div className="mb-4 h-20 rounded bg-[radial-gradient(circle_at_center,rgba(143,29,44,.35),transparent_52%),linear-gradient(135deg,rgba(214,166,95,.12),rgba(0,0,0,.2))]" /><strong>{item.name}</strong>{item.description && <p className="mt-2 text-sm text-mist">{item.description}</p>}</button>)}</div></div>;
+function PickList({ title, label, items, value, onChange }) {
+  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">{title}</p><div className="mt-6 grid gap-4 md:grid-cols-3">{items.map((item) => <button key={item.id} onClick={() => onChange(item.id)} className={`gothic-panel rounded-md p-4 text-left soft-motion ${value === item.id ? 'border-ember bg-ember/10' : ''}`}><EntityImage src={item.image} label={label} name={item.name} className="mb-4 h-24" /><strong>{item.name}</strong>{item.description && <p className="mt-2 text-sm text-mist">{item.description}</p>}</button>)}</div></div>;
 }
 
 function OriginStep({ catalog, form, setForm }) {
-  return <div><PickList title="Escolha uma origem" items={catalog.origins} value={form.originId} onChange={(originId) => setForm({ ...form, originId, origin: '' })} /><label className="mt-6 block text-sm text-mist">Origem personalizada<input className="mt-2 w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={form.origin} onChange={(event) => setForm({ ...form, origin: event.target.value, originId: '' })} /></label></div>;
+  return <div><PickList title="Escolha uma origem" label="Origem" items={catalog.origins} value={form.originId} onChange={(originId) => setForm({ ...form, originId, origin: '' })} /><label className="mt-6 block text-sm text-mist">Origem personalizada<input className="mt-2 w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={form.origin} onChange={(event) => setForm({ ...form, origin: event.target.value, originId: '' })} /></label></div>;
 }
 
-function NumberGrid({ title, keysList, values, onChange, finalValues }) {
-  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">{title}</p><div className="mt-6 grid gap-4 md:grid-cols-3">{keysList.map((key) => <label key={key} className="rounded-md border border-ember/15 bg-black/20 p-4 text-sm capitalize text-mist">{key}<input type="number" className="mt-2 w-full bg-transparent text-4xl font-bold outline-none" value={values[key]} onChange={(event) => onChange({ ...values, [key]: Number(event.target.value) })} />{finalValues && <span className="text-xs text-ember">Final: {finalValues[key]}</span>}</label>)}</div></div>;
+function AttributePreview({ attributes, selectedRace }) {
+  const modifiers = selectedRace?.attribute_modifiers || {};
+  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">Atributos calculados</p><p className="mt-3 max-w-2xl text-sm text-mist">Todos começam em 2 e são fechados automaticamente pela raça. Nesta etapa você apenas confere o resultado final.</p><div className="mt-6 grid gap-4 md:grid-cols-5">{attributeKeys.map((key) => <div key={key} className="rounded-md border border-ember/15 bg-black/20 p-4 text-center text-sm capitalize text-mist"><span>{key}</span><div className="mt-2 text-4xl font-bold text-white">{attributes[key]}</div><span className="text-xs text-ember">Base 2 {Number(modifiers[key] || 0) >= 0 ? '+' : ''}{Number(modifiers[key] || 0)}</span></div>)}</div></div>;
 }
 
 function Inventory({ form, setForm }) {
@@ -178,7 +191,7 @@ function SheetPreview({ form, attributes, catalog }) {
   const klass = catalog.classes.find((item) => item.id === form.classId)?.name || 'Classe';
   const origin = catalog.origins.find((item) => item.id === form.originId)?.name || form.origin || 'Origem';
   const totalDefense = form.defense + form.inventory.reduce((sum, item) => sum + Number(item.defenseBonus || 0), 0);
-  return <div><h2 className="font-display text-3xl text-ember">{form.characterName || 'Personagem'}</h2><p className="text-sm text-mist">{form.playerName || 'Jogador'} · {origin}</p><p className="mt-1 text-sm text-mist">{race} · {klass}</p><div className="mt-5 grid grid-cols-3 gap-3 text-center"><Stat label="Vida" value="63" /><Stat label="Mana" value={form.mana} /><Stat label="Defesa" value={totalDefense} /></div><div className="mt-5 grid grid-cols-5 gap-2">{attributeKeys.map((key) => <Stat key={key} label={key.slice(0, 3).toUpperCase()} value={attributes[key]} />)}</div><p className="mt-4 text-center text-sm text-mist">Esquiva {15 - attributes.agilidade}</p></div>;
+  return <div><h2 className="font-display text-3xl text-ember">{form.characterName || 'Personagem'}</h2><p className="text-sm text-mist">{form.playerName || 'Jogador'} · {origin}</p><p className="mt-1 text-sm text-mist">{race} · {klass}</p><div className="mt-5 grid grid-cols-3 gap-3 text-center"><Stat label="Vida" value={`${form.lifeCurrent}/${form.lifeMax}`} /><Stat label="Sanidade" value={`${form.sanityCurrent}/${form.sanityMax}`} /><Stat label="Mana" value={`${form.mana}/${form.manaMax || form.mana}`} /></div><div className="mt-3 grid grid-cols-1 gap-3 text-center"><Stat label="Defesa" value={totalDefense} /></div><div className="mt-5 grid grid-cols-5 gap-2">{attributeKeys.map((key) => <Stat key={key} label={key.slice(0, 3).toUpperCase()} value={attributes[key]} />)}</div><p className="mt-4 text-center text-sm text-mist">Esquiva {15 - attributes.agilidade}</p></div>;
 }
 
 function Stat({ label, value }) {

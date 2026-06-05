@@ -219,7 +219,12 @@ describe('fluxo principal da API', () => {
         raceId: editedRace.body.id,
         classId: klass.body.id,
         originId: origin.body.id,
+        lifeCurrent: 63,
+        lifeMax: 63,
+        sanityCurrent: 52,
+        sanityMax: 52,
         mana: 10,
+        manaMax: 10,
         defense: 10,
         attributes: { forca: 2, agilidade: 2, intelecto: 2, vigor: 2, presenca: 2 },
         inventory: [{ name: 'Couraça', weight: 2, defenseBonus: 1 }]
@@ -229,12 +234,39 @@ describe('fluxo principal da API', () => {
     expect(character.body.attributes.forca).toBe(5);
     expect(character.body.skills[skill.body.key]).toBe(2);
     expect(character.body.total_defense).toBe(11);
+    expect(character.body.life_current).toBe(63);
+    expect(character.body.sanity_current).toBe(52);
+    expect(character.body.mana_max).toBe(10);
+    expect(character.body.save_history).toHaveLength(1);
 
     await request(app)
       .patch(`/api/characters/${character.body.id}/play`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ mana: 8, skills: { [skill.body.key]: 4 } })
+      .send({ lifeCurrent: 40, sanityCurrent: 30, mana: 8, manaMax: 10, skills: { [skill.body.key]: 4 } })
       .expect(200);
+
+    await request(app)
+      .patch(`/api/characters/${character.body.id}/play`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ lifeCurrent: 39, sanityCurrent: 29, mana: 7 })
+      .expect(200);
+
+    await request(app)
+      .patch(`/api/characters/${character.body.id}/play`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ lifeCurrent: 38, sanityCurrent: 28, mana: 6 })
+      .expect(200);
+
+    const savedCharacter = await request(app)
+      .patch(`/api/characters/${character.body.id}/play`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ lifeCurrent: 37, sanityCurrent: 27, mana: 5 })
+      .expect(200);
+
+    expect(savedCharacter.body.life_current).toBe(37);
+    expect(savedCharacter.body.sanity_current).toBe(27);
+    expect(savedCharacter.body.mana).toBe(5);
+    expect(savedCharacter.body.save_history).toHaveLength(3);
 
     const campaign = await request(app)
       .post('/api/campaigns')
@@ -303,5 +335,6 @@ describe('fluxo principal da API', () => {
     const d20 = Math.floor(Math.random() * 20) + 1;
     expect(d20).toBeGreaterThanOrEqual(1);
     expect(d20).toBeLessThanOrEqual(20);
+    expect(d20 + savedCharacter.body.skills[skill.body.key]).toBeGreaterThan(savedCharacter.body.skills[skill.body.key]);
   });
 });

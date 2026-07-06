@@ -75,6 +75,8 @@ create table if not exists characters (
   attributes jsonb not null,
   skills jsonb not null,
   inventory jsonb not null default '[]',
+  attacks jsonb not null default '[]',
+  spells jsonb not null default '[]',
   share_token uuid not null default uuid_generate_v4(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -85,6 +87,8 @@ alter table characters add column if not exists life_max int not null default 63
 alter table characters add column if not exists sanity_current int not null default 52;
 alter table characters add column if not exists sanity_max int not null default 52;
 alter table characters add column if not exists mana_max int not null default 0;
+alter table characters add column if not exists attacks jsonb not null default '[]';
+alter table characters add column if not exists spells jsonb not null default '[]';
 update characters set mana_max = mana where mana_max = 0 and mana > 0;
 
 create table if not exists character_saves (
@@ -160,11 +164,13 @@ create unique index if not exists races_name_unique on races (lower(name));
 create unique index if not exists classes_name_unique on classes (lower(name));
 create unique index if not exists origins_name_unique on origins (lower(name));
 
-update characters set race_id = null where race_id in (select id from races where name not in ('Humano','Elfo','Elfo Negro','Anão','Warforged'));
+update characters set race_id = null where race_id in (select id from races where name not in ('Humano','Elfo','Elfo Negro','Anão','Tiefling','Halfling','Genasi'));
 update characters set class_id = null where class_id in (select id from classes where name not in ('Cavaleiro','Mago','Atirador','Ladino','Paladino','Sacerdote','Feiticeiro'));
+update characters set origin_id = null where origin_id in (select id from origins where name not in ('Sobrevivente','Nobre','Criminoso','Pesquisador','Caçador','Soldado','Religioso','Mercador'));
 
-delete from races where name not in ('Humano','Elfo','Elfo Negro','Anão','Warforged');
+delete from races where name not in ('Humano','Elfo','Elfo Negro','Anão','Tiefling','Halfling','Genasi');
 delete from classes where name not in ('Cavaleiro','Mago','Atirador','Ladino','Paladino','Sacerdote','Feiticeiro');
+delete from origins where name not in ('Sobrevivente','Nobre','Criminoso','Pesquisador','Caçador','Soldado','Religioso','Mercador');
 delete from skills where "key" not in ('acrobacia','atletismo','crime','enganacao','furtividade','iniciativa','intimidacao','investigacao','medicina','percepcao','pontaria','reflexos','vontade');
 
 insert into races (name, image, attribute_modifiers)
@@ -173,14 +179,21 @@ values
   ('Elfo', '', '{"forca":-1,"intelecto":1}'),
   ('Elfo Negro', '', '{"forca":-1,"agilidade":1}'),
   ('Anão', '', '{"forca":1,"agilidade":-1,"intelecto":1}'),
-  ('Warforged', '', '{"agilidade":-1,"vigor":1}')
+  ('Tiefling', '', '{"presenca":-1,"intelecto":1}'),
+  ('Halfling', '', '{"agilidade":-1,"presenca":1}'),
+  ('Genasi', '', '{}')
 on conflict ((lower(name))) do update set image = excluded.image, attribute_modifiers = excluded.attribute_modifiers;
 
 insert into origins (name, description, skill_modifiers)
 values
-  ('Iniciado do Véu', 'Conhece rumores, símbolos e presságios.', '{"investigacao":5,"vontade":5}'),
-  ('Sobrevivente', 'Escapou de algo que ainda sussurra seu nome.', '{"atletismo":5,"percepcao":5}'),
-  ('Erudito Oculto', 'Estudou textos que deveriam permanecer fechados.', '{"medicina":5,"investigacao":5}')
+  ('Sobrevivente', 'Escapou de terras hostis e aprendeu a resistir quando tudo desaba.', '{"atletismo":5,"vontade":5}'),
+  ('Nobre', 'Cresceu entre intrigas, títulos e ameaças ditas em voz baixa.', '{"enganacao":5,"intimidacao":5}'),
+  ('Criminoso', 'Conhece becos, fechaduras e o valor do silêncio.', '{"crime":5,"furtividade":5}'),
+  ('Pesquisador', 'Procura respostas em cadáveres, arquivos e vestígios proibidos.', '{"investigacao":5,"medicina":5}'),
+  ('Caçador', 'Rastreia presas e perigos antes que eles percebam sua presença.', '{"percepcao":5,"pontaria":5}'),
+  ('Soldado', 'Foi treinado para sobreviver ao caos da linha de frente.', '{"atletismo":5,"reflexos":5}'),
+  ('Religioso', 'Carrega ritos, fé e cuidado contra horrores do mundo.', '{"vontade":5,"medicina":5}'),
+  ('Mercador', 'Aprendeu a ler pessoas e vender verdades convenientes.', '{"enganacao":5,"percepcao":5}')
 on conflict ((lower(name))) do update set description = excluded.description, skill_modifiers = excluded.skill_modifiers;
 
 insert into skills ("key", name, attribute)

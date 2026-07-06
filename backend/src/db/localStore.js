@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 
 const dataDir = process.env.VERCEL ? '/tmp/lugubre-data' : path.resolve('data');
 const dataFile = path.join(dataDir, 'local-db.json');
-const seedVersion = '2026-06-rpg-data-v3';
+const seedVersion = '2026-07-rpg-sheet-v4';
 
 function publicUser(user) {
   if (!user) return null;
@@ -46,16 +46,23 @@ const defaultData = {
   friend_messages: [],
   skills: defaultSkills,
   origins: [
-    { id: 'origin-initiated', name: 'Iniciado do Véu', description: 'Conhece rumores, símbolos e presságios.', skill_modifiers: { investigacao: 5, vontade: 5 } },
-    { id: 'origin-survivor', name: 'Sobrevivente', description: 'Escapou de algo que ainda sussurra seu nome.', skill_modifiers: { atletismo: 5, percepcao: 5 } },
-    { id: 'origin-scholar', name: 'Erudito Oculto', description: 'Estudou textos que deveriam permanecer fechados.', skill_modifiers: { medicina: 5, investigacao: 5 } }
+    { id: 'origin-survivor', name: 'Sobrevivente', description: 'Escapou de terras hostis e aprendeu a resistir quando tudo desaba.', skill_modifiers: { atletismo: 5, vontade: 5 } },
+    { id: 'origin-noble', name: 'Nobre', description: 'Cresceu entre intrigas, títulos e ameaças ditas em voz baixa.', skill_modifiers: { enganacao: 5, intimidacao: 5 } },
+    { id: 'origin-criminal', name: 'Criminoso', description: 'Conhece becos, fechaduras e o valor do silêncio.', skill_modifiers: { crime: 5, furtividade: 5 } },
+    { id: 'origin-researcher', name: 'Pesquisador', description: 'Procura respostas em cadáveres, arquivos e vestígios proibidos.', skill_modifiers: { investigacao: 5, medicina: 5 } },
+    { id: 'origin-hunter', name: 'Caçador', description: 'Rastreia presas e perigos antes que eles percebam sua presença.', skill_modifiers: { percepcao: 5, pontaria: 5 } },
+    { id: 'origin-soldier', name: 'Soldado', description: 'Foi treinado para sobreviver ao caos da linha de frente.', skill_modifiers: { atletismo: 5, reflexos: 5 } },
+    { id: 'origin-religious', name: 'Religioso', description: 'Carrega ritos, fé e cuidado contra horrores do mundo.', skill_modifiers: { vontade: 5, medicina: 5 } },
+    { id: 'origin-merchant', name: 'Mercador', description: 'Aprendeu a ler pessoas e vender verdades convenientes.', skill_modifiers: { enganacao: 5, percepcao: 5 } }
   ],
   races: [
     { id: 'race-human', name: 'Humano', image: '', attribute_modifiers: {} },
     { id: 'race-elf', name: 'Elfo', image: '', attribute_modifiers: { forca: -1, intelecto: 1 } },
     { id: 'race-dark-elf', name: 'Elfo Negro', image: '', attribute_modifiers: { forca: -1, agilidade: 1 } },
     { id: 'race-dwarf', name: 'Anão', image: '', attribute_modifiers: { forca: 1, agilidade: -1, intelecto: 1 } },
-    { id: 'race-warforged', name: 'Warforged', image: '', attribute_modifiers: { agilidade: -1, vigor: 1 } }
+    { id: 'race-tiefling', name: 'Tiefling', image: '', attribute_modifiers: { presenca: -1, intelecto: 1 } },
+    { id: 'race-halfling', name: 'Halfling', image: '', attribute_modifiers: { agilidade: -1, presenca: 1 } },
+    { id: 'race-genasi', name: 'Genasi', image: '', attribute_modifiers: {} }
   ],
   classes: [
     { id: 'class-cavaleiro', name: 'Cavaleiro', description: 'Espadas, escudos, defesa e combate corpo a corpo.', image: '', progression: [{ level: 1, mana: 0, feature: 'Postura defensiva' }, { level: 5, mana: 0, feature: 'Mestre de escudo' }, { level: 10, mana: 0, feature: 'Golpe de guarda' }, { level: 15, mana: 0, feature: 'Muralha viva' }, { level: 20, mana: 0, feature: 'Campeão de aço' }] },
@@ -167,6 +174,15 @@ async function ensureStore() {
       character.sanity_current = Number(character.sanity_current ?? character.sanityCurrent ?? 52);
       character.sanity_max = Number(character.sanity_max ?? character.sanityMax ?? 52);
       character.mana_max = Number(character.mana_max ?? character.manaMax ?? character.mana ?? 0);
+      character.inventory = (Array.isArray(character.inventory) ? character.inventory : []).map((item) => ({
+        quantity: Number(item.quantity ?? 1),
+        weight: Number(item.weight ?? 0),
+        name: item.name || 'Item',
+        description: item.description || '',
+        defenseBonus: Number(item.defenseBonus ?? 0)
+      }));
+      character.attacks = Array.isArray(character.attacks) ? character.attacks : [];
+      character.spells = Array.isArray(character.spells) ? character.spells : [];
       character.save_history = Array.isArray(character.save_history) ? character.save_history.slice(0, 3) : [];
       character.updated_at = character.updated_at || character.created_at || new Date().toISOString();
     }
@@ -176,6 +192,7 @@ async function ensureStore() {
       data.races = defaultData.races;
       data.classes = defaultData.classes;
       data.skills = defaultData.skills;
+      data.origins = defaultData.origins;
       for (const character of data.characters) {
         if (character.race_id && !allowedRaceIds.has(character.race_id)) character.race_id = '';
         if (character.class_id && !allowedClassIds.has(character.class_id)) character.class_id = '';
@@ -353,6 +370,9 @@ export async function createLocalCharacter(ownerId, character) {
     sanity_current: character.sanityCurrent ?? 52,
     sanity_max: character.sanityMax ?? 52,
     mana_max: character.manaMax ?? character.mana ?? 0,
+    inventory: character.inventory ?? [],
+    attacks: character.attacks ?? [],
+    spells: character.spells ?? [],
     share_token: crypto.randomUUID(),
     save_history: [{ id: crypto.randomUUID(), label: 'Criacao da ficha', saved_at: now }],
     created_at: now,
@@ -381,6 +401,9 @@ export async function updateLocalCharacter(id, ownerId, character) {
     sanity_current: character.sanityCurrent ?? data.characters[index].sanity_current ?? 52,
     sanity_max: character.sanityMax ?? data.characters[index].sanity_max ?? 52,
     mana_max: character.manaMax ?? data.characters[index].mana_max ?? character.mana ?? 0,
+    inventory: character.inventory ?? data.characters[index].inventory ?? [],
+    attacks: character.attacks ?? data.characters[index].attacks ?? [],
+    spells: character.spells ?? data.characters[index].spells ?? [],
     save_history: nextSaveHistory(data.characters[index].save_history, label),
     updated_at: new Date().toISOString()
   };

@@ -5,7 +5,7 @@ import Button from '../components/Button';
 import EntityImage from '../components/EntityImage';
 import { api } from '../lib/api';
 
-const attributeKeys = ['forca', 'agilidade', 'intelecto', 'vigor', 'presenca'];
+const attributeKeys = ['forca', 'agilidade', 'presenca', 'intelecto', 'vigor'];
 const attributeLabels = { forca: 'Força', agilidade: 'Agilidade', intelecto: 'Intelecto', vigor: 'Vigor', presenca: 'Presença' };
 const baseAttributes = Object.fromEntries(attributeKeys.map((key) => [key, 2]));
 const steps = ['Jogador', 'Personagem', 'Foto', 'Raça', 'Classe', 'Origem', 'Atributos', 'Inventário', 'Resumo'];
@@ -27,7 +27,9 @@ const initial = {
   defense: 10,
   attributes: baseAttributes,
   skills: {},
-  inventory: []
+  inventory: [],
+  attacks: [],
+  spells: []
 };
 
 export default function CharacterBuilder() {
@@ -65,7 +67,9 @@ export default function CharacterBuilder() {
       defense: data.defense,
       attributes: baseAttributes,
       skills: data.skills || {},
-      inventory: data.inventory || []
+      inventory: data.inventory || [],
+      attacks: data.attacks || [],
+      spells: data.spells || []
     }));
   }, [id]);
 
@@ -174,13 +178,13 @@ function AttributePreview({ attributes, selectedRace }) {
 }
 
 function Inventory({ form, setForm }) {
-  const [item, setItem] = useState({ name: '', weight: 0, description: '', defenseBonus: 0 });
+  const [item, setItem] = useState({ quantity: 1, weight: 0, name: '', description: '', defenseBonus: 0 });
   function add() {
     if (!item.name.trim()) return;
     setForm({ ...form, inventory: [...form.inventory, item] });
-    setItem({ name: '', weight: 0, description: '', defenseBonus: 0 });
+    setItem({ quantity: 1, weight: 0, name: '', description: '', defenseBonus: 0 });
   }
-  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">Inventário</p><div className="mt-6 grid gap-3 md:grid-cols-4"><input placeholder="Item" className="rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={item.name} onChange={(event) => setItem({ ...item, name: event.target.value })} /><input type="number" placeholder="Peso" className="rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={item.weight} onChange={(event) => setItem({ ...item, weight: Number(event.target.value) })} /><input type="number" placeholder="Defesa" className="rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={item.defenseBonus} onChange={(event) => setItem({ ...item, defenseBonus: Number(event.target.value) })} /><Button type="button" onClick={add}>Adicionar</Button></div><ul className="mt-5 space-y-2">{form.inventory.map((it, index) => <li key={`${it.name}-${index}`} className="text-mist">{it.name} · peso {it.weight} · defesa +{it.defenseBonus}</li>)}</ul></div>;
+  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">Inventário</p><div className="mt-6 grid gap-3 md:grid-cols-4"><input type="number" min="0" placeholder="Quantidade" className="rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={item.quantity} onChange={(event) => setItem({ ...item, quantity: Number(event.target.value) })} /><input type="number" min="0" placeholder="Peso" className="rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={item.weight} onChange={(event) => setItem({ ...item, weight: Number(event.target.value) })} /><input placeholder="Nome" className="rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={item.name} onChange={(event) => setItem({ ...item, name: event.target.value })} /><Button type="button" onClick={add}>Adicionar</Button></div><textarea placeholder="Descrição" className="mt-3 w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={item.description} onChange={(event) => setItem({ ...item, description: event.target.value })} /><ul className="mt-5 space-y-2">{form.inventory.map((it, index) => <li key={`${it.name}-${index}`} className="text-mist">{Number(it.quantity ?? 1)}x {it.name} · peso {Number(it.weight || 0)}</li>)}</ul></div>;
 }
 
 function Summary({ form, attributes, catalog }) {

@@ -134,6 +134,15 @@ describe('fluxo principal da API', () => {
     const officialSkills = await request(app)
       .get('/api/catalog/skills')
       .expect(200);
+    const officialRaces = await request(app)
+      .get('/api/catalog/races')
+      .expect(200);
+    const officialOrigins = await request(app)
+      .get('/api/catalog/origins')
+      .expect(200);
+    const officialClasses = await request(app)
+      .get('/api/catalog/classes')
+      .expect(200);
 
     expect(officialSkills.body.map((item) => item.key).sort()).toEqual([
       'acrobacia',
@@ -150,6 +159,13 @@ describe('fluxo principal da API', () => {
       'reflexos',
       'vontade'
     ].sort());
+    expect(officialRaces.body.map((item) => item.name).sort()).toEqual(['Humano', 'Elfo', 'Elfo Negro', 'Anão', 'Tiefling', 'Halfling', 'Genasi'].sort());
+    expect(officialClasses.body).toHaveLength(7);
+    expect(officialOrigins.body.map((item) => item.name).sort()).toEqual(['Sobrevivente', 'Nobre', 'Criminoso', 'Pesquisador', 'Caçador', 'Soldado', 'Religioso', 'Mercador'].sort());
+    for (const originItem of officialOrigins.body) {
+      const trained = Object.entries(originItem.skill_modifiers || {}).filter(([, value]) => Number(value) === 5);
+      expect(trained).toHaveLength(2);
+    }
 
     const skill = await request(app)
       .post('/api/admin/skills')
@@ -247,6 +263,70 @@ describe('fluxo principal da API', () => {
       .send({ email: `jogador-editado-${stamp}@lugubre.local`, password: 'nova123' })
       .expect(200);
 
+    const expectedRaceAttributes = {
+      Humano: { forca: 2, agilidade: 2, presenca: 2, intelecto: 2, vigor: 2 },
+      Elfo: { forca: 1, agilidade: 2, presenca: 2, intelecto: 3, vigor: 2 },
+      'Elfo Negro': { forca: 1, agilidade: 3, presenca: 2, intelecto: 2, vigor: 2 },
+      Anão: { forca: 3, agilidade: 1, presenca: 2, intelecto: 3, vigor: 2 },
+      Tiefling: { forca: 2, agilidade: 2, presenca: 1, intelecto: 3, vigor: 2 },
+      Halfling: { forca: 2, agilidade: 1, presenca: 3, intelecto: 2, vigor: 2 },
+      Genasi: { forca: 2, agilidade: 2, presenca: 2, intelecto: 2, vigor: 2 }
+    };
+    const classId = officialClasses.body[0].id;
+    const defaultOriginId = officialOrigins.body[0].id;
+
+    for (const raceItem of officialRaces.body) {
+      const response = await request(app)
+        .post('/api/characters')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          playerName: 'Teste Raça',
+          characterName: `Teste ${raceItem.name}`,
+          raceId: raceItem.id,
+          classId,
+          originId: defaultOriginId,
+          mana: 10,
+          manaMax: 10,
+          inventory: []
+        })
+        .expect(201);
+
+      expect(response.body.attributes).toMatchObject(expectedRaceAttributes[raceItem.name]);
+
+      await request(app)
+        .delete(`/api/characters/${response.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(204);
+    }
+
+    const humanRaceId = officialRaces.body.find((item) => item.name === 'Humano').id;
+    for (const originItem of officialOrigins.body) {
+      const response = await request(app)
+        .post('/api/characters')
+        .set('Authorization', `Bearer ${token}`)
+        .send({
+          playerName: 'Teste Origem',
+          characterName: `Origem ${originItem.name}`,
+          raceId: humanRaceId,
+          classId,
+          originId: originItem.id,
+          mana: 10,
+          manaMax: 10,
+          inventory: []
+        })
+        .expect(201);
+      const trained = Object.entries(response.body.skills).filter(([, value]) => Number(value) === 5);
+      expect(trained).toHaveLength(2);
+      for (const [key] of trained) {
+        expect(originItem.skill_modifiers[key]).toBe(5);
+      }
+
+      await request(app)
+        .delete(`/api/characters/${response.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(204);
+    }
+
     const character = await request(app)
       .post('/api/characters')
       .set('Authorization', `Bearer ${token}`)
@@ -264,7 +344,9 @@ describe('fluxo principal da API', () => {
         manaMax: 10,
         defense: 10,
         attributes: { forca: 2, agilidade: 2, intelecto: 2, vigor: 2, presenca: 2 },
-        inventory: [{ name: 'Couraça', weight: 2, defenseBonus: 1 }]
+        inventory: [{ quantity: 1, weight: 2, name: 'Couraça', description: 'Proteção pesada', defenseBonus: 1 }],
+        attacks: [{ name: 'Espada Longa', damage: '1d8+2' }],
+        spells: [{ name: 'Raio Sombrio', damage: '1d10+2' }]
       })
       .expect(201);
 
@@ -274,12 +356,24 @@ describe('fluxo principal da API', () => {
     expect(character.body.life_current).toBe(63);
     expect(character.body.sanity_current).toBe(52);
     expect(character.body.mana_max).toBe(10);
+    expect(character.body.inventory[0]).toMatchObject({ quantity: 1, weight: 2, name: 'Couraça' });
+    expect(character.body.attacks[0]).toMatchObject({ name: 'Espada Longa', damage: '1d8+2' });
+    expect(character.body.spells[0]).toMatchObject({ name: 'Raio Sombrio', damage: '1d10+2' });
     expect(character.body.save_history).toHaveLength(1);
 
     await request(app)
       .patch(`/api/characters/${character.body.id}/play`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ lifeCurrent: 40, sanityCurrent: 30, mana: 8, manaMax: 10, skills: { [skill.body.key]: 4 } })
+      .send({
+        lifeCurrent: 40,
+        sanityCurrent: 30,
+        mana: 8,
+        manaMax: 10,
+        skills: { [skill.body.key]: 4 },
+        inventory: [{ quantity: 2, weight: 1, name: 'Poção de Vida', description: 'Restaura fôlego' }],
+        attacks: [{ name: 'Arco Curto', damage: '1d6+1' }],
+        spells: [{ name: 'Bola de Fogo', damage: '2d8+3' }]
+      })
       .expect(200);
 
     await request(app)
@@ -303,6 +397,9 @@ describe('fluxo principal da API', () => {
     expect(savedCharacter.body.life_current).toBe(37);
     expect(savedCharacter.body.sanity_current).toBe(27);
     expect(savedCharacter.body.mana).toBe(5);
+    expect(savedCharacter.body.inventory[0]).toMatchObject({ quantity: 2, weight: 1, name: 'Poção de Vida' });
+    expect(savedCharacter.body.attacks[0]).toMatchObject({ name: 'Arco Curto', damage: '1d6+1' });
+    expect(savedCharacter.body.spells[0]).toMatchObject({ name: 'Bola de Fogo', damage: '2d8+3' });
     expect(savedCharacter.body.save_history).toHaveLength(3);
 
     const campaign = await request(app)

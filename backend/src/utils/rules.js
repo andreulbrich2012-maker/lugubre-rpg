@@ -1,4 +1,4 @@
-export const ATTRIBUTE_KEYS = ['forca', 'agilidade', 'intelecto', 'vigor', 'presenca'];
+export const ATTRIBUTE_KEYS = ['forca', 'agilidade', 'presenca', 'intelecto', 'vigor'];
 export const SKILL_KEYS = ['acrobacia', 'atletismo', 'crime', 'enganacao', 'furtividade', 'iniciativa', 'intimidacao', 'investigacao', 'medicina', 'percepcao', 'pontaria', 'reflexos', 'vontade'];
 
 export function baseAttributes() {

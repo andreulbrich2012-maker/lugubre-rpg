@@ -13,7 +13,7 @@ const attributes = [
 ];
 
 const itemCategories = ['Todos os itens', 'Comida', 'Armas', 'Carteira', 'Outros'];
-const spellElements = ['Érebo', 'Nix', 'Tártaro', 'Ananque', 'Éter', 'Gaia', 'Caos'];
+const spellElements = ['Érebo', 'Nix', 'Tártaro', 'Ananque', 'Éter', 'Gaia', 'Caos', 'Hemera'];
 const quickDice = [4, 6, 8, 10, 12, 16, 20];
 
 const blankItem = { quantity: 1, weight: 0, name: '', category: 'Outros', description: '', defenseBonus: 0 };

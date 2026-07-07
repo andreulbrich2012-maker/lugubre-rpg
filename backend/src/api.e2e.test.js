@@ -471,11 +471,11 @@ describe('fluxo principal da API', () => {
     const spell = await request(app)
       .post(`/api/characters/${character.body.id}/powers`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ type: 'spells', name: 'Sussurro', damage: '1d20+5', element: 'Nix', criticalValue: 20, criticalMultiplier: 2, manaCost: 3, image: '', description: 'Eco proibido' })
+      .send({ type: 'spells', name: 'Sussurro', damage: '1d20+5', element: 'Hemera', criticalValue: 20, criticalMultiplier: 2, manaCost: 3, image: '', description: 'Eco proibido' })
       .expect(201);
 
     const spellId = spell.body.spells.find((power) => power.name === 'Sussurro').id;
-    expect(spell.body.spells.find((power) => power.id === spellId)).toMatchObject({ manaCost: 3, element: 'Nix' });
+    expect(spell.body.spells.find((power) => power.id === spellId)).toMatchObject({ manaCost: 3, element: 'Hemera' });
 
     const damageRoll = await request(app)
       .post(`/api/characters/${character.body.id}/powers/roll`)

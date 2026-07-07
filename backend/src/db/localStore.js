@@ -4,7 +4,9 @@ import bcrypt from 'bcryptjs';
 
 const dataDir = process.env.VERCEL ? '/tmp/lugubre-data' : path.resolve('data');
 const dataFile = path.join(dataDir, 'local-db.json');
-const seedVersion = '2026-07-rpg-sheet-v4';
+const seedVersion = '2026-07-rpg-sheet-v5';
+let cachedData = null;
+let writeQueue = Promise.resolve();
 
 function publicUser(user) {
   if (!user) return null;
@@ -59,7 +61,7 @@ const defaultData = {
     { id: 'race-human', name: 'Humano', image: '', attribute_modifiers: {} },
     { id: 'race-elf', name: 'Elfo', image: '', attribute_modifiers: { forca: -1, intelecto: 1 } },
     { id: 'race-dark-elf', name: 'Elfo Negro', image: '', attribute_modifiers: { forca: -1, agilidade: 1 } },
-    { id: 'race-dwarf', name: 'Anão', image: '', attribute_modifiers: { forca: 1, agilidade: -1, intelecto: 1 } },
+    { id: 'race-dwarf', name: 'Anão', image: '', attribute_modifiers: { forca: 1, agilidade: -1 } },
     { id: 'race-tiefling', name: 'Tiefling', image: '', attribute_modifiers: { presenca: -1, intelecto: 1 } },
     { id: 'race-halfling', name: 'Halfling', image: '', attribute_modifiers: { agilidade: -1, presenca: 1 } },
     { id: 'race-genasi', name: 'Genasi', image: '', attribute_modifiers: {} }
@@ -147,10 +149,13 @@ async function ensureSeedUsers(data) {
 }
 
 async function writeStore(data) {
-  await fs.writeFile(dataFile, JSON.stringify(data, null, 2));
+  cachedData = data;
+  writeQueue = writeQueue.then(() => fs.writeFile(dataFile, JSON.stringify(data, null, 2)));
+  await writeQueue;
 }
 
 async function ensureStore() {
+  if (cachedData) return cachedData;
   await fs.mkdir(dataDir, { recursive: true });
   try {
     const data = JSON.parse(await fs.readFile(dataFile, 'utf8'));
@@ -175,14 +180,30 @@ async function ensureStore() {
       character.sanity_max = Number(character.sanity_max ?? character.sanityMax ?? 52);
       character.mana_max = Number(character.mana_max ?? character.manaMax ?? character.mana ?? 0);
       character.inventory = (Array.isArray(character.inventory) ? character.inventory : []).map((item) => ({
+        id: item.id || crypto.randomUUID(),
         quantity: Number(item.quantity ?? 1),
         weight: Number(item.weight ?? 0),
         name: item.name || 'Item',
         description: item.description || '',
         defenseBonus: Number(item.defenseBonus ?? 0)
       }));
-      character.attacks = Array.isArray(character.attacks) ? character.attacks : [];
-      character.spells = Array.isArray(character.spells) ? character.spells : [];
+      character.attacks = (Array.isArray(character.attacks) ? character.attacks : []).map((power) => ({
+        id: power.id || crypto.randomUUID(),
+        name: power.name || 'Ataque',
+        damage: power.damage || '1d4',
+        manaCost: Number(power.manaCost ?? 0),
+        description: power.description || ''
+      }));
+      character.spells = (Array.isArray(character.spells) ? character.spells : []).map((power) => ({
+        id: power.id || crypto.randomUUID(),
+        name: power.name || 'Magia',
+        damage: power.damage || '1d4',
+        manaCost: Number(power.manaCost ?? 0),
+        description: power.description || ''
+      }));
+      if (character.race_id === 'race-dwarf' || character.raceId === 'race-dwarf') {
+        character.attributes = { forca: 3, agilidade: 1, presenca: 2, intelecto: 2, vigor: 2 };
+      }
       character.save_history = Array.isArray(character.save_history) ? character.save_history.slice(0, 3) : [];
       character.updated_at = character.updated_at || character.created_at || new Date().toISOString();
     }

@@ -10,12 +10,13 @@ import {
   updateLocalCharacter
 } from '../db/localStore.js';
 import { requireAuth } from '../middleware/auth.js';
-import { applyRaceModifiers, baseAttributes, baseSkills, calculateDefense, calculateDodge } from '../utils/rules.js';
+import { applyRaceModifiers, baseAttributes, baseSkills, calculateDefense, calculateDodge, rollDiceFormula } from '../utils/rules.js';
 
 const router = Router();
 router.use(requireAuth);
 
 const itemSchema = z.object({
+  id: z.string().optional(),
   quantity: z.coerce.number().min(0).default(1),
   weight: z.coerce.number().min(0).default(0),
   name: z.string().min(1),
@@ -27,6 +28,7 @@ const powerSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1),
   damage: z.string().min(1),
+  manaCost: z.coerce.number().min(0).default(0),
   description: z.string().optional().default('')
 });
 
@@ -77,6 +79,34 @@ function normalizeSkillTraining(skills = {}, keys = []) {
     const rounded = Math.round(Number(skills?.[key] || 0) / 5) * 5;
     return [key, Math.max(0, Math.min(15, rounded))];
   }));
+}
+
+function normalizeItem(item) {
+  const parsed = itemSchema.parse(item);
+  return {
+    ...parsed,
+    id: parsed.id || crypto.randomUUID(),
+    quantity: Number(parsed.quantity ?? 1),
+    weight: Number(parsed.weight ?? 0),
+    description: parsed.description || '',
+    defenseBonus: Number(parsed.defenseBonus ?? 0)
+  };
+}
+
+function normalizePower(power) {
+  const parsed = powerSchema.parse(power);
+  return {
+    ...parsed,
+    id: parsed.id || crypto.randomUUID(),
+    manaCost: Number(parsed.manaCost ?? 0),
+    description: parsed.description || ''
+  };
+}
+
+function powerField(value) {
+  if (['attack', 'attacks', 'ataque', 'ataques'].includes(value)) return 'attacks';
+  if (['spell', 'spells', 'magia', 'magias'].includes(value)) return 'spells';
+  return null;
 }
 
 function characterSnapshot(row) {
@@ -148,7 +178,10 @@ async function normalizeCharacter(body, currentSkills = null) {
     ...data,
     manaMax: data.manaMax ?? data.mana,
     attributes,
-    skills: normalizeSkillTraining(currentSkills || data.skills || createdSkills, keys)
+    skills: normalizeSkillTraining(currentSkills || data.skills || createdSkills, keys),
+    inventory: data.inventory.map(normalizeItem),
+    attacks: data.attacks.map(normalizePower),
+    spells: data.spells.map(normalizePower)
   };
 }
 
@@ -191,6 +224,25 @@ async function enrich(row) {
   };
 }
 
+async function findOwnedCharacter(id, ownerId) {
+  const result = await tryQuery('select * from characters where id = $1 and owner_id = $2', [id, ownerId]);
+  return result?.rows?.[0] || await getLocalCharacter(id, ownerId);
+}
+
+async function persistPlayLists(req, row, payload, label = 'Ajuste de jogo') {
+  const inventory = payload.inventory ?? parseJsonField(row.inventory, []);
+  const attacks = payload.attacks ?? parseJsonField(row.attacks, []);
+  const spells = payload.spells ?? parseJsonField(row.spells, []);
+  const result = await tryQuery(
+    `update characters set inventory=$1, attacks=$2, spells=$3, updated_at=now()
+     where id=$4 and owner_id=$5 returning *`,
+    [toJson(inventory), toJson(attacks), toJson(spells), req.params.id, req.user.id]
+  );
+  const updated = result?.rows?.[0] || await updateLocalCharacter(req.params.id, req.user.id, { inventory, attacks, spells });
+  await recordCharacterSave(updated, label);
+  return enrich(updated);
+}
+
 router.get('/', async (req, res) => {
   const result = await tryQuery(
     `select c.*, r.name as race_name, cl.name as class_name, o.name as origin_name
@@ -218,6 +270,88 @@ router.post('/', async (req, res) => {
   const row = result?.rows?.[0] || await createLocalCharacter(req.user.id, data);
   await recordCharacterSave(row, 'Criacao da ficha');
   res.status(201).json(await enrich(row));
+});
+
+router.get('/:id/inventory', async (req, res) => {
+  const row = await findOwnedCharacter(req.params.id, req.user.id);
+  if (!row) return res.status(404).json({ message: 'Ficha nao encontrada.' });
+  res.json(parseJsonField(row.inventory, []));
+});
+
+router.post('/:id/inventory', async (req, res) => {
+  const row = await findOwnedCharacter(req.params.id, req.user.id);
+  if (!row) return res.status(404).json({ message: 'Ficha nao encontrada.' });
+  const inventory = [...parseJsonField(row.inventory, []), normalizeItem(req.body)];
+  res.status(201).json(await persistPlayLists(req, row, { inventory }, 'Item adicionado'));
+});
+
+router.put('/:id/inventory/:itemId', async (req, res) => {
+  const row = await findOwnedCharacter(req.params.id, req.user.id);
+  if (!row) return res.status(404).json({ message: 'Ficha nao encontrada.' });
+  const inventory = parseJsonField(row.inventory, []);
+  const index = inventory.findIndex((item) => item.id === req.params.itemId);
+  if (index === -1) return res.status(404).json({ message: 'Item nao encontrado.' });
+  inventory[index] = normalizeItem({ ...req.body, id: req.params.itemId });
+  res.json(await persistPlayLists(req, row, { inventory }, 'Item editado'));
+});
+
+router.delete('/:id/inventory/:itemId', async (req, res) => {
+  const row = await findOwnedCharacter(req.params.id, req.user.id);
+  if (!row) return res.status(404).json({ message: 'Ficha nao encontrada.' });
+  const inventory = parseJsonField(row.inventory, []);
+  const nextInventory = inventory.filter((item) => item.id !== req.params.itemId);
+  if (nextInventory.length === inventory.length) return res.status(404).json({ message: 'Item nao encontrado.' });
+  res.json(await persistPlayLists(req, row, { inventory: nextInventory }, 'Item removido'));
+});
+
+router.get('/:id/powers', async (req, res) => {
+  const row = await findOwnedCharacter(req.params.id, req.user.id);
+  if (!row) return res.status(404).json({ message: 'Ficha nao encontrada.' });
+  res.json({
+    attacks: parseJsonField(row.attacks, []),
+    spells: parseJsonField(row.spells, [])
+  });
+});
+
+router.post('/:id/powers/roll', async (req, res) => {
+  const row = await findOwnedCharacter(req.params.id, req.user.id);
+  if (!row) return res.status(404).json({ message: 'Ficha nao encontrada.' });
+  const formula = z.object({ formula: z.string().min(1) }).parse(req.body).formula;
+  res.json(rollDiceFormula(formula));
+});
+
+router.post('/:id/powers', async (req, res) => {
+  const row = await findOwnedCharacter(req.params.id, req.user.id);
+  if (!row) return res.status(404).json({ message: 'Ficha nao encontrada.' });
+  const body = z.object({ type: z.string().default('attacks') }).passthrough().parse(req.body);
+  const field = powerField(body.type);
+  if (!field) return res.status(400).json({ message: 'Tipo de poder invalido.' });
+  const list = parseJsonField(row[field], []);
+  const power = normalizePower(body);
+  res.status(201).json(await persistPlayLists(req, row, { [field]: [...list, power] }, field === 'spells' ? 'Magia adicionada' : 'Ataque adicionado'));
+});
+
+router.put('/:id/powers/:type/:powerId', async (req, res) => {
+  const row = await findOwnedCharacter(req.params.id, req.user.id);
+  if (!row) return res.status(404).json({ message: 'Ficha nao encontrada.' });
+  const field = powerField(req.params.type);
+  if (!field) return res.status(400).json({ message: 'Tipo de poder invalido.' });
+  const list = parseJsonField(row[field], []);
+  const index = list.findIndex((power) => power.id === req.params.powerId);
+  if (index === -1) return res.status(404).json({ message: 'Poder nao encontrado.' });
+  list[index] = normalizePower({ ...req.body, id: req.params.powerId });
+  res.json(await persistPlayLists(req, row, { [field]: list }, field === 'spells' ? 'Magia editada' : 'Ataque editado'));
+});
+
+router.delete('/:id/powers/:type/:powerId', async (req, res) => {
+  const row = await findOwnedCharacter(req.params.id, req.user.id);
+  if (!row) return res.status(404).json({ message: 'Ficha nao encontrada.' });
+  const field = powerField(req.params.type);
+  if (!field) return res.status(400).json({ message: 'Tipo de poder invalido.' });
+  const list = parseJsonField(row[field], []);
+  const nextList = list.filter((power) => power.id !== req.params.powerId);
+  if (nextList.length === list.length) return res.status(404).json({ message: 'Poder nao encontrado.' });
+  res.json(await persistPlayLists(req, row, { [field]: nextList }, field === 'spells' ? 'Magia removida' : 'Ataque removido'));
 });
 
 router.get('/:id', async (req, res) => {
@@ -275,9 +409,9 @@ router.patch('/:id/play', async (req, res) => {
     manaMax: body.manaMax ?? row.mana_max ?? row.mana,
     defense: body.defense ?? row.defense,
     skills: normalizeSkillTraining({ ...parseJsonField(row.skills, {}), ...(body.skills || {}) }, await skillKeys()),
-    inventory: body.inventory ?? parseJsonField(row.inventory, []),
-    attacks: body.attacks ?? parseJsonField(row.attacks, []),
-    spells: body.spells ?? parseJsonField(row.spells, [])
+    inventory: body.inventory ? body.inventory.map(normalizeItem) : parseJsonField(row.inventory, []),
+    attacks: body.attacks ? body.attacks.map(normalizePower) : parseJsonField(row.attacks, []),
+    spells: body.spells ? body.spells.map(normalizePower) : parseJsonField(row.spells, [])
   };
   const updatedResult = await tryQuery(
     `update characters set life_current=$1, life_max=$2, sanity_current=$3, sanity_max=$4,

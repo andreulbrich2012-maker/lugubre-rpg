@@ -178,11 +178,18 @@ values
   ('Humano', '', '{}'),
   ('Elfo', '', '{"forca":-1,"intelecto":1}'),
   ('Elfo Negro', '', '{"forca":-1,"agilidade":1}'),
-  ('Anão', '', '{"forca":1,"agilidade":-1,"intelecto":1}'),
+  ('Anão', '', '{"forca":1,"agilidade":-1}'),
   ('Tiefling', '', '{"presenca":-1,"intelecto":1}'),
   ('Halfling', '', '{"agilidade":-1,"presenca":1}'),
   ('Genasi', '', '{}')
 on conflict ((lower(name))) do update set image = excluded.image, attribute_modifiers = excluded.attribute_modifiers;
+
+update characters c
+set attributes = '{"forca":3,"agilidade":1,"presenca":2,"intelecto":2,"vigor":2}'::jsonb,
+    updated_at = now()
+from races r
+where c.race_id = r.id
+  and r.name = 'Anão';
 
 insert into origins (name, description, skill_modifiers)
 values

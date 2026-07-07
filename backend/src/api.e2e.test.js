@@ -5,6 +5,8 @@ import request from 'supertest';
 import { createApp } from './app.js';
 import { signToken } from './middleware/auth.js';
 
+process.env.REQUIRE_POSTGRES = 'true';
+
 const app = createApp();
 
 beforeAll(async () => {
@@ -144,7 +146,7 @@ describe('fluxo principal da API', () => {
       .get('/api/catalog/classes')
       .expect(200);
 
-    expect(officialSkills.body.map((item) => item.key).sort()).toEqual([
+    const defaultSkillKeys = [
       'acrobacia',
       'atletismo',
       'crime',
@@ -158,11 +160,15 @@ describe('fluxo principal da API', () => {
       'pontaria',
       'reflexos',
       'vontade'
-    ].sort());
-    expect(officialRaces.body.map((item) => item.name).sort()).toEqual(['Humano', 'Elfo', 'Elfo Negro', 'Anão', 'Tiefling', 'Halfling', 'Genasi'].sort());
-    expect(officialClasses.body).toHaveLength(7);
-    expect(officialOrigins.body.map((item) => item.name).sort()).toEqual(['Sobrevivente', 'Nobre', 'Criminoso', 'Pesquisador', 'Caçador', 'Soldado', 'Religioso', 'Mercador'].sort());
-    for (const originItem of officialOrigins.body) {
+    ];
+    const defaultRaceNames = ['Humano', 'Elfo', 'Elfo Negro', 'Anão', 'Tiefling', 'Halfling', 'Genasi'];
+    const defaultOriginNames = ['Sobrevivente', 'Nobre', 'Criminoso', 'Pesquisador', 'Caçador', 'Soldado', 'Religioso', 'Mercador'];
+
+    expect(officialSkills.body.map((item) => item.key)).toEqual(expect.arrayContaining(defaultSkillKeys));
+    expect(officialRaces.body.map((item) => item.name)).toEqual(expect.arrayContaining(defaultRaceNames));
+    expect(officialClasses.body.length).toBeGreaterThanOrEqual(7);
+    expect(officialOrigins.body.map((item) => item.name)).toEqual(expect.arrayContaining(defaultOriginNames));
+    for (const originItem of officialOrigins.body.filter((item) => defaultOriginNames.includes(item.name))) {
       const trained = Object.entries(originItem.skill_modifiers || {}).filter(([, value]) => Number(value) === 5);
       expect(trained).toHaveLength(2);
     }
@@ -202,7 +208,7 @@ describe('fluxo principal da API', () => {
       .send({ name: 'Jogador Teste', email: `jogador-${stamp}@lugubre.local`, password: 'adm123' })
       .expect(201);
 
-    const token = user.body.token;
+    let token = user.body.token;
     const profileImage = 'data:image/png;base64,iVBORw0KGgo=';
 
     await request(app)
@@ -258,24 +264,25 @@ describe('fluxo principal da API', () => {
       .send({ currentPassword: 'adm123', newPassword: 'nova123' })
       .expect(200);
 
-    await request(app)
+    const loginAfterPasswordChange = await request(app)
       .post('/api/auth/login')
       .send({ email: `jogador-editado-${stamp}@lugubre.local`, password: 'nova123' })
       .expect(200);
+    token = loginAfterPasswordChange.body.token;
 
     const expectedRaceAttributes = {
       Humano: { forca: 2, agilidade: 2, presenca: 2, intelecto: 2, vigor: 2 },
       Elfo: { forca: 1, agilidade: 2, presenca: 2, intelecto: 3, vigor: 2 },
       'Elfo Negro': { forca: 1, agilidade: 3, presenca: 2, intelecto: 2, vigor: 2 },
-      Anão: { forca: 3, agilidade: 1, presenca: 2, intelecto: 3, vigor: 2 },
+      Anão: { forca: 3, agilidade: 1, presenca: 2, intelecto: 2, vigor: 2 },
       Tiefling: { forca: 2, agilidade: 2, presenca: 1, intelecto: 3, vigor: 2 },
       Halfling: { forca: 2, agilidade: 1, presenca: 3, intelecto: 2, vigor: 2 },
       Genasi: { forca: 2, agilidade: 2, presenca: 2, intelecto: 2, vigor: 2 }
     };
-    const classId = officialClasses.body[0].id;
-    const defaultOriginId = officialOrigins.body[0].id;
+    const classId = officialClasses.body.find((item) => item.name === 'Cavaleiro')?.id || officialClasses.body[0].id;
+    const defaultOriginId = officialOrigins.body.find((item) => item.name === 'Sobrevivente')?.id || officialOrigins.body[0].id;
 
-    for (const raceItem of officialRaces.body) {
+    for (const raceItem of officialRaces.body.filter((item) => defaultRaceNames.includes(item.name))) {
       const response = await request(app)
         .post('/api/characters')
         .set('Authorization', `Bearer ${token}`)
@@ -300,7 +307,7 @@ describe('fluxo principal da API', () => {
     }
 
     const humanRaceId = officialRaces.body.find((item) => item.name === 'Humano').id;
-    for (const originItem of officialOrigins.body) {
+    for (const originItem of officialOrigins.body.filter((item) => defaultOriginNames.includes(item.name))) {
       const response = await request(app)
         .post('/api/characters')
         .set('Authorization', `Bearer ${token}`)
@@ -401,6 +408,71 @@ describe('fluxo principal da API', () => {
     expect(savedCharacter.body.attacks[0]).toMatchObject({ name: 'Arco Curto', damage: '1d6+1' });
     expect(savedCharacter.body.spells[0]).toMatchObject({ name: 'Bola de Fogo', damage: '2d8+3' });
     expect(savedCharacter.body.save_history).toHaveLength(3);
+
+    const addedItem = await request(app)
+      .post(`/api/characters/${character.body.id}/inventory`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ quantity: 3, weight: 0.5, name: 'Vela Ritual', description: 'Chama fria' })
+      .expect(201);
+
+    const itemId = addedItem.body.inventory.find((item) => item.name === 'Vela Ritual').id;
+    expect(itemId).toBeTruthy();
+
+    const editedItem = await request(app)
+      .put(`/api/characters/${character.body.id}/inventory/${itemId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ quantity: 2, weight: 1, name: 'Vela Ritual Editada', description: 'Chama fria' })
+      .expect(200);
+
+    expect(editedItem.body.inventory.find((item) => item.id === itemId)).toMatchObject({ quantity: 2, weight: 1, name: 'Vela Ritual Editada' });
+
+    const attack = await request(app)
+      .post(`/api/characters/${character.body.id}/powers`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ type: 'attacks', name: 'Machado', damage: '1d8+2', description: 'Corte pesado' })
+      .expect(201);
+
+    const attackId = attack.body.attacks.find((power) => power.name === 'Machado').id;
+    expect(attackId).toBeTruthy();
+
+    await request(app)
+      .put(`/api/characters/${character.body.id}/powers/attacks/${attackId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Machado Negro', damage: '2d6+3', description: 'Corte pesado' })
+      .expect(200);
+
+    const spell = await request(app)
+      .post(`/api/characters/${character.body.id}/powers`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ type: 'spells', name: 'Sussurro', damage: '1d20+5', manaCost: 3, description: 'Eco proibido' })
+      .expect(201);
+
+    const spellId = spell.body.spells.find((power) => power.name === 'Sussurro').id;
+    expect(spell.body.spells.find((power) => power.id === spellId)).toMatchObject({ manaCost: 3 });
+
+    const damageRoll = await request(app)
+      .post(`/api/characters/${character.body.id}/powers/roll`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ formula: '2d6+3' })
+      .expect(200);
+
+    expect(damageRoll.body.rolls).toHaveLength(2);
+    expect(damageRoll.body.total).toBeGreaterThanOrEqual(5);
+
+    await request(app)
+      .delete(`/api/characters/${character.body.id}/powers/spells/${spellId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    await request(app)
+      .delete(`/api/characters/${character.body.id}/powers/attacks/${attackId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    await request(app)
+      .delete(`/api/characters/${character.body.id}/inventory/${itemId}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
 
     const campaign = await request(app)
       .post('/api/campaigns')

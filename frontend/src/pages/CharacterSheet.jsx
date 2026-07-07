@@ -13,7 +13,7 @@ const attributes = [
 ];
 
 const blankItem = { quantity: 1, weight: 0, name: '', description: '', defenseBonus: 0 };
-const blankPower = { name: '', damage: '', description: '' };
+const blankPower = { name: '', damage: '', manaCost: 0, description: '' };
 
 function formatSaveDate(value) {
   if (!value) return 'Sem registro';
@@ -56,12 +56,13 @@ export default function CharacterSheet() {
   const [d20, setD20] = useState(null);
   const [skillRoll, setSkillRoll] = useState(null);
   const [damageRoll, setDamageRoll] = useState(null);
+  const [itemModal, setItemModal] = useState(null);
+  const [powerModal, setPowerModal] = useState(null);
 
   async function load() {
     try {
       const { data } = await api.get(`/characters/${id}`);
-      setSheet(data);
-      setDraft(makeDraft(data));
+      syncSheet(data);
       setNotFound(false);
     } catch {
       setNotFound(true);
@@ -70,10 +71,14 @@ export default function CharacterSheet() {
 
   useEffect(() => { load(); }, [id]);
 
-  async function persist(nextDraft, closeEditor = false) {
-    const { data } = await api.patch(`/characters/${id}/play`, nextDraft);
+  function syncSheet(data) {
     setSheet(data);
     setDraft(makeDraft(data));
+  }
+
+  async function persist(nextDraft, closeEditor = false) {
+    const { data } = await api.patch(`/characters/${id}/play`, nextDraft);
+    syncSheet(data);
     if (closeEditor) setEditing(false);
   }
 
@@ -104,6 +109,46 @@ export default function CharacterSheet() {
   function rollPower(power, type) {
     const result = rollDiceFormula(power.damage);
     setDamageRoll({ ...result, name: power.name, damage: power.damage, type });
+  }
+
+  async function saveItem(payload, itemId = null) {
+    const request = itemId
+      ? api.put(`/characters/${id}/inventory/${itemId}`, payload)
+      : api.post(`/characters/${id}/inventory`, payload);
+    const { data } = await request;
+    syncSheet(data);
+    setItemModal(null);
+  }
+
+  async function deleteItem(item) {
+    if (!item?.id) return;
+    const { data } = await api.delete(`/characters/${id}/inventory/${item.id}`);
+    syncSheet(data);
+  }
+
+  async function savePower(payload, type, powerId = null) {
+    const field = type || payload.type || 'attacks';
+    const request = powerId
+      ? api.put(`/characters/${id}/powers/${field}/${powerId}`, payload)
+      : api.post(`/characters/${id}/powers`, { ...payload, type: field });
+    const { data } = await request;
+    syncSheet(data);
+    setPowerModal(null);
+  }
+
+  async function deletePower(type, power) {
+    if (!power?.id) return;
+    const { data } = await api.delete(`/characters/${id}/powers/${type}/${power.id}`);
+    syncSheet(data);
+  }
+
+  async function rollSavedPower(power, type) {
+    try {
+      const { data } = await api.post(`/characters/${id}/powers/roll`, { formula: power.damage });
+      setDamageRoll({ ...data, name: power.name, damage: power.damage, type });
+    } catch {
+      rollPower(power, type);
+    }
   }
 
   if (notFound) return <main className="mx-auto max-w-3xl px-4 py-16 text-center text-mist"><h1 className="font-display text-4xl text-ember">Ficha não encontrada</h1><p className="mt-3">Ela pode ter sido removida ou pertencer a outro armazenamento local.</p><Link className="mt-6 inline-block text-ember" to="/characters">Voltar para personagens</Link></main>;
@@ -154,7 +199,15 @@ export default function CharacterSheet() {
             <Metric label="Esquiva" value={sheet.dodge} />
           </section>
 
-          <InventoryPanel inventory={inventory} editing={editing} draft={draft} setDraft={setDraft} />
+          <InventoryPanel
+            inventory={inventory}
+            editing={editing}
+            draft={draft}
+            setDraft={setDraft}
+            onAdd={() => setItemModal({ mode: 'add', item: blankItem })}
+            onEdit={(item) => setItemModal({ mode: 'edit', item })}
+            onDelete={deleteItem}
+          />
 
           <Panel>
             <div className="flex items-center justify-between gap-3">
@@ -190,7 +243,10 @@ export default function CharacterSheet() {
             editing={editing}
             draft={draft}
             setDraft={setDraft}
-            onRoll={rollPower}
+            onRoll={rollSavedPower}
+            onAdd={(type = 'attacks') => setPowerModal({ mode: 'add', type, power: blankPower })}
+            onEdit={(type, power) => setPowerModal({ mode: 'edit', type, power })}
+            onDelete={deletePower}
             roll={damageRoll}
           />
 
@@ -203,6 +259,20 @@ export default function CharacterSheet() {
           <SaveHistory saves={sheet.save_history || []} />
         </section>
       </section>
+      {itemModal && (
+        <ItemModal
+          state={itemModal}
+          onClose={() => setItemModal(null)}
+          onSave={(payload) => saveItem(payload, itemModal.item?.id)}
+        />
+      )}
+      {powerModal && (
+        <PowerModal
+          state={powerModal}
+          onClose={() => setPowerModal(null)}
+          onSave={(payload, type) => savePower(payload, type, powerModal.power?.id)}
+        />
+      )}
     </main>
   );
 }
@@ -242,7 +312,7 @@ function PlayEditor({ draft, setDraft, skillsCatalog, onRoll, roll }) {
   );
 }
 
-function InventoryPanel({ inventory, editing, draft, setDraft }) {
+function InventoryPanel({ inventory, editing, draft, setDraft, onAdd, onEdit, onDelete }) {
   const [item, setItem] = useState(blankItem);
 
   function updateItem(index, key, value) {
@@ -262,14 +332,28 @@ function InventoryPanel({ inventory, editing, draft, setDraft }) {
 
   return (
     <Panel>
-      <h2 className="font-display text-2xl text-ember">Inventário</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-display text-2xl text-ember">Inventário</h2>
+        <Button type="button" variant="ghost" onClick={onAdd}><Plus size={16} className="inline" /> Adicionar Item</Button>
+      </div>
+      {inventory.length > 0 && (
+        <p className="mt-2 text-xs uppercase tracking-[.18em] text-mist">
+          Peso total {inventory.reduce((sum, current) => sum + Number(current.weight || 0) * Number(current.quantity ?? 1), 0).toFixed(1)}
+        </p>
+      )}
       {!editing && (
         <ul className="mt-3 space-y-2 text-sm text-mist">
           {inventory.length ? inventory.map((item, index) => (
             <li key={item.id || `${item.name}-${index}`} className="rounded border border-white/10 bg-black/25 px-3 py-2">
-              <span className="text-white">{Number(item.quantity ?? 1)}x {item.name}</span>
-              <span className="ml-2 text-xs text-mist">peso {Number(item.weight || 0)}</span>
-              {item.description && <p className="mt-1 text-xs text-mist">{item.description}</p>}
+              <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+                <div className="min-w-0">
+                  <span className="text-white">{Number(item.quantity ?? 1)}x {item.name}</span>
+                  <span className="ml-2 text-xs text-mist">peso {Number(item.weight || 0)}</span>
+                  {item.description && <p className="mt-1 text-xs text-mist">{item.description}</p>}
+                </div>
+                <Button type="button" variant="ghost" onClick={() => onEdit(item)}><Edit size={16} className="inline" /> Editar</Button>
+                <button type="button" className="grid h-10 w-10 place-items-center rounded border border-red-400/30 text-red-300 soft-motion hover:bg-red-950/30" onClick={() => onDelete(item)} aria-label="Excluir item"><Trash2 size={16} /></button>
+              </div>
             </li>
           )) : <li className="text-mist">Inventário vazio.</li>}
         </ul>
@@ -302,20 +386,26 @@ function InventoryPanel({ inventory, editing, draft, setDraft }) {
   );
 }
 
-function PowersPanel({ attacks, spells, editing, draft, setDraft, onRoll, roll }) {
+function PowersPanel({ attacks, spells, editing, draft, setDraft, onRoll, onAdd, onEdit, onDelete, roll }) {
   return (
     <Panel>
-      <h2 className="font-display text-2xl text-ember">Poderes e Ataques</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="font-display text-2xl text-ember">Poderes e Ataques</h2>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="ghost" onClick={() => onAdd('attacks')}><Plus size={16} className="inline" /> Adicionar Ataque</Button>
+          <Button type="button" variant="ghost" onClick={() => onAdd('spells')}><Plus size={16} className="inline" /> Adicionar Magia</Button>
+        </div>
+      </div>
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <PowerList title="Ataques Normais" field="attacks" items={attacks} editing={editing} draft={draft} setDraft={setDraft} onRoll={(power) => onRoll(power, 'Ataque')} />
-        <PowerList title="Magias" field="spells" items={spells} editing={editing} draft={draft} setDraft={setDraft} onRoll={(power) => onRoll(power, 'Magia')} />
+        <PowerList title="Ataques Normais" field="attacks" items={attacks} editing={editing} draft={draft} setDraft={setDraft} onRoll={(power) => onRoll(power, 'Ataque')} onEdit={(power) => onEdit('attacks', power)} onDelete={(power) => onDelete('attacks', power)} />
+        <PowerList title="Magias" field="spells" items={spells} editing={editing} draft={draft} setDraft={setDraft} onRoll={(power) => onRoll(power, 'Magia')} onEdit={(power) => onEdit('spells', power)} onDelete={(power) => onDelete('spells', power)} />
       </div>
       <DamageFeedback roll={roll} />
     </Panel>
   );
 }
 
-function PowerList({ title, field, items, editing, draft, setDraft, onRoll }) {
+function PowerList({ title, field, items, editing, draft, setDraft, onRoll, onEdit, onDelete }) {
   const [power, setPower] = useState(blankPower);
 
   function updatePower(index, key, value) {
@@ -340,18 +430,22 @@ function PowerList({ title, field, items, editing, draft, setDraft, onRoll }) {
         {items.length ? items.map((item, index) => (
           <div key={item.id || `${item.name}-${index}`} className="rounded border border-white/10 bg-black/25 p-3">
             {!editing ? (
-              <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+              <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center">
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-white">{item.name}</p>
-                  <p className="text-sm text-ember">{item.damage}</p>
+                  <p className="text-sm text-ember">{item.damage}{field === 'spells' ? ` · mana ${Number(item.manaCost || 0)}` : ''}</p>
+                  {item.description && <p className="mt-1 text-xs text-mist">{item.description}</p>}
                 </div>
                 <Button type="button" variant="ghost" onClick={() => onRoll(item)}><Dice5 size={16} className="inline" /> Rolar</Button>
+                <Button type="button" variant="ghost" onClick={() => onEdit(item)}><Edit size={16} className="inline" /> Editar</Button>
+                <button type="button" className="grid h-10 w-10 place-items-center rounded border border-red-400/30 text-red-300 soft-motion hover:bg-red-950/30" onClick={() => onDelete(item)} aria-label="Excluir poder"><Trash2 size={16} /></button>
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="grid gap-2 sm:grid-cols-[1fr_110px_36px]">
+                <div className="grid gap-2 sm:grid-cols-[1fr_110px_90px_36px]">
                   <input placeholder="Nome" className="min-w-0 rounded border border-ember/20 bg-black/30 px-3 py-2" value={item.name || ''} onChange={(event) => updatePower(index, 'name', event.target.value)} />
                   <input placeholder="Dano" className="rounded border border-ember/20 bg-black/30 px-3 py-2" value={item.damage || ''} onChange={(event) => updatePower(index, 'damage', event.target.value)} />
+                  <NumberInput placeholder="Mana" value={item.manaCost ?? 0} onChange={(value) => updatePower(index, 'manaCost', field === 'spells' ? value : 0)} />
                   <button type="button" className="grid h-10 place-items-center rounded border border-red-400/30 text-red-300" onClick={() => removePower(index)}><Trash2 size={16} /></button>
                 </div>
                 <textarea placeholder="Descrição" className="w-full rounded border border-ember/20 bg-black/30 px-3 py-2 text-sm" value={item.description || ''} onChange={(event) => updatePower(index, 'description', event.target.value)} />
@@ -362,15 +456,97 @@ function PowerList({ title, field, items, editing, draft, setDraft, onRoll }) {
       </div>
       {editing && (
         <div className="mt-3 rounded border border-ember/20 bg-black/20 p-3">
-          <div className="grid gap-2 sm:grid-cols-[1fr_110px_auto]">
+          <div className="grid gap-2 sm:grid-cols-[1fr_110px_90px_auto]">
             <input placeholder="Nome" className="min-w-0 rounded border border-ember/20 bg-black/30 px-3 py-2" value={power.name} onChange={(event) => setPower({ ...power, name: event.target.value })} />
             <input placeholder="Dano" className="rounded border border-ember/20 bg-black/30 px-3 py-2" value={power.damage} onChange={(event) => setPower({ ...power, damage: event.target.value })} />
+            <NumberInput placeholder="Mana" value={power.manaCost} onChange={(manaCost) => setPower({ ...power, manaCost: field === 'spells' ? manaCost : 0 })} />
             <Button type="button" variant="ghost" onClick={addPower}><Plus size={16} /></Button>
           </div>
           <textarea placeholder="Descrição" className="mt-2 w-full rounded border border-ember/20 bg-black/30 px-3 py-2 text-sm" value={power.description} onChange={(event) => setPower({ ...power, description: event.target.value })} />
         </div>
       )}
     </section>
+  );
+}
+
+function ItemModal({ state, onClose, onSave }) {
+  const [form, setForm] = useState({ ...blankItem, ...(state.item || {}) });
+  const canSave = String(form.name || '').trim().length > 0;
+
+  return (
+    <ModalFrame title={state.mode === 'edit' ? 'Editar item' : 'Adicionar item'} onClose={onClose}>
+      <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); if (canSave) onSave(form); }}>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <NumberField label="Quantidade" value={form.quantity ?? 1} onChange={(quantity) => setForm({ ...form, quantity })} />
+          <NumberField label="Peso" value={form.weight ?? 0} onChange={(weight) => setForm({ ...form, weight })} />
+        </div>
+        <label className="block text-sm text-mist">
+          Nome do item
+          <input className="mt-1 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={form.name || ''} onChange={(event) => setForm({ ...form, name: event.target.value })} autoFocus />
+        </label>
+        <label className="block text-sm text-mist">
+          Descrição opcional
+          <textarea className="mt-1 min-h-24 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={form.description || ''} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+        </label>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" disabled={!canSave}>Salvar</Button>
+        </div>
+      </form>
+    </ModalFrame>
+  );
+}
+
+function PowerModal({ state, onClose, onSave }) {
+  const [type, setType] = useState(state.type || 'attacks');
+  const [form, setForm] = useState({ ...blankPower, ...(state.power || {}) });
+  const canSave = String(form.name || '').trim().length > 0 && String(form.damage || '').trim().length > 0;
+
+  return (
+    <ModalFrame title={state.mode === 'edit' ? 'Editar poder' : 'Adicionar poder'} onClose={onClose}>
+      <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); if (canSave) onSave({ ...form, manaCost: type === 'spells' ? Number(form.manaCost || 0) : 0 }, type); }}>
+        <label className="block text-sm text-mist">
+          Tipo
+          <select className="mt-1 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={type} onChange={(event) => setType(event.target.value)}>
+            <option value="attacks">Ataque Normal</option>
+            <option value="spells">Magia</option>
+          </select>
+        </label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm text-mist">
+            Nome
+            <input className="mt-1 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={form.name || ''} onChange={(event) => setForm({ ...form, name: event.target.value })} autoFocus />
+          </label>
+          <label className="block text-sm text-mist">
+            Dano
+            <input className="mt-1 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" placeholder="1d8+2" value={form.damage || ''} onChange={(event) => setForm({ ...form, damage: event.target.value })} />
+          </label>
+        </div>
+        {type === 'spells' && <NumberField label="Custo de mana" value={form.manaCost ?? 0} onChange={(manaCost) => setForm({ ...form, manaCost })} />}
+        <label className="block text-sm text-mist">
+          Descrição opcional
+          <textarea className="mt-1 min-h-24 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={form.description || ''} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+        </label>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" disabled={!canSave}>Salvar</Button>
+        </div>
+      </form>
+    </ModalFrame>
+  );
+}
+
+function ModalFrame({ title, children, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 px-4 py-6 backdrop-blur-sm">
+      <section className="w-full max-w-xl rounded-md border border-ember/30 bg-[#0b0b0d] p-5 shadow-glow">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="font-display text-2xl text-ember">{title}</h2>
+          <button type="button" className="grid h-10 w-10 place-items-center rounded border border-white/15 text-mist soft-motion hover:bg-white/10" onClick={onClose} aria-label="Fechar"><X size={18} /></button>
+        </div>
+        {children}
+      </section>
+    </div>
   );
 }
 

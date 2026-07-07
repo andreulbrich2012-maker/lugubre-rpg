@@ -1,5 +1,5 @@
-import { ChevronLeft, ChevronRight, Dice5, Edit, Plus, Save, Trash2, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { ChevronLeft, ChevronRight, Dice5, Edit, Minus, Plus, Save, Trash2, X } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Button from '../components/Button';
 import { api } from '../lib/api';
@@ -29,6 +29,24 @@ const blankPower = {
   manaCost: 0,
   description: ''
 };
+
+const vitalColumnByField = { lifeCurrent: 'life_current', sanityCurrent: 'sanity_current', mana: 'mana' };
+const vitalMaxByField = { lifeCurrent: 'lifeMax', sanityCurrent: 'sanityMax', mana: 'manaMax' };
+
+function clampCurrentValue(value, max) {
+  const safeMax = Number(max ?? 0);
+  const safeValue = Math.max(0, Number(value || 0));
+  return safeMax > 0 ? Math.min(safeValue, safeMax) : safeValue;
+}
+
+function normalizeWalletValues(wallet = {}) {
+  return {
+    bronze: Math.max(0, Number(wallet?.bronze || 0)),
+    silver: Math.max(0, Number(wallet?.silver || 0)),
+    platinum: Math.max(0, Number(wallet?.platinum || 0)),
+    gold: Math.max(0, Number(wallet?.gold || 0))
+  };
+}
 
 function formatSaveDate(value) {
   if (!value) return 'Sem registro';
@@ -77,6 +95,9 @@ export default function CharacterSheet() {
   const [damageRoll, setDamageRoll] = useState(null);
   const [itemModal, setItemModal] = useState(null);
   const [powerModal, setPowerModal] = useState(null);
+  const draftRef = useRef(null);
+  const sheetRef = useRef(null);
+  const persistQueueRef = useRef(Promise.resolve());
 
   async function load() {
     try {
@@ -91,8 +112,10 @@ export default function CharacterSheet() {
   useEffect(() => { load(); }, [id]);
 
   function syncSheet(data) {
+    sheetRef.current = data;
+    draftRef.current = makeDraft(data);
     setSheet(data);
-    setDraft(makeDraft(data));
+    setDraft(draftRef.current);
   }
 
   async function persist(nextDraft, closeEditor = false) {
@@ -101,22 +124,38 @@ export default function CharacterSheet() {
     if (closeEditor) setEditing(false);
   }
 
+  async function persistQueued(nextDraft) {
+    persistQueueRef.current = persistQueueRef.current
+      .catch(() => {})
+      .then(async () => {
+        const { data } = await api.patch(`/characters/${id}/play`, nextDraft);
+        if (draftRef.current === nextDraft) syncSheet(data);
+      })
+      .catch(async () => {
+        if (draftRef.current === nextDraft) await load();
+      });
+    return persistQueueRef.current;
+  }
+
+  function setInteractiveState(nextDraft, sheetPatch) {
+    draftRef.current = nextDraft;
+    setDraft(nextDraft);
+    const nextSheet = { ...(sheetRef.current || sheet), ...sheetPatch };
+    sheetRef.current = nextSheet;
+    setSheet(nextSheet);
+  }
+
   async function savePlayChanges() {
     await persist(draft, true);
   }
 
-  async function adjustVital(field, direction, event) {
-    const step = event.shiftKey ? 5 : 1;
-    const nextValue = Math.max(0, Number(draft[field] ?? 0) + direction * step);
-    const nextDraft = { ...draft, [field]: nextValue };
-    const columnByField = { lifeCurrent: 'life_current', sanityCurrent: 'sanity_current', mana: 'mana' };
-    setDraft(nextDraft);
-    setSheet({ ...sheet, [columnByField[field]]: nextValue });
-    try {
-      await persist(nextDraft);
-    } catch {
-      await load();
-    }
+  async function adjustVital(field, direction) {
+    const source = draftRef.current || draft;
+    const maxField = vitalMaxByField[field];
+    const nextValue = clampCurrentValue(Number(source[field] ?? 0) + direction, source[maxField]);
+    const nextDraft = { ...source, [field]: nextValue };
+    setInteractiveState(nextDraft, { [vitalColumnByField[field]]: nextValue });
+    await persistQueued(nextDraft);
   }
 
   function rollSkill(skill, training = 0, other = 0) {
@@ -190,11 +229,13 @@ export default function CharacterSheet() {
     await persist(nextDraft);
   }
 
-  async function saveWallet(wallet) {
-    const nextDraft = { ...draft, wallet };
-    setDraft(nextDraft);
-    setSheet({ ...sheet, wallet });
-    await persist(nextDraft);
+  async function saveWallet(walletOrUpdater) {
+    const source = draftRef.current || draft;
+    const currentWallet = normalizeWalletValues(source.wallet);
+    const wallet = normalizeWalletValues(typeof walletOrUpdater === 'function' ? walletOrUpdater(currentWallet) : walletOrUpdater);
+    const nextDraft = { ...source, wallet };
+    setInteractiveState(nextDraft, { wallet });
+    await persistQueued(nextDraft);
   }
 
   async function updateQuickModifier(value) {
@@ -248,9 +289,9 @@ export default function CharacterSheet() {
           </Panel>
 
           <section className="grid gap-3">
-            <VitalsBar label="Vida" current={draft.lifeCurrent} max={draft.lifeMax} tone="red" onDecrease={(event) => adjustVital('lifeCurrent', -1, event)} onIncrease={(event) => adjustVital('lifeCurrent', 1, event)} />
-            <VitalsBar label="Sanidade" current={draft.sanityCurrent} max={draft.sanityMax} tone="purple" onDecrease={(event) => adjustVital('sanityCurrent', -1, event)} onIncrease={(event) => adjustVital('sanityCurrent', 1, event)} />
-            <VitalsBar label="Mana" current={draft.mana} max={draft.manaMax} tone="orange" onDecrease={(event) => adjustVital('mana', -1, event)} onIncrease={(event) => adjustVital('mana', 1, event)} />
+            <VitalsBar label="Vida" current={draft.lifeCurrent} max={draft.lifeMax} tone="red" onDecrease={() => adjustVital('lifeCurrent', -1)} onIncrease={() => adjustVital('lifeCurrent', 1)} />
+            <VitalsBar label="Sanidade" current={draft.sanityCurrent} max={draft.sanityMax} tone="purple" onDecrease={() => adjustVital('sanityCurrent', -1)} onIncrease={() => adjustVital('sanityCurrent', 1)} />
+            <VitalsBar label="Mana" current={draft.mana} max={draft.manaMax} tone="orange" onDecrease={() => adjustVital('mana', -1)} onIncrease={() => adjustVital('mana', 1)} />
           </section>
 
           <section className="grid grid-cols-3 gap-2">
@@ -463,26 +504,25 @@ function InventoryPanel({ inventory, wallet, editing, draft, setDraft, onAdd, on
 }
 
 function WalletPanel({ wallet, onChange }) {
-  const values = {
-    bronze: Number(wallet?.bronze || 0),
-    silver: Number(wallet?.silver || 0),
-    platinum: Number(wallet?.platinum || 0),
-    gold: Number(wallet?.gold || 0)
-  };
+  const values = normalizeWalletValues(wallet);
   const total = values.bronze + values.silver * 10 + values.platinum * 100 + values.gold * 500;
 
   function update(key, value) {
-    onChange({ ...values, [key]: Math.max(0, Number(value || 0)) });
+    onChange((current) => ({ ...current, [key]: Math.max(0, Number(value || 0)) }));
+  }
+
+  function adjust(key, direction) {
+    onChange((current) => ({ ...current, [key]: Math.max(0, Number(current[key] || 0) + direction) }));
   }
 
   return (
     <section className="mt-3 rounded border border-ember/20 bg-black/25 p-3">
       <h3 className="font-display text-xl text-white">Carteira</h3>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        <CoinField label="Bronze" rate={1} value={values.bronze} onChange={(value) => update('bronze', value)} />
-        <CoinField label="Prata" rate={10} value={values.silver} onChange={(value) => update('silver', value)} />
-        <CoinField label="Platina" rate={100} value={values.platinum} onChange={(value) => update('platinum', value)} />
-        <CoinField label="Ouro" rate={500} value={values.gold} onChange={(value) => update('gold', value)} />
+        <CoinField label="Bronze" rate={1} value={values.bronze} onChange={(value) => update('bronze', value)} onDecrease={() => adjust('bronze', -1)} onIncrease={() => adjust('bronze', 1)} />
+        <CoinField label="Prata" rate={10} value={values.silver} onChange={(value) => update('silver', value)} onDecrease={() => adjust('silver', -1)} onIncrease={() => adjust('silver', 1)} />
+        <CoinField label="Platina" rate={100} value={values.platinum} onChange={(value) => update('platinum', value)} onDecrease={() => adjust('platinum', -1)} onIncrease={() => adjust('platinum', 1)} />
+        <CoinField label="Ouro" rate={500} value={values.gold} onChange={(value) => update('gold', value)} onDecrease={() => adjust('gold', -1)} onIncrease={() => adjust('gold', 1)} />
       </div>
       <div className="mt-3 rounded border border-white/10 bg-black/30 p-3 text-center">
         <p className="text-xs uppercase tracking-[.18em] text-mist">Total</p>
@@ -492,12 +532,23 @@ function WalletPanel({ wallet, onChange }) {
   );
 }
 
-function CoinField({ label, rate, value, onChange }) {
+function CoinField({ label, rate, value, onChange, onDecrease, onIncrease }) {
   return (
-    <label className="text-sm text-mist">
-      {label} <span className="text-xs text-ember">= {rate} Dracmas</span>
-      <NumberInput className="mt-1 w-full" value={value} onChange={onChange} />
-    </label>
+    <div className="text-sm text-mist">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span>{label}</span>
+        <span className="text-xs text-ember">= {rate} Dracmas</span>
+      </div>
+      <div className="grid grid-cols-[40px_1fr_40px] overflow-hidden rounded border border-ember/20 bg-black/30">
+        <button type="button" className="grid h-10 place-items-center border-r border-white/10 text-mist soft-motion hover:bg-white/10 hover:text-white" onClick={onDecrease} aria-label={`Diminuir ${label}`}>
+          <Minus size={16} />
+        </button>
+        <NumberInput className="h-10 w-full rounded-none border-0 bg-transparent text-center" value={value} onChange={onChange} />
+        <button type="button" className="grid h-10 place-items-center border-l border-white/10 text-mist soft-motion hover:bg-white/10 hover:text-white" onClick={onIncrease} aria-label={`Aumentar ${label}`}>
+          <Plus size={16} />
+        </button>
+      </div>
+    </div>
   );
 }
 

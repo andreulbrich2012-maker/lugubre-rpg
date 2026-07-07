@@ -170,15 +170,6 @@ create unique index if not exists races_name_unique on races (lower(name));
 create unique index if not exists classes_name_unique on classes (lower(name));
 create unique index if not exists origins_name_unique on origins (lower(name));
 
-update characters set race_id = null where race_id in (select id from races where name not in ('Humano','Elfo','Elfo Negro','Anão','Tiefling','Halfling','Genasi'));
-update characters set class_id = null where class_id in (select id from classes where name not in ('Cavaleiro','Mago','Atirador','Ladino','Paladino','Sacerdote','Feiticeiro'));
-update characters set origin_id = null where origin_id in (select id from origins where name not in ('Sobrevivente','Nobre','Criminoso','Pesquisador','Caçador','Soldado','Religioso','Mercador'));
-
-delete from races where name not in ('Humano','Elfo','Elfo Negro','Anão','Tiefling','Halfling','Genasi');
-delete from classes where name not in ('Cavaleiro','Mago','Atirador','Ladino','Paladino','Sacerdote','Feiticeiro');
-delete from origins where name not in ('Sobrevivente','Nobre','Criminoso','Pesquisador','Caçador','Soldado','Religioso','Mercador');
-delete from skills where "key" not in ('acrobacia','adestramento','artes','atletismo','atualidades','ciencias','crime','diplomacia','enganacao','fortitude','furtividade','iniciativa','intimidacao','intuicao','investigacao','luta','medicina','ocultismo','percepcao','pilotagem','pontaria','profissao','reflexos','religiao','sobrevivencia','tatica','tecnologia','vontade');
-
 insert into races (name, image, attribute_modifiers)
 values
   ('Humano', '', '{}'),
@@ -187,7 +178,10 @@ values
   ('Anão', '', '{"forca":1,"agilidade":-1}'),
   ('Tiefling', '', '{"presenca":-1,"intelecto":1}'),
   ('Halfling', '', '{"agilidade":-1,"presenca":1}'),
-  ('Genasi', '', '{}')
+  ('Genasi', '', '{}'),
+  ('Kenku', '', '{"agilidade":1,"vigor":-1}'),
+  ('Orc', '', '{"forca":1,"intelecto":-1}'),
+  ('Aasimar', '', '{"vigor":-1,"presenca":1}')
 on conflict ((lower(name))) do update set image = excluded.image, attribute_modifiers = excluded.attribute_modifiers;
 
 update characters c

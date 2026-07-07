@@ -5,7 +5,7 @@ import { SKILL_DEFINITIONS } from '../utils/rules.js';
 
 const dataDir = process.env.VERCEL ? '/tmp/lugubre-data' : path.resolve('data');
 const dataFile = path.join(dataDir, 'local-db.json');
-const seedVersion = '2026-07-rpg-sheet-v6';
+const seedVersion = '2026-07-rpg-sheet-v7';
 let cachedData = null;
 let writeQueue = Promise.resolve();
 
@@ -51,7 +51,10 @@ const defaultData = {
     { id: 'race-dwarf', name: 'Anão', image: '', attribute_modifiers: { forca: 1, agilidade: -1 } },
     { id: 'race-tiefling', name: 'Tiefling', image: '', attribute_modifiers: { presenca: -1, intelecto: 1 } },
     { id: 'race-halfling', name: 'Halfling', image: '', attribute_modifiers: { agilidade: -1, presenca: 1 } },
-    { id: 'race-genasi', name: 'Genasi', image: '', attribute_modifiers: {} }
+    { id: 'race-genasi', name: 'Genasi', image: '', attribute_modifiers: {} },
+    { id: 'race-kenku', name: 'Kenku', image: '', attribute_modifiers: { agilidade: 1, vigor: -1 } },
+    { id: 'race-orc', name: 'Orc', image: '', attribute_modifiers: { forca: 1, intelecto: -1 } },
+    { id: 'race-aasimar', name: 'Aasimar', image: '', attribute_modifiers: { vigor: -1, presenca: 1 } }
   ],
   classes: [
     { id: 'class-cavaleiro', name: 'Cavaleiro', description: 'Espadas, escudos, defesa e combate corpo a corpo.', image: '', progression: [{ level: 1, mana: 0, feature: 'Postura defensiva' }, { level: 5, mana: 0, feature: 'Mestre de escudo' }, { level: 10, mana: 0, feature: 'Golpe de guarda' }, { level: 15, mana: 0, feature: 'Muralha viva' }, { level: 20, mana: 0, feature: 'Campeão de aço' }] },
@@ -146,7 +149,6 @@ async function ensureStore() {
   await fs.mkdir(dataDir, { recursive: true });
   try {
     const data = JSON.parse(await fs.readFile(dataFile, 'utf8'));
-    const shouldRefreshCatalog = data.seed_version !== seedVersion;
     for (const [key, value] of Object.entries(defaultData)) {
       if (!Array.isArray(data[key])) data[key] = value;
     }
@@ -214,24 +216,15 @@ async function ensureStore() {
       character.save_history = Array.isArray(character.save_history) ? character.save_history.slice(0, 3) : [];
       character.updated_at = character.updated_at || character.created_at || new Date().toISOString();
     }
-    if (shouldRefreshCatalog) {
-      const allowedRaceIds = new Set(defaultData.races.map((item) => item.id));
-      const allowedClassIds = new Set(defaultData.classes.map((item) => item.id));
-      data.races = defaultData.races;
-      data.classes = defaultData.classes;
-      data.skills = defaultData.skills;
-      data.origins = defaultData.origins;
-      for (const character of data.characters) {
-        if (character.race_id && !allowedRaceIds.has(character.race_id)) character.race_id = '';
-        if (character.class_id && !allowedClassIds.has(character.class_id)) character.class_id = '';
-      }
-    } else {
-      for (const key of ['races', 'classes', 'skills']) {
-        for (const item of defaultData[key]) {
-          const index = data[key].findIndex((row) => row.id === item.id);
-          if (index >= 0) data[key][index] = { ...data[key][index], ...item };
-          else data[key].push(item);
-        }
+    for (const key of ['races', 'classes', 'skills']) {
+      for (const item of defaultData[key]) {
+        const index = data[key].findIndex((row) => (
+          row.id === item.id ||
+          (item.key && row.key === item.key) ||
+          (item.name && normalizeEmail(row.name) === normalizeEmail(item.name))
+        ));
+        if (index >= 0) data[key][index] = { ...data[key][index], ...item };
+        else data[key].push(item);
       }
     }
     for (const item of defaultData.origins) {

@@ -40,10 +40,10 @@ const powerSchema = z.object({
 });
 
 const walletSchema = z.object({
-  bronze: z.coerce.number().min(0).default(0),
-  silver: z.coerce.number().min(0).default(0),
-  platinum: z.coerce.number().min(0).default(0),
-  gold: z.coerce.number().min(0).default(0)
+  bronze: z.coerce.number().default(0),
+  silver: z.coerce.number().default(0),
+  platinum: z.coerce.number().default(0),
+  gold: z.coerce.number().default(0)
 });
 
 const diceSettingsSchema = z.object({
@@ -134,11 +134,17 @@ function normalizePower(power) {
 function normalizeWallet(wallet) {
   const parsed = walletSchema.parse(wallet || {});
   return {
-    bronze: Number(parsed.bronze || 0),
-    silver: Number(parsed.silver || 0),
-    platinum: Number(parsed.platinum || 0),
-    gold: Number(parsed.gold || 0)
+    bronze: Math.max(0, Number(parsed.bronze || 0)),
+    silver: Math.max(0, Number(parsed.silver || 0)),
+    platinum: Math.max(0, Number(parsed.platinum || 0)),
+    gold: Math.max(0, Number(parsed.gold || 0))
   };
+}
+
+function clampCurrent(value, max) {
+  const safeMax = Number(max ?? 0);
+  const safeValue = Math.max(0, Number(value || 0));
+  return safeMax > 0 ? Math.min(safeValue, safeMax) : safeValue;
 }
 
 function normalizeDiceSettings(settings) {
@@ -459,11 +465,11 @@ router.patch('/:id/play', async (req, res) => {
   const row = dbRow?.rows?.[0] || await getLocalCharacter(req.params.id, req.user.id);
   if (!row) return res.status(404).json({ message: 'Ficha não encontrada.' });
   const body = z.object({
-    lifeCurrent: z.coerce.number().min(0).optional(),
+    lifeCurrent: z.coerce.number().optional(),
     lifeMax: z.coerce.number().min(0).optional(),
-    sanityCurrent: z.coerce.number().min(0).optional(),
+    sanityCurrent: z.coerce.number().optional(),
     sanityMax: z.coerce.number().min(0).optional(),
-    mana: z.coerce.number().min(0).optional(),
+    mana: z.coerce.number().optional(),
     manaMax: z.coerce.number().min(0).optional(),
     defense: z.coerce.number().min(0).optional(),
     skills: z.record(z.coerce.number()).optional(),
@@ -482,11 +488,11 @@ router.patch('/:id/play', async (req, res) => {
     raceId: row.race_id || row.raceId,
     classId: row.class_id || row.classId,
     originId: row.origin_id || row.originId,
-    lifeCurrent: body.lifeCurrent ?? row.life_current ?? 63,
+    lifeCurrent: clampCurrent(body.lifeCurrent ?? row.life_current ?? 63, body.lifeMax ?? row.life_max ?? 63),
     lifeMax: body.lifeMax ?? row.life_max ?? 63,
-    sanityCurrent: body.sanityCurrent ?? row.sanity_current ?? 52,
+    sanityCurrent: clampCurrent(body.sanityCurrent ?? row.sanity_current ?? 52, body.sanityMax ?? row.sanity_max ?? 52),
     sanityMax: body.sanityMax ?? row.sanity_max ?? 52,
-    mana: body.mana ?? row.mana,
+    mana: clampCurrent(body.mana ?? row.mana, body.manaMax ?? row.mana_max ?? row.mana),
     manaMax: body.manaMax ?? row.mana_max ?? row.mana,
     defense: body.defense ?? row.defense,
     skills: normalizeSkillTraining({ ...parseJsonField(row.skills, {}), ...(body.skills || {}) }, keys),

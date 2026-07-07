@@ -10,7 +10,7 @@ export default function Layout({ children }) {
       <nav className="sticky top-0 z-20 border-b border-ember/10 bg-abyss/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-3 py-3 sm:px-4">
           <Link to="/" className="font-display text-2xl text-ember">Lúgubre RPG</Link>
-          <div className="flex flex-wrap items-center justify-end gap-2 text-xs sm:gap-3 sm:text-sm">
+          <div className="flex min-w-0 basis-full flex-wrap items-center gap-3 text-xs sm:basis-auto sm:justify-end sm:text-sm">
             {user && <NavLink to="/dashboard" className="text-mist hover:text-white">Dashboard</NavLink>}
             <NavLink to="/characters" className="text-mist hover:text-white">Personagens</NavLink>
             <NavLink to="/campaigns" className="text-mist hover:text-white">Campanhas</NavLink>

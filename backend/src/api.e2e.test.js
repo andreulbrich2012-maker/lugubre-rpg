@@ -176,7 +176,7 @@ describe('fluxo principal da API', () => {
       'tecnologia',
       'vontade'
     ];
-    const defaultRaceNames = ['Humano', 'Elfo', 'Elfo Negro', 'Anão', 'Tiefling', 'Halfling', 'Genasi'];
+    const defaultRaceNames = ['Humano', 'Elfo', 'Elfo Negro', 'Anão', 'Tiefling', 'Halfling', 'Genasi', 'Kenku', 'Orc', 'Aasimar'];
     const defaultOriginNames = ['Sobrevivente', 'Nobre', 'Criminoso', 'Pesquisador', 'Caçador', 'Soldado', 'Religioso', 'Mercador'];
 
     expect(officialSkills.body.map((item) => item.key)).toEqual(expect.arrayContaining(defaultSkillKeys));
@@ -292,7 +292,10 @@ describe('fluxo principal da API', () => {
       Anão: { forca: 3, agilidade: 1, presenca: 2, intelecto: 2, vigor: 2 },
       Tiefling: { forca: 2, agilidade: 2, presenca: 1, intelecto: 3, vigor: 2 },
       Halfling: { forca: 2, agilidade: 1, presenca: 3, intelecto: 2, vigor: 2 },
-      Genasi: { forca: 2, agilidade: 2, presenca: 2, intelecto: 2, vigor: 2 }
+      Genasi: { forca: 2, agilidade: 2, presenca: 2, intelecto: 2, vigor: 2 },
+      Kenku: { forca: 2, agilidade: 3, presenca: 2, intelecto: 2, vigor: 1 },
+      Orc: { forca: 3, agilidade: 2, presenca: 2, intelecto: 1, vigor: 2 },
+      Aasimar: { forca: 2, agilidade: 2, presenca: 3, intelecto: 2, vigor: 1 }
     };
     const classId = officialClasses.body.find((item) => item.name === 'Cavaleiro')?.id || officialClasses.body[0].id;
     const defaultOriginId = officialOrigins.body.find((item) => item.name === 'Sobrevivente')?.id || officialOrigins.body[0].id;
@@ -435,6 +438,70 @@ describe('fluxo principal da API', () => {
     expect(savedCharacter.body.wallet_total_dracmas).toBe(625);
     expect(savedCharacter.body.quick_roll_modifier).toBe(-2);
     expect(savedCharacter.body.save_history).toHaveLength(3);
+
+    async function patchPlay(payload) {
+      await request(app)
+        .patch(`/api/characters/${character.body.id}/play`)
+        .set('Authorization', `Bearer ${token}`)
+        .send(payload)
+        .expect(200);
+
+      return request(app)
+        .get(`/api/characters/${character.body.id}`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+    }
+
+    let reloaded = await patchPlay({ lifeCurrent: 36 });
+    expect(reloaded.body.life_current).toBe(36);
+    expect(reloaded.body.life_max).toBe(63);
+
+    reloaded = await patchPlay({ lifeCurrent: 37 });
+    expect(reloaded.body.life_current).toBe(37);
+    expect(reloaded.body.life_max).toBe(63);
+
+    reloaded = await patchPlay({ lifeCurrent: -1 });
+    expect(reloaded.body.life_current).toBe(0);
+    expect(reloaded.body.life_max).toBe(63);
+
+    reloaded = await patchPlay({ sanityCurrent: 26 });
+    expect(reloaded.body.sanity_current).toBe(26);
+    expect(reloaded.body.sanity_max).toBe(52);
+
+    reloaded = await patchPlay({ sanityCurrent: 27 });
+    expect(reloaded.body.sanity_current).toBe(27);
+    expect(reloaded.body.sanity_max).toBe(52);
+
+    reloaded = await patchPlay({ mana: 4 });
+    expect(reloaded.body.mana).toBe(4);
+    expect(reloaded.body.mana_max).toBe(10);
+
+    reloaded = await patchPlay({ mana: 5 });
+    expect(reloaded.body.mana).toBe(5);
+    expect(reloaded.body.mana_max).toBe(10);
+
+    const walletSteps = [
+      [{ bronze: 6, silver: 2, platinum: 1, gold: 1 }, 626],
+      [{ bronze: 5, silver: 2, platinum: 1, gold: 1 }, 625],
+      [{ bronze: 5, silver: 3, platinum: 1, gold: 1 }, 635],
+      [{ bronze: 5, silver: 2, platinum: 1, gold: 1 }, 625],
+      [{ bronze: 5, silver: 2, platinum: 2, gold: 1 }, 725],
+      [{ bronze: 5, silver: 2, platinum: 1, gold: 1 }, 625],
+      [{ bronze: 5, silver: 2, platinum: 1, gold: 2 }, 1125],
+      [{ bronze: 5, silver: 2, platinum: 1, gold: 1 }, 625],
+      [{ bronze: -10, silver: -1, platinum: -1, gold: -1 }, 0]
+    ];
+
+    for (const [wallet, total] of walletSteps) {
+      reloaded = await patchPlay({ wallet });
+      expect(reloaded.body.wallet).toEqual({
+        bronze: Math.max(0, wallet.bronze),
+        silver: Math.max(0, wallet.silver),
+        platinum: Math.max(0, wallet.platinum),
+        gold: Math.max(0, wallet.gold)
+      });
+      expect(reloaded.body.wallet_total_dracmas).toBe(total);
+    }
 
     const addedItem = await request(app)
       .post(`/api/characters/${character.body.id}/inventory`)

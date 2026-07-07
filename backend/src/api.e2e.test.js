@@ -148,17 +148,32 @@ describe('fluxo principal da API', () => {
 
     const defaultSkillKeys = [
       'acrobacia',
+      'adestramento',
+      'artes',
       'atletismo',
+      'atualidades',
+      'ciencias',
       'crime',
+      'diplomacia',
       'enganacao',
+      'fortitude',
       'furtividade',
       'iniciativa',
       'intimidacao',
+      'intuicao',
       'investigacao',
+      'luta',
       'medicina',
+      'ocultismo',
       'percepcao',
+      'pilotagem',
       'pontaria',
+      'profissao',
       'reflexos',
+      'religiao',
+      'sobrevivencia',
+      'tatica',
+      'tecnologia',
       'vontade'
     ];
     const defaultRaceNames = ['Humano', 'Elfo', 'Elfo Negro', 'Anão', 'Tiefling', 'Halfling', 'Genasi'];
@@ -351,9 +366,12 @@ describe('fluxo principal da API', () => {
         manaMax: 10,
         defense: 10,
         attributes: { forca: 2, agilidade: 2, intelecto: 2, vigor: 2, presenca: 2 },
-        inventory: [{ quantity: 1, weight: 2, name: 'Couraça', description: 'Proteção pesada', defenseBonus: 1 }],
-        attacks: [{ name: 'Espada Longa', damage: '1d8+2' }],
-        spells: [{ name: 'Raio Sombrio', damage: '1d10+2' }]
+        skillBonuses: { luta: 2 },
+        inventory: [{ quantity: 1, weight: 2, name: 'Couraça', category: 'Armas', description: 'Proteção pesada', defenseBonus: 1 }],
+        attacks: [{ name: 'Espada Longa', damage: '1d8+2', criticalValue: 20, criticalMultiplier: 2, range: '-', skill: 'Luta' }],
+        spells: [{ name: 'Raio Sombrio', damage: '1d10+2', element: 'Érebo', manaCost: 2 }],
+        wallet: { bronze: 5, silver: 2, platinum: 1, gold: 1 },
+        diceSettings: { quickRollModifier: 5 }
       })
       .expect(201);
 
@@ -364,8 +382,10 @@ describe('fluxo principal da API', () => {
     expect(character.body.sanity_current).toBe(52);
     expect(character.body.mana_max).toBe(10);
     expect(character.body.inventory[0]).toMatchObject({ quantity: 1, weight: 2, name: 'Couraça' });
-    expect(character.body.attacks[0]).toMatchObject({ name: 'Espada Longa', damage: '1d8+2' });
-    expect(character.body.spells[0]).toMatchObject({ name: 'Raio Sombrio', damage: '1d10+2' });
+    expect(character.body.attacks[0]).toMatchObject({ name: 'Espada Longa', damage: '1d8+2', criticalValue: 20, criticalMultiplier: 2, skill: 'Luta' });
+    expect(character.body.spells[0]).toMatchObject({ name: 'Raio Sombrio', damage: '1d10+2', element: 'Érebo', manaCost: 2 });
+    expect(character.body.wallet_total_dracmas).toBe(625);
+    expect(character.body.quick_roll_modifier).toBe(5);
     expect(character.body.save_history).toHaveLength(1);
 
     await request(app)
@@ -376,10 +396,13 @@ describe('fluxo principal da API', () => {
         sanityCurrent: 30,
         mana: 8,
         manaMax: 10,
-        skills: { [skill.body.key]: 4 },
-        inventory: [{ quantity: 2, weight: 1, name: 'Poção de Vida', description: 'Restaura fôlego' }],
-        attacks: [{ name: 'Arco Curto', damage: '1d6+1' }],
-        spells: [{ name: 'Bola de Fogo', damage: '2d8+3' }]
+        skills: { [skill.body.key]: 4, luta: 10 },
+        skillBonuses: { luta: 3 },
+        inventory: [{ quantity: 2, weight: 1, name: 'Poção de Vida', category: 'Comida', description: 'Restaura fôlego' }],
+        attacks: [{ name: 'Arco Curto', damage: '1d6+1', criticalValue: 19, criticalMultiplier: 3, range: '18m', skill: 'Pontaria' }],
+        spells: [{ name: 'Bola de Fogo', damage: '2d8+3', element: 'Caos', manaCost: 4 }],
+        wallet: { bronze: 5, silver: 2, platinum: 1, gold: 1 },
+        diceSettings: { quickRollModifier: -2 }
       })
       .expect(200);
 
@@ -405,14 +428,18 @@ describe('fluxo principal da API', () => {
     expect(savedCharacter.body.sanity_current).toBe(27);
     expect(savedCharacter.body.mana).toBe(5);
     expect(savedCharacter.body.inventory[0]).toMatchObject({ quantity: 2, weight: 1, name: 'Poção de Vida' });
-    expect(savedCharacter.body.attacks[0]).toMatchObject({ name: 'Arco Curto', damage: '1d6+1' });
-    expect(savedCharacter.body.spells[0]).toMatchObject({ name: 'Bola de Fogo', damage: '2d8+3' });
+    expect(savedCharacter.body.skills.luta).toBe(10);
+    expect(savedCharacter.body.skill_bonuses.luta).toBe(3);
+    expect(savedCharacter.body.attacks[0]).toMatchObject({ name: 'Arco Curto', damage: '1d6+1', criticalValue: 19, criticalMultiplier: 3, range: '18m', skill: 'Pontaria' });
+    expect(savedCharacter.body.spells[0]).toMatchObject({ name: 'Bola de Fogo', damage: '2d8+3', element: 'Caos', manaCost: 4 });
+    expect(savedCharacter.body.wallet_total_dracmas).toBe(625);
+    expect(savedCharacter.body.quick_roll_modifier).toBe(-2);
     expect(savedCharacter.body.save_history).toHaveLength(3);
 
     const addedItem = await request(app)
       .post(`/api/characters/${character.body.id}/inventory`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ quantity: 3, weight: 0.5, name: 'Vela Ritual', description: 'Chama fria' })
+      .send({ quantity: 3, weight: 0.5, name: 'Vela Ritual', category: 'Outros', description: 'Chama fria' })
       .expect(201);
 
     const itemId = addedItem.body.inventory.find((item) => item.name === 'Vela Ritual').id;
@@ -421,15 +448,15 @@ describe('fluxo principal da API', () => {
     const editedItem = await request(app)
       .put(`/api/characters/${character.body.id}/inventory/${itemId}`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ quantity: 2, weight: 1, name: 'Vela Ritual Editada', description: 'Chama fria' })
+      .send({ quantity: 2, weight: 1, name: 'Vela Ritual Editada', category: 'Carteira', description: 'Chama fria' })
       .expect(200);
 
-    expect(editedItem.body.inventory.find((item) => item.id === itemId)).toMatchObject({ quantity: 2, weight: 1, name: 'Vela Ritual Editada' });
+    expect(editedItem.body.inventory.find((item) => item.id === itemId)).toMatchObject({ quantity: 2, weight: 1, name: 'Vela Ritual Editada', category: 'Carteira' });
 
     const attack = await request(app)
       .post(`/api/characters/${character.body.id}/powers`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ type: 'attacks', name: 'Machado', damage: '1d8+2', description: 'Corte pesado' })
+      .send({ type: 'attacks', name: 'Machado', damage: '1d8+2', criticalValue: 20, criticalMultiplier: 2, range: '-', skill: 'Luta', image: '', description: 'Corte pesado' })
       .expect(201);
 
     const attackId = attack.body.attacks.find((power) => power.name === 'Machado').id;
@@ -438,26 +465,27 @@ describe('fluxo principal da API', () => {
     await request(app)
       .put(`/api/characters/${character.body.id}/powers/attacks/${attackId}`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ name: 'Machado Negro', damage: '2d6+3', description: 'Corte pesado' })
+      .send({ name: 'Machado Negro', damage: '2d6+3', criticalValue: 19, criticalMultiplier: 3, range: 'curto', skill: 'Luta', image: '', description: 'Corte pesado' })
       .expect(200);
 
     const spell = await request(app)
       .post(`/api/characters/${character.body.id}/powers`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ type: 'spells', name: 'Sussurro', damage: '1d20+5', manaCost: 3, description: 'Eco proibido' })
+      .send({ type: 'spells', name: 'Sussurro', damage: '1d20+5', element: 'Nix', criticalValue: 20, criticalMultiplier: 2, manaCost: 3, image: '', description: 'Eco proibido' })
       .expect(201);
 
     const spellId = spell.body.spells.find((power) => power.name === 'Sussurro').id;
-    expect(spell.body.spells.find((power) => power.id === spellId)).toMatchObject({ manaCost: 3 });
+    expect(spell.body.spells.find((power) => power.id === spellId)).toMatchObject({ manaCost: 3, element: 'Nix' });
 
     const damageRoll = await request(app)
       .post(`/api/characters/${character.body.id}/powers/roll`)
       .set('Authorization', `Bearer ${token}`)
-      .send({ formula: '2d6+3' })
+      .send({ formula: '2d6+3', criticalValue: 19, criticalMultiplier: 3, d20: 20 })
       .expect(200);
 
     expect(damageRoll.body.rolls).toHaveLength(2);
-    expect(damageRoll.body.total).toBeGreaterThanOrEqual(5);
+    expect(damageRoll.body.isCritical).toBe(true);
+    expect(damageRoll.body.total).toBe(damageRoll.body.baseTotal * 3);
 
     await request(app)
       .delete(`/api/characters/${character.body.id}/powers/spells/${spellId}`)

@@ -1,10 +1,11 @@
 import fs from 'fs/promises';
 import path from 'path';
 import bcrypt from 'bcryptjs';
+import { SKILL_DEFINITIONS } from '../utils/rules.js';
 
 const dataDir = process.env.VERCEL ? '/tmp/lugubre-data' : path.resolve('data');
 const dataFile = path.join(dataDir, 'local-db.json');
-const seedVersion = '2026-07-rpg-sheet-v5';
+const seedVersion = '2026-07-rpg-sheet-v6';
 let cachedData = null;
 let writeQueue = Promise.resolve();
 
@@ -22,21 +23,7 @@ function publicUser(user) {
   };
 }
 
-const defaultSkills = [
-  { id: 'skill-acrobacia', key: 'acrobacia', name: 'Acrobacia', attribute: 'agilidade' },
-  { id: 'skill-atletismo', key: 'atletismo', name: 'Atletismo', attribute: 'forca' },
-  { id: 'skill-crime', key: 'crime', name: 'Crime', attribute: 'agilidade' },
-  { id: 'skill-enganacao', key: 'enganacao', name: 'Enganação', attribute: 'presenca' },
-  { id: 'skill-furtividade', key: 'furtividade', name: 'Furtividade', attribute: 'agilidade' },
-  { id: 'skill-iniciativa', key: 'iniciativa', name: 'Iniciativa', attribute: 'agilidade' },
-  { id: 'skill-intimidacao', key: 'intimidacao', name: 'Intimidação', attribute: 'presenca' },
-  { id: 'skill-investigacao', key: 'investigacao', name: 'Investigação', attribute: 'intelecto' },
-  { id: 'skill-medicina', key: 'medicina', name: 'Medicina', attribute: 'intelecto' },
-  { id: 'skill-percepcao', key: 'percepcao', name: 'Percepção', attribute: 'presenca' },
-  { id: 'skill-pontaria', key: 'pontaria', name: 'Pontaria', attribute: 'agilidade' },
-  { id: 'skill-reflexos', key: 'reflexos', name: 'Reflexos', attribute: 'agilidade' },
-  { id: 'skill-vontade', key: 'vontade', name: 'Vontade', attribute: 'presenca' }
-];
+const defaultSkills = SKILL_DEFINITIONS.map(([key, name, attribute]) => ({ id: `skill-${key}`, key, name, attribute }));
 
 const defaultData = {
   users: [],
@@ -179,11 +166,22 @@ async function ensureStore() {
       character.sanity_current = Number(character.sanity_current ?? character.sanityCurrent ?? 52);
       character.sanity_max = Number(character.sanity_max ?? character.sanityMax ?? 52);
       character.mana_max = Number(character.mana_max ?? character.manaMax ?? character.mana ?? 0);
+      character.skill_bonuses = character.skill_bonuses || character.skillBonuses || {};
+      character.wallet = {
+        bronze: Number(character.wallet?.bronze ?? 0),
+        silver: Number(character.wallet?.silver ?? 0),
+        platinum: Number(character.wallet?.platinum ?? 0),
+        gold: Number(character.wallet?.gold ?? 0)
+      };
+      character.dice_settings = {
+        quickRollModifier: Number(character.dice_settings?.quickRollModifier ?? character.diceSettings?.quickRollModifier ?? character.quickRollModifier ?? 0)
+      };
       character.inventory = (Array.isArray(character.inventory) ? character.inventory : []).map((item) => ({
         id: item.id || crypto.randomUUID(),
         quantity: Number(item.quantity ?? 1),
         weight: Number(item.weight ?? 0),
         name: item.name || 'Item',
+        category: item.category || 'Outros',
         description: item.description || '',
         defenseBonus: Number(item.defenseBonus ?? 0)
       }));
@@ -191,6 +189,11 @@ async function ensureStore() {
         id: power.id || crypto.randomUUID(),
         name: power.name || 'Ataque',
         damage: power.damage || '1d4',
+        criticalValue: Number(power.criticalValue ?? 20),
+        criticalMultiplier: Number(power.criticalMultiplier ?? 2),
+        range: power.range || '-',
+        skill: power.skill || 'Luta',
+        image: power.image || '',
         manaCost: Number(power.manaCost ?? 0),
         description: power.description || ''
       }));
@@ -198,6 +201,10 @@ async function ensureStore() {
         id: power.id || crypto.randomUUID(),
         name: power.name || 'Magia',
         damage: power.damage || '1d4',
+        element: power.element || 'Érebo',
+        criticalValue: Number(power.criticalValue ?? 20),
+        criticalMultiplier: Number(power.criticalMultiplier ?? 2),
+        image: power.image || '',
         manaCost: Number(power.manaCost ?? 0),
         description: power.description || ''
       }));
@@ -391,9 +398,12 @@ export async function createLocalCharacter(ownerId, character) {
     sanity_current: character.sanityCurrent ?? 52,
     sanity_max: character.sanityMax ?? 52,
     mana_max: character.manaMax ?? character.mana ?? 0,
+    skill_bonuses: character.skillBonuses ?? character.skill_bonuses ?? {},
     inventory: character.inventory ?? [],
     attacks: character.attacks ?? [],
     spells: character.spells ?? [],
+    wallet: character.wallet ?? { bronze: 0, silver: 0, platinum: 0, gold: 0 },
+    dice_settings: character.diceSettings ?? character.dice_settings ?? { quickRollModifier: 0 },
     share_token: crypto.randomUUID(),
     save_history: [{ id: crypto.randomUUID(), label: 'Criacao da ficha', saved_at: now }],
     created_at: now,
@@ -422,9 +432,12 @@ export async function updateLocalCharacter(id, ownerId, character) {
     sanity_current: character.sanityCurrent ?? data.characters[index].sanity_current ?? 52,
     sanity_max: character.sanityMax ?? data.characters[index].sanity_max ?? 52,
     mana_max: character.manaMax ?? data.characters[index].mana_max ?? character.mana ?? 0,
+    skill_bonuses: character.skillBonuses ?? character.skill_bonuses ?? data.characters[index].skill_bonuses ?? {},
     inventory: character.inventory ?? data.characters[index].inventory ?? [],
     attacks: character.attacks ?? data.characters[index].attacks ?? [],
     spells: character.spells ?? data.characters[index].spells ?? [],
+    wallet: character.wallet ?? data.characters[index].wallet ?? { bronze: 0, silver: 0, platinum: 0, gold: 0 },
+    dice_settings: character.diceSettings ?? character.dice_settings ?? data.characters[index].dice_settings ?? { quickRollModifier: 0 },
     save_history: nextSaveHistory(data.characters[index].save_history, label),
     updated_at: new Date().toISOString()
   };

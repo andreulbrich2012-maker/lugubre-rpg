@@ -1,5 +1,36 @@
 export const ATTRIBUTE_KEYS = ['forca', 'agilidade', 'presenca', 'intelecto', 'vigor'];
-export const SKILL_KEYS = ['acrobacia', 'atletismo', 'crime', 'enganacao', 'furtividade', 'iniciativa', 'intimidacao', 'investigacao', 'medicina', 'percepcao', 'pontaria', 'reflexos', 'vontade'];
+export const SKILL_DEFINITIONS = [
+  ['acrobacia', 'Acrobacia', 'agilidade'],
+  ['adestramento', 'Adestramento', 'presenca'],
+  ['artes', 'Artes', 'presenca'],
+  ['atletismo', 'Atletismo', 'forca'],
+  ['atualidades', 'Atualidades', 'intelecto'],
+  ['ciencias', 'Ciências', 'intelecto'],
+  ['crime', 'Crime', 'agilidade'],
+  ['diplomacia', 'Diplomacia', 'presenca'],
+  ['enganacao', 'Enganação', 'presenca'],
+  ['fortitude', 'Fortitude', 'vigor'],
+  ['furtividade', 'Furtividade', 'agilidade'],
+  ['iniciativa', 'Iniciativa', 'agilidade'],
+  ['intimidacao', 'Intimidação', 'presenca'],
+  ['intuicao', 'Intuição', 'presenca'],
+  ['investigacao', 'Investigação', 'intelecto'],
+  ['luta', 'Luta', 'forca'],
+  ['medicina', 'Medicina', 'intelecto'],
+  ['ocultismo', 'Ocultismo', 'intelecto'],
+  ['percepcao', 'Percepção', 'presenca'],
+  ['pilotagem', 'Pilotagem', 'agilidade'],
+  ['pontaria', 'Pontaria', 'agilidade'],
+  ['profissao', 'Profissão', 'intelecto'],
+  ['reflexos', 'Reflexos', 'agilidade'],
+  ['religiao', 'Religião', 'presenca'],
+  ['sobrevivencia', 'Sobrevivência', 'intelecto'],
+  ['tatica', 'Tática', 'intelecto'],
+  ['tecnologia', 'Tecnologia', 'intelecto'],
+  ['vontade', 'Vontade', 'presenca']
+];
+
+export const SKILL_KEYS = SKILL_DEFINITIONS.map(([key]) => key);
 
 export function baseAttributes() {
   return Object.fromEntries(ATTRIBUTE_KEYS.map((key) => [key, 2]));

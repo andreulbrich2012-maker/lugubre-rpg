@@ -74,9 +74,12 @@ create table if not exists characters (
   defense int not null default 10,
   attributes jsonb not null,
   skills jsonb not null,
+  skill_bonuses jsonb not null default '{}',
   inventory jsonb not null default '[]',
   attacks jsonb not null default '[]',
   spells jsonb not null default '[]',
+  wallet jsonb not null default '{"bronze":0,"silver":0,"platinum":0,"gold":0}',
+  dice_settings jsonb not null default '{"quickRollModifier":0}',
   share_token uuid not null default uuid_generate_v4(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -87,8 +90,11 @@ alter table characters add column if not exists life_max int not null default 63
 alter table characters add column if not exists sanity_current int not null default 52;
 alter table characters add column if not exists sanity_max int not null default 52;
 alter table characters add column if not exists mana_max int not null default 0;
+alter table characters add column if not exists skill_bonuses jsonb not null default '{}';
 alter table characters add column if not exists attacks jsonb not null default '[]';
 alter table characters add column if not exists spells jsonb not null default '[]';
+alter table characters add column if not exists wallet jsonb not null default '{"bronze":0,"silver":0,"platinum":0,"gold":0}';
+alter table characters add column if not exists dice_settings jsonb not null default '{"quickRollModifier":0}';
 update characters set mana_max = mana where mana_max = 0 and mana > 0;
 
 create table if not exists character_saves (
@@ -171,7 +177,7 @@ update characters set origin_id = null where origin_id in (select id from origin
 delete from races where name not in ('Humano','Elfo','Elfo Negro','Anão','Tiefling','Halfling','Genasi');
 delete from classes where name not in ('Cavaleiro','Mago','Atirador','Ladino','Paladino','Sacerdote','Feiticeiro');
 delete from origins where name not in ('Sobrevivente','Nobre','Criminoso','Pesquisador','Caçador','Soldado','Religioso','Mercador');
-delete from skills where "key" not in ('acrobacia','atletismo','crime','enganacao','furtividade','iniciativa','intimidacao','investigacao','medicina','percepcao','pontaria','reflexos','vontade');
+delete from skills where "key" not in ('acrobacia','adestramento','artes','atletismo','atualidades','ciencias','crime','diplomacia','enganacao','fortitude','furtividade','iniciativa','intimidacao','intuicao','investigacao','luta','medicina','ocultismo','percepcao','pilotagem','pontaria','profissao','reflexos','religiao','sobrevivencia','tatica','tecnologia','vontade');
 
 insert into races (name, image, attribute_modifiers)
 values
@@ -206,17 +212,32 @@ on conflict ((lower(name))) do update set description = excluded.description, sk
 insert into skills ("key", name, attribute)
 values
   ('acrobacia', 'Acrobacia', 'agilidade'),
+  ('adestramento', 'Adestramento', 'presenca'),
+  ('artes', 'Artes', 'presenca'),
   ('atletismo', 'Atletismo', 'forca'),
+  ('atualidades', 'Atualidades', 'intelecto'),
+  ('ciencias', 'Ciências', 'intelecto'),
   ('crime', 'Crime', 'agilidade'),
+  ('diplomacia', 'Diplomacia', 'presenca'),
   ('enganacao', 'Enganação', 'presenca'),
+  ('fortitude', 'Fortitude', 'vigor'),
   ('furtividade', 'Furtividade', 'agilidade'),
   ('iniciativa', 'Iniciativa', 'agilidade'),
   ('intimidacao', 'Intimidação', 'presenca'),
+  ('intuicao', 'Intuição', 'presenca'),
   ('investigacao', 'Investigação', 'intelecto'),
+  ('luta', 'Luta', 'forca'),
   ('medicina', 'Medicina', 'intelecto'),
+  ('ocultismo', 'Ocultismo', 'intelecto'),
   ('percepcao', 'Percepção', 'presenca'),
+  ('pilotagem', 'Pilotagem', 'agilidade'),
   ('pontaria', 'Pontaria', 'agilidade'),
+  ('profissao', 'Profissão', 'intelecto'),
   ('reflexos', 'Reflexos', 'agilidade'),
+  ('religiao', 'Religião', 'presenca'),
+  ('sobrevivencia', 'Sobrevivência', 'intelecto'),
+  ('tatica', 'Tática', 'intelecto'),
+  ('tecnologia', 'Tecnologia', 'intelecto'),
   ('vontade', 'Vontade', 'presenca')
 on conflict ("key") do update set name = excluded.name, attribute = excluded.attribute;
 

@@ -20,6 +20,7 @@ const itemSchema = z.object({
   quantity: z.coerce.number().min(0).default(1),
   weight: z.coerce.number().min(0).default(0),
   name: z.string().min(1),
+  category: z.string().optional().default('Outros'),
   description: z.string().optional().default(''),
   defenseBonus: z.coerce.number().default(0)
 });
@@ -28,8 +29,25 @@ const powerSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1),
   damage: z.string().min(1),
+  criticalValue: z.coerce.number().min(1).max(20).default(20),
+  criticalMultiplier: z.coerce.number().min(1).max(10).default(2),
+  range: z.string().optional().default('-'),
+  skill: z.string().optional().default('Luta'),
+  element: z.string().optional().default('Érebo'),
+  image: z.string().optional().default(''),
   manaCost: z.coerce.number().min(0).default(0),
   description: z.string().optional().default('')
+});
+
+const walletSchema = z.object({
+  bronze: z.coerce.number().min(0).default(0),
+  silver: z.coerce.number().min(0).default(0),
+  platinum: z.coerce.number().min(0).default(0),
+  gold: z.coerce.number().min(0).default(0)
+});
+
+const diceSettingsSchema = z.object({
+  quickRollModifier: z.coerce.number().default(0)
 });
 
 const characterSchema = z.object({
@@ -50,9 +68,12 @@ const characterSchema = z.object({
   defense: z.coerce.number().min(0).default(10),
   attributes: z.record(z.coerce.number()).default(baseAttributes()),
   skills: z.record(z.coerce.number()).optional(),
+  skillBonuses: z.record(z.coerce.number()).optional(),
   inventory: z.array(itemSchema).default([]),
   attacks: z.array(powerSchema).default([]),
-  spells: z.array(powerSchema).default([])
+  spells: z.array(powerSchema).default([]),
+  wallet: walletSchema.default({ bronze: 0, silver: 0, platinum: 0, gold: 0 }),
+  diceSettings: diceSettingsSchema.default({ quickRollModifier: 0 })
 });
 
 async function skillKeys() {
@@ -88,6 +109,7 @@ function normalizeItem(item) {
     id: parsed.id || crypto.randomUUID(),
     quantity: Number(parsed.quantity ?? 1),
     weight: Number(parsed.weight ?? 0),
+    category: parsed.category || 'Outros',
     description: parsed.description || '',
     defenseBonus: Number(parsed.defenseBonus ?? 0)
   };
@@ -98,9 +120,34 @@ function normalizePower(power) {
   return {
     ...parsed,
     id: parsed.id || crypto.randomUUID(),
+    criticalValue: Number(parsed.criticalValue ?? 20),
+    criticalMultiplier: Number(parsed.criticalMultiplier ?? 2),
+    range: parsed.range || '-',
+    skill: parsed.skill || 'Luta',
+    element: parsed.element || 'Érebo',
+    image: parsed.image || '',
     manaCost: Number(parsed.manaCost ?? 0),
     description: parsed.description || ''
   };
+}
+
+function normalizeWallet(wallet) {
+  const parsed = walletSchema.parse(wallet || {});
+  return {
+    bronze: Number(parsed.bronze || 0),
+    silver: Number(parsed.silver || 0),
+    platinum: Number(parsed.platinum || 0),
+    gold: Number(parsed.gold || 0)
+  };
+}
+
+function normalizeDiceSettings(settings) {
+  const parsed = diceSettingsSchema.parse(settings || {});
+  return { quickRollModifier: Number(parsed.quickRollModifier || 0) };
+}
+
+function walletTotal(wallet) {
+  return Number(wallet?.bronze || 0) + Number(wallet?.silver || 0) * 10 + Number(wallet?.platinum || 0) * 100 + Number(wallet?.gold || 0) * 500;
 }
 
 function powerField(value) {
@@ -123,9 +170,12 @@ function characterSnapshot(row) {
     defense: row.defense,
     attributes: parseJsonField(row.attributes, {}),
     skills: parseJsonField(row.skills, {}),
+    skill_bonuses: parseJsonField(row.skill_bonuses, {}),
     inventory: parseJsonField(row.inventory, []),
     attacks: parseJsonField(row.attacks, []),
-    spells: parseJsonField(row.spells, [])
+    spells: parseJsonField(row.spells, []),
+    wallet: parseJsonField(row.wallet, {}),
+    dice_settings: parseJsonField(row.dice_settings, {})
   };
 }
 
@@ -179,9 +229,12 @@ async function normalizeCharacter(body, currentSkills = null) {
     manaMax: data.manaMax ?? data.mana,
     attributes,
     skills: normalizeSkillTraining(currentSkills || data.skills || createdSkills, keys),
+    skillBonuses: Object.fromEntries(keys.map((key) => [key, Number(data.skillBonuses?.[key] || 0)])),
     inventory: data.inventory.map(normalizeItem),
     attacks: data.attacks.map(normalizePower),
-    spells: data.spells.map(normalizePower)
+    spells: data.spells.map(normalizePower),
+    wallet: normalizeWallet(data.wallet),
+    diceSettings: normalizeDiceSettings(data.diceSettings)
   };
 }
 
@@ -202,6 +255,9 @@ async function enrich(row) {
   const inventory = parseJsonField(row.inventory, []);
   const attacks = parseJsonField(row.attacks, []);
   const spells = parseJsonField(row.spells, []);
+  const skillBonuses = parseJsonField(row.skill_bonuses, {});
+  const wallet = normalizeWallet(parseJsonField(row.wallet, {}));
+  const diceSettings = normalizeDiceSettings(parseJsonField(row.dice_settings, {}));
   const skills = { ...baseSkills(skillsCatalog.map((skill) => skill.key)), ...parseJsonField(row.skills, {}) };
   const savesResult = await tryQuery(
     'select id, label, saved_at from character_saves where character_id = $1 order by saved_at desc limit 3',
@@ -211,9 +267,14 @@ async function enrich(row) {
     ...row,
     attributes,
     skills,
+    skill_bonuses: skillBonuses,
     inventory,
     attacks,
     spells,
+    wallet,
+    wallet_total_dracmas: walletTotal(wallet),
+    dice_settings: diceSettings,
+    quick_roll_modifier: diceSettings.quickRollModifier,
     save_history: savesResult?.rows || row.save_history || [],
     skills_catalog: skillsCatalog,
     race_name: row.race_name || races.find((item) => item.id === row.race_id)?.name,
@@ -262,10 +323,10 @@ router.post('/', async (req, res) => {
   const data = await normalizeCharacter({ ...req.body, skills: undefined });
   const result = await tryQuery(
     `insert into characters
-     (owner_id, player_name, character_name, photo, race_id, class_id, origin_id, origin, level, life_current, life_max, sanity_current, sanity_max, mana, mana_max, defense, attributes, skills, inventory, attacks, spells)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+     (owner_id, player_name, character_name, photo, race_id, class_id, origin_id, origin, level, life_current, life_max, sanity_current, sanity_max, mana, mana_max, defense, attributes, skills, skill_bonuses, inventory, attacks, spells, wallet, dice_settings)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
      returning *`,
-    [req.user.id, data.playerName, data.characterName, data.photo, data.raceId || null, data.classId || null, data.originId || null, data.origin, data.level, data.lifeCurrent, data.lifeMax, data.sanityCurrent, data.sanityMax, data.mana, data.manaMax, data.defense, toJson(data.attributes), toJson(data.skills), toJson(data.inventory), toJson(data.attacks), toJson(data.spells)]
+    [req.user.id, data.playerName, data.characterName, data.photo, data.raceId || null, data.classId || null, data.originId || null, data.origin, data.level, data.lifeCurrent, data.lifeMax, data.sanityCurrent, data.sanityMax, data.mana, data.manaMax, data.defense, toJson(data.attributes), toJson(data.skills), toJson(data.skillBonuses), toJson(data.inventory), toJson(data.attacks), toJson(data.spells), toJson(data.wallet), toJson(data.diceSettings)]
   );
   const row = result?.rows?.[0] || await createLocalCharacter(req.user.id, data);
   await recordCharacterSave(row, 'Criacao da ficha');
@@ -316,8 +377,24 @@ router.get('/:id/powers', async (req, res) => {
 router.post('/:id/powers/roll', async (req, res) => {
   const row = await findOwnedCharacter(req.params.id, req.user.id);
   if (!row) return res.status(404).json({ message: 'Ficha nao encontrada.' });
-  const formula = z.object({ formula: z.string().min(1) }).parse(req.body).formula;
-  res.json(rollDiceFormula(formula));
+  const body = z.object({
+    formula: z.string().min(1),
+    criticalValue: z.coerce.number().min(1).max(20).default(20),
+    criticalMultiplier: z.coerce.number().min(1).max(10).default(2),
+    d20: z.coerce.number().min(1).max(20).optional()
+  }).parse(req.body);
+  const attackRoll = body.d20 ?? Math.floor(Math.random() * 20) + 1;
+  const damage = rollDiceFormula(body.formula);
+  const isCritical = attackRoll >= body.criticalValue;
+  res.json({
+    ...damage,
+    attackRoll,
+    criticalValue: body.criticalValue,
+    criticalMultiplier: body.criticalMultiplier,
+    isCritical,
+    total: isCritical ? damage.total * body.criticalMultiplier : damage.total,
+    baseTotal: damage.total
+  });
 });
 
 router.post('/:id/powers', async (req, res) => {
@@ -367,9 +444,9 @@ router.put('/:id', async (req, res) => {
   const result = await tryQuery(
     `update characters set player_name=$1, character_name=$2, photo=$3, race_id=$4, class_id=$5,
      origin_id=$6, origin=$7, level=$8, life_current=$9, life_max=$10, sanity_current=$11, sanity_max=$12,
-     mana=$13, mana_max=$14, defense=$15, attributes=$16, skills=$17, inventory=$18, attacks=$19, spells=$20, updated_at=now()
-     where id=$21 and owner_id=$22 returning *`,
-    [data.playerName, data.characterName, data.photo, data.raceId || null, data.classId || null, data.originId || null, data.origin, data.level, data.lifeCurrent, data.lifeMax, data.sanityCurrent, data.sanityMax, data.mana, data.manaMax, data.defense, toJson(data.attributes), toJson(data.skills), toJson(data.inventory), toJson(data.attacks), toJson(data.spells), req.params.id, req.user.id]
+     mana=$13, mana_max=$14, defense=$15, attributes=$16, skills=$17, skill_bonuses=$18, inventory=$19, attacks=$20, spells=$21, wallet=$22, dice_settings=$23, updated_at=now()
+     where id=$24 and owner_id=$25 returning *`,
+    [data.playerName, data.characterName, data.photo, data.raceId || null, data.classId || null, data.originId || null, data.origin, data.level, data.lifeCurrent, data.lifeMax, data.sanityCurrent, data.sanityMax, data.mana, data.manaMax, data.defense, toJson(data.attributes), toJson(data.skills), toJson(data.skillBonuses), toJson(data.inventory), toJson(data.attacks), toJson(data.spells), toJson(data.wallet), toJson(data.diceSettings), req.params.id, req.user.id]
   );
   const row = result?.rows?.[0] || await updateLocalCharacter(req.params.id, req.user.id, data);
   if (!row) return res.status(404).json({ message: 'Ficha não encontrada.' });
@@ -390,10 +467,14 @@ router.patch('/:id/play', async (req, res) => {
     manaMax: z.coerce.number().min(0).optional(),
     defense: z.coerce.number().min(0).optional(),
     skills: z.record(z.coerce.number()).optional(),
+    skillBonuses: z.record(z.coerce.number()).optional(),
     inventory: z.array(itemSchema).optional(),
     attacks: z.array(powerSchema).optional(),
-    spells: z.array(powerSchema).optional()
+    spells: z.array(powerSchema).optional(),
+    wallet: walletSchema.optional(),
+    diceSettings: diceSettingsSchema.optional()
   }).parse(req.body);
+  const keys = await skillKeys();
   const payload = {
     ...row,
     playerName: row.player_name || row.playerName,
@@ -408,16 +489,19 @@ router.patch('/:id/play', async (req, res) => {
     mana: body.mana ?? row.mana,
     manaMax: body.manaMax ?? row.mana_max ?? row.mana,
     defense: body.defense ?? row.defense,
-    skills: normalizeSkillTraining({ ...parseJsonField(row.skills, {}), ...(body.skills || {}) }, await skillKeys()),
+    skills: normalizeSkillTraining({ ...parseJsonField(row.skills, {}), ...(body.skills || {}) }, keys),
+    skillBonuses: Object.fromEntries(keys.map((key) => [key, Number({ ...parseJsonField(row.skill_bonuses, {}), ...(body.skillBonuses || {}) }[key] || 0)])),
     inventory: body.inventory ? body.inventory.map(normalizeItem) : parseJsonField(row.inventory, []),
     attacks: body.attacks ? body.attacks.map(normalizePower) : parseJsonField(row.attacks, []),
-    spells: body.spells ? body.spells.map(normalizePower) : parseJsonField(row.spells, [])
+    spells: body.spells ? body.spells.map(normalizePower) : parseJsonField(row.spells, []),
+    wallet: normalizeWallet(body.wallet ?? parseJsonField(row.wallet, {})),
+    diceSettings: normalizeDiceSettings(body.diceSettings ?? parseJsonField(row.dice_settings, {}))
   };
   const updatedResult = await tryQuery(
     `update characters set life_current=$1, life_max=$2, sanity_current=$3, sanity_max=$4,
-     mana=$5, mana_max=$6, defense=$7, skills=$8, inventory=$9, attacks=$10, spells=$11, updated_at=now()
-     where id=$12 and owner_id=$13 returning *`,
-    [payload.lifeCurrent, payload.lifeMax, payload.sanityCurrent, payload.sanityMax, payload.mana, payload.manaMax, payload.defense, toJson(payload.skills), toJson(payload.inventory), toJson(payload.attacks), toJson(payload.spells), req.params.id, req.user.id]
+     mana=$5, mana_max=$6, defense=$7, skills=$8, skill_bonuses=$9, inventory=$10, attacks=$11, spells=$12, wallet=$13, dice_settings=$14, updated_at=now()
+     where id=$15 and owner_id=$16 returning *`,
+    [payload.lifeCurrent, payload.lifeMax, payload.sanityCurrent, payload.sanityMax, payload.mana, payload.manaMax, payload.defense, toJson(payload.skills), toJson(payload.skillBonuses), toJson(payload.inventory), toJson(payload.attacks), toJson(payload.spells), toJson(payload.wallet), toJson(payload.diceSettings), req.params.id, req.user.id]
   );
   const updated = updatedResult?.rows?.[0] || await updateLocalCharacter(req.params.id, req.user.id, payload);
   await recordCharacterSave(updated, 'Ajuste de jogo');

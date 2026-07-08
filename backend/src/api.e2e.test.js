@@ -484,13 +484,25 @@ describe('fluxo principal da API', () => {
     expect(reloaded.body.sanity_current).toBe(0);
     expect(reloaded.body.sanity_max).toBe(60);
 
-    reloaded = await patchPlay({ mana: 4 });
-    expect(reloaded.body.mana).toBe(4);
+    reloaded = await patchPlay({ mana: 12 });
+    expect(reloaded.body.mana).toBe(10);
     expect(reloaded.body.mana_max).toBe(10);
 
-    reloaded = await patchPlay({ mana: 5 });
-    expect(reloaded.body.mana).toBe(5);
-    expect(reloaded.body.mana_max).toBe(10);
+    reloaded = await patchPlay({ manaMax: 40 });
+    expect(reloaded.body.mana).toBe(10);
+    expect(reloaded.body.mana_max).toBe(40);
+
+    reloaded = await patchPlay({ mana: 12 });
+    expect(reloaded.body.mana).toBe(12);
+    expect(reloaded.body.mana_max).toBe(40);
+
+    reloaded = await patchPlay({ mana: 90 });
+    expect(reloaded.body.mana).toBe(40);
+    expect(reloaded.body.mana_max).toBe(40);
+
+    reloaded = await patchPlay({ mana: -1 });
+    expect(reloaded.body.mana).toBe(0);
+    expect(reloaded.body.mana_max).toBe(40);
 
     const walletSteps = [
       [{ bronze: 6, silver: 2, platinum: 1, gold: 1 }, 626],

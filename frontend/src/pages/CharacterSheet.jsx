@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Dice5, Edit, Minus, Plus, Save, Trash2, X } from 'lucide-react';
+import { Dice5, Edit, Minus, Plus, Save, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Button from '../components/Button';
@@ -30,11 +30,10 @@ const blankPower = {
   description: ''
 };
 
-const vitalColumnByField = { lifeCurrent: 'life_current', sanityCurrent: 'sanity_current', mana: 'mana' };
-const vitalMaxByField = { lifeCurrent: 'lifeMax', sanityCurrent: 'sanityMax', mana: 'manaMax' };
 const editableVitals = {
   life: { current: 'lifeCurrent', max: 'lifeMax', currentColumn: 'life_current', maxColumn: 'life_max' },
-  sanity: { current: 'sanityCurrent', max: 'sanityMax', currentColumn: 'sanity_current', maxColumn: 'sanity_max' }
+  sanity: { current: 'sanityCurrent', max: 'sanityMax', currentColumn: 'sanity_current', maxColumn: 'sanity_max' },
+  mana: { current: 'mana', max: 'manaMax', currentColumn: 'mana', maxColumn: 'mana_max' }
 };
 
 function clampCurrentValue(value, max) {
@@ -162,15 +161,6 @@ export default function CharacterSheet() {
 
   async function savePlayChanges() {
     await persist(draft, true);
-  }
-
-  async function adjustVital(field, direction) {
-    const source = draftRef.current || draft;
-    const maxField = vitalMaxByField[field];
-    const nextValue = clampCurrentValue(Number(source[field] ?? 0) + direction, source[maxField]);
-    const nextDraft = { ...source, [field]: nextValue };
-    setInteractiveState(nextDraft, { [vitalColumnByField[field]]: nextValue });
-    await persistQueued(nextDraft);
   }
 
   function updateManualVital(type, field, value) {
@@ -336,7 +326,7 @@ export default function CharacterSheet() {
           <section className="grid gap-3">
             <EditableVitalsBar label="Vida" current={draft.lifeCurrent} max={draft.lifeMax} tone="red" status={vitalSaveStatus.life} onChange={(field, value) => updateManualVital('life', field, value)} onSave={() => saveManualVital('life')} />
             <EditableVitalsBar label="Sanidade" current={draft.sanityCurrent} max={draft.sanityMax} tone="purple" status={vitalSaveStatus.sanity} onChange={(field, value) => updateManualVital('sanity', field, value)} onSave={() => saveManualVital('sanity')} />
-            <VitalsBar label="Mana" current={draft.mana} max={draft.manaMax} tone="orange" onDecrease={() => adjustVital('mana', -1)} onIncrease={() => adjustVital('mana', 1)} />
+            <EditableVitalsBar label="Mana" current={draft.mana} max={draft.manaMax} tone="orange" status={vitalSaveStatus.mana} onChange={(field, value) => updateManualVital('mana', field, value)} onSave={() => saveManualVital('mana')} />
           </section>
 
           <section className="grid grid-cols-3 gap-2">
@@ -917,7 +907,8 @@ function EditableVitalsBar({ label, current, max, tone, status, onChange, onSave
   const width = safeMax > 0 ? Math.min(100, (safeCurrent / safeMax) * 100) : safeCurrent > 0 ? 100 : 0;
   const tones = {
     red: 'from-red-950 via-red-800 to-red-600 border-red-500/40 shadow-red-950/40',
-    purple: 'from-purple-950 via-purple-800 to-fuchsia-600 border-purple-400/40 shadow-purple-950/40'
+    purple: 'from-purple-950 via-purple-800 to-fuchsia-600 border-purple-400/40 shadow-purple-950/40',
+    orange: 'from-orange-950 via-orange-700 to-amber-500 border-orange-400/40 shadow-orange-950/40'
   };
   const statusTone = status === 'Erro ao salvar' ? 'text-red-300' : status === 'Salvo' ? 'text-emerald-300' : 'text-mist';
 
@@ -943,28 +934,6 @@ function EditableVitalsBar({ label, current, max, tone, status, onChange, onSave
         <button type="button" className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded border border-ember/30 bg-ember/10 px-4 text-sm font-semibold text-ember soft-motion hover:bg-ember/20 sm:mt-5" onClick={onSave}>
           <Save size={16} /> Salvar
         </button>
-      </div>
-    </div>
-  );
-}
-
-function VitalsBar({ label, current, max, tone, onDecrease, onIncrease }) {
-  const safeCurrent = Number(current ?? 0);
-  const safeMax = Number(max ?? 0);
-  const width = safeMax > 0 ? Math.min(100, (safeCurrent / safeMax) * 100) : safeCurrent > 0 ? 100 : 0;
-  const tones = {
-    red: 'from-red-950 via-red-800 to-red-600 border-red-500/40 shadow-red-950/40',
-    purple: 'from-purple-950 via-purple-800 to-fuchsia-600 border-purple-400/40 shadow-purple-950/40',
-    orange: 'from-orange-950 via-orange-700 to-amber-500 border-orange-400/40 shadow-orange-950/40'
-  };
-  return (
-    <div>
-      <p className="mb-1 text-center text-xs font-bold uppercase tracking-[.18em] text-mist">{label}</p>
-      <div className={`relative grid min-h-12 grid-cols-[48px_1fr_48px] overflow-hidden rounded border bg-black/50 shadow-lg ${tones[tone]}`}>
-        <div className={`pointer-events-none absolute inset-y-0 left-0 bg-gradient-to-r ${tones[tone]} opacity-80 transition-all duration-200`} style={{ width: `${width}%` }} />
-        <button type="button" className="relative grid place-items-center border-r border-white/15 text-white soft-motion hover:bg-white/10" onClick={onDecrease} aria-label={`Diminuir ${label}`}><ChevronLeft size={22} /></button>
-        <div className="relative grid place-items-center px-3 text-lg font-black text-white drop-shadow">{safeCurrent} / {safeMax}</div>
-        <button type="button" className="relative grid place-items-center border-l border-white/15 text-white soft-motion hover:bg-white/10" onClick={onIncrease} aria-label={`Aumentar ${label}`}><ChevronRight size={22} /></button>
       </div>
     </div>
   );

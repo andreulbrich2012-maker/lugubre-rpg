@@ -32,11 +32,23 @@ const blankPower = {
 
 const vitalColumnByField = { lifeCurrent: 'life_current', sanityCurrent: 'sanity_current', mana: 'mana' };
 const vitalMaxByField = { lifeCurrent: 'lifeMax', sanityCurrent: 'sanityMax', mana: 'manaMax' };
+const editableVitals = {
+  life: { current: 'lifeCurrent', max: 'lifeMax', currentColumn: 'life_current', maxColumn: 'life_max' },
+  sanity: { current: 'sanityCurrent', max: 'sanityMax', currentColumn: 'sanity_current', maxColumn: 'sanity_max' }
+};
 
 function clampCurrentValue(value, max) {
   const safeMax = Number(max ?? 0);
   const safeValue = Math.max(0, Number(value || 0));
   return safeMax > 0 ? Math.min(safeValue, safeMax) : safeValue;
+}
+
+function normalizeVitalPair(current, max) {
+  const safeMax = Math.max(0, Number(max || 0));
+  return {
+    current: clampCurrentValue(current, safeMax),
+    max: safeMax
+  };
 }
 
 function normalizeWalletValues(wallet = {}) {
@@ -93,6 +105,7 @@ export default function CharacterSheet() {
   const [quickRoll, setQuickRoll] = useState(null);
   const [skillRoll, setSkillRoll] = useState(null);
   const [damageRoll, setDamageRoll] = useState(null);
+  const [vitalSaveStatus, setVitalSaveStatus] = useState({});
   const [itemModal, setItemModal] = useState(null);
   const [powerModal, setPowerModal] = useState(null);
   const draftRef = useRef(null);
@@ -124,15 +137,17 @@ export default function CharacterSheet() {
     if (closeEditor) setEditing(false);
   }
 
-  async function persistQueued(nextDraft) {
+  async function persistQueued(nextDraft, callbacks = {}) {
     persistQueueRef.current = persistQueueRef.current
       .catch(() => {})
       .then(async () => {
         const { data } = await api.patch(`/characters/${id}/play`, nextDraft);
         if (draftRef.current === nextDraft) syncSheet(data);
+        callbacks.onSuccess?.(data);
       })
-      .catch(async () => {
+      .catch(async (error) => {
         if (draftRef.current === nextDraft) await load();
+        callbacks.onError?.(error);
       });
     return persistQueueRef.current;
   }
@@ -156,6 +171,36 @@ export default function CharacterSheet() {
     const nextDraft = { ...source, [field]: nextValue };
     setInteractiveState(nextDraft, { [vitalColumnByField[field]]: nextValue });
     await persistQueued(nextDraft);
+  }
+
+  function updateManualVital(type, field, value) {
+    const config = editableVitals[type];
+    const source = draftRef.current || draft;
+    const currentValue = field === 'current' ? value : source[config.current];
+    const maxValue = field === 'max' ? value : source[config.max];
+    const normalized = normalizeVitalPair(currentValue, maxValue);
+    const nextDraft = { ...source, [config.current]: normalized.current, [config.max]: normalized.max };
+    setInteractiveState(nextDraft, {
+      [config.currentColumn]: normalized.current,
+      [config.maxColumn]: normalized.max
+    });
+    setVitalSaveStatus((status) => ({ ...status, [type]: 'Alterado' }));
+  }
+
+  async function saveManualVital(type) {
+    const config = editableVitals[type];
+    const source = draftRef.current || draft;
+    const normalized = normalizeVitalPair(source[config.current], source[config.max]);
+    const nextDraft = { ...source, [config.current]: normalized.current, [config.max]: normalized.max };
+    setInteractiveState(nextDraft, {
+      [config.currentColumn]: normalized.current,
+      [config.maxColumn]: normalized.max
+    });
+    setVitalSaveStatus((status) => ({ ...status, [type]: 'Salvando...' }));
+    await persistQueued(nextDraft, {
+      onSuccess: () => setVitalSaveStatus((status) => ({ ...status, [type]: 'Salvo' })),
+      onError: () => setVitalSaveStatus((status) => ({ ...status, [type]: 'Erro ao salvar' }))
+    });
   }
 
   function rollSkill(skill, training = 0, other = 0) {
@@ -289,8 +334,8 @@ export default function CharacterSheet() {
           </Panel>
 
           <section className="grid gap-3">
-            <VitalsBar label="Vida" current={draft.lifeCurrent} max={draft.lifeMax} tone="red" onDecrease={() => adjustVital('lifeCurrent', -1)} onIncrease={() => adjustVital('lifeCurrent', 1)} />
-            <VitalsBar label="Sanidade" current={draft.sanityCurrent} max={draft.sanityMax} tone="purple" onDecrease={() => adjustVital('sanityCurrent', -1)} onIncrease={() => adjustVital('sanityCurrent', 1)} />
+            <EditableVitalsBar label="Vida" current={draft.lifeCurrent} max={draft.lifeMax} tone="red" status={vitalSaveStatus.life} onChange={(field, value) => updateManualVital('life', field, value)} onSave={() => saveManualVital('life')} />
+            <EditableVitalsBar label="Sanidade" current={draft.sanityCurrent} max={draft.sanityMax} tone="purple" status={vitalSaveStatus.sanity} onChange={(field, value) => updateManualVital('sanity', field, value)} onSave={() => saveManualVital('sanity')} />
             <VitalsBar label="Mana" current={draft.mana} max={draft.manaMax} tone="orange" onDecrease={() => adjustVital('mana', -1)} onIncrease={() => adjustVital('mana', 1)} />
           </section>
 
@@ -864,6 +909,43 @@ function SaveHistory({ saves }) {
 
 function InfoBlock({ label, value, subLabel, subValue }) {
   return <div className="space-y-2 text-sm"><div className="grid grid-cols-[90px_1fr] gap-2"><span className="text-xs font-bold uppercase text-mist">{label}</span><span className="min-w-0 border-b border-white/50 pb-1 text-white">{value}</span></div><div className="grid grid-cols-[90px_1fr] gap-2"><span className="text-xs font-bold uppercase text-mist">{subLabel}</span><span className="min-w-0 border-b border-white/50 pb-1 text-white">{subValue}</span></div></div>;
+}
+
+function EditableVitalsBar({ label, current, max, tone, status, onChange, onSave }) {
+  const safeCurrent = Number(current ?? 0);
+  const safeMax = Number(max ?? 0);
+  const width = safeMax > 0 ? Math.min(100, (safeCurrent / safeMax) * 100) : safeCurrent > 0 ? 100 : 0;
+  const tones = {
+    red: 'from-red-950 via-red-800 to-red-600 border-red-500/40 shadow-red-950/40',
+    purple: 'from-purple-950 via-purple-800 to-fuchsia-600 border-purple-400/40 shadow-purple-950/40'
+  };
+  const statusTone = status === 'Erro ao salvar' ? 'text-red-300' : status === 'Salvo' ? 'text-emerald-300' : 'text-mist';
+
+  return (
+    <div className="rounded border border-white/10 bg-black/25 p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <p className="text-xs font-bold uppercase tracking-[.18em] text-mist">{label}</p>
+        <span className={`text-xs uppercase tracking-[.14em] ${statusTone}`}>{status || 'Pronto'}</span>
+      </div>
+      <div className={`relative min-h-12 overflow-hidden rounded border bg-black/50 shadow-lg ${tones[tone]}`}>
+        <div className={`pointer-events-none absolute inset-y-0 left-0 bg-gradient-to-r ${tones[tone]} opacity-80 transition-all duration-200`} style={{ width: `${width}%` }} />
+        <div className="relative grid min-h-12 place-items-center px-3 text-lg font-black text-white drop-shadow">{safeCurrent} / {safeMax}</div>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+        <label className="text-xs uppercase tracking-[.12em] text-mist">
+          Atual
+          <NumberInput className="mt-1 h-10 w-full text-center" value={safeCurrent} onChange={(value) => onChange('current', value)} />
+        </label>
+        <label className="text-xs uppercase tracking-[.12em] text-mist">
+          Máxima
+          <NumberInput className="mt-1 h-10 w-full text-center" value={safeMax} onChange={(value) => onChange('max', value)} />
+        </label>
+        <button type="button" className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded border border-ember/30 bg-ember/10 px-4 text-sm font-semibold text-ember soft-motion hover:bg-ember/20 sm:mt-5" onClick={onSave}>
+          <Save size={16} /> Salvar
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function VitalsBar({ label, current, max, tone, onDecrease, onIncrease }) {

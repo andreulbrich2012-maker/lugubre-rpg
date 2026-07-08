@@ -452,25 +452,37 @@ describe('fluxo principal da API', () => {
         .expect(200);
     }
 
-    let reloaded = await patchPlay({ lifeCurrent: 36 });
-    expect(reloaded.body.life_current).toBe(36);
+    let reloaded = await patchPlay({ lifeCurrent: 45 });
+    expect(reloaded.body.life_current).toBe(45);
     expect(reloaded.body.life_max).toBe(63);
 
-    reloaded = await patchPlay({ lifeCurrent: 37 });
-    expect(reloaded.body.life_current).toBe(37);
-    expect(reloaded.body.life_max).toBe(63);
+    reloaded = await patchPlay({ lifeMax: 70 });
+    expect(reloaded.body.life_current).toBe(45);
+    expect(reloaded.body.life_max).toBe(70);
+
+    reloaded = await patchPlay({ lifeCurrent: 90 });
+    expect(reloaded.body.life_current).toBe(70);
+    expect(reloaded.body.life_max).toBe(70);
 
     reloaded = await patchPlay({ lifeCurrent: -1 });
     expect(reloaded.body.life_current).toBe(0);
-    expect(reloaded.body.life_max).toBe(63);
+    expect(reloaded.body.life_max).toBe(70);
 
-    reloaded = await patchPlay({ sanityCurrent: 26 });
-    expect(reloaded.body.sanity_current).toBe(26);
+    reloaded = await patchPlay({ sanityCurrent: 20 });
+    expect(reloaded.body.sanity_current).toBe(20);
     expect(reloaded.body.sanity_max).toBe(52);
 
-    reloaded = await patchPlay({ sanityCurrent: 27 });
-    expect(reloaded.body.sanity_current).toBe(27);
-    expect(reloaded.body.sanity_max).toBe(52);
+    reloaded = await patchPlay({ sanityMax: 60 });
+    expect(reloaded.body.sanity_current).toBe(20);
+    expect(reloaded.body.sanity_max).toBe(60);
+
+    reloaded = await patchPlay({ sanityCurrent: 90 });
+    expect(reloaded.body.sanity_current).toBe(60);
+    expect(reloaded.body.sanity_max).toBe(60);
+
+    reloaded = await patchPlay({ sanityCurrent: -1 });
+    expect(reloaded.body.sanity_current).toBe(0);
+    expect(reloaded.body.sanity_max).toBe(60);
 
     reloaded = await patchPlay({ mana: 4 });
     expect(reloaded.body.mana).toBe(4);

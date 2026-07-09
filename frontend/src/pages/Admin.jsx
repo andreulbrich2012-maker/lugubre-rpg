@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Button from '../components/Button';
+import AdminMonstersPage from '../components/monsters/AdminMonstersPage';
 import { api } from '../lib/api';
 
 const attributes = ['forca', 'agilidade', 'intelecto', 'vigor', 'presenca'];
@@ -11,6 +12,7 @@ export default function Admin() {
   const [origin, setOrigin] = useState(blankOrigin());
   const [skill, setSkill] = useState({ name: '', key: '', attribute: 'presenca' });
   const [editor, setEditor] = useState(null);
+  const [adminSection, setAdminSection] = useState('catalogs');
 
   async function load() {
     const [races, classes, origins, skills] = await Promise.all([
@@ -95,7 +97,18 @@ export default function Admin() {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-10">
-      <h1 className="font-display text-4xl text-ember">Administração</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="font-display text-4xl text-ember">Administração</h1>
+        <div className="flex rounded-md border border-ember/15 bg-black/25 p-1">
+          <button type="button" className={`rounded px-3 py-2 text-sm ${adminSection === 'catalogs' ? 'bg-ember/15 text-white' : 'text-mist hover:text-white'}`} onClick={() => setAdminSection('catalogs')}>Catálogos</button>
+          <button type="button" className={`rounded px-3 py-2 text-sm ${adminSection === 'monsters' ? 'bg-ember/15 text-white' : 'text-mist hover:text-white'}`} onClick={() => setAdminSection('monsters')}>Monstros</button>
+        </div>
+      </div>
+
+      {adminSection === 'monsters' ? (
+        <div className="mt-8"><AdminMonstersPage /></div>
+      ) : (
+        <>
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <Panel title="Raças" onSubmit={addRace}>
           <Input placeholder="Nome" value={race.name} onChange={(name) => setRace({ ...race, name })} />
@@ -156,6 +169,8 @@ export default function Admin() {
             </div>
           </section>
         </div>
+      )}
+        </>
       )}
     </main>
   );

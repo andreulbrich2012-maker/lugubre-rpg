@@ -11,6 +11,7 @@ import CharacterBuilder from './pages/CharacterBuilder';
 import CharacterSheet from './pages/CharacterSheet';
 import Campaigns from './pages/Campaigns';
 import CampaignRoom from './pages/CampaignRoom';
+import Monsters from './pages/Monsters';
 import Admin from './pages/Admin';
 import { useAuth } from './store/authStore';
 
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/characters/:id/edit" element={<ProtectedRoute><CharacterBuilder /></ProtectedRoute>} />
         <Route path="/campaigns" element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
         <Route path="/campaigns/:id" element={<ProtectedRoute><CampaignRoom /></ProtectedRoute>} />
+        <Route path="/monsters" element={<ProtectedRoute><Monsters /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute role="admin"><Admin /></ProtectedRoute>} />
       </Routes>
     </Layout>

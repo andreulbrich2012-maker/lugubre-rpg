@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Camera, Eye, EyeOff, LayoutDashboard, Menu, MessageCircle, Palette, ScrollText, Settings, Shield, Swords, Trash2, Users, X } from 'lucide-react';
+import { Camera, Eye, EyeOff, LayoutDashboard, Menu, MessageCircle, Palette, ScrollText, Settings, Shield, Skull, Swords, Trash2, Users, X } from 'lucide-react';
 import Alert from '../components/Alert';
 import Avatar from '../components/Avatar';
 import Button from '../components/Button';
 import LoadingButton from '../components/LoadingButton';
 import UserMenu from '../components/UserMenu';
 import { api } from '../lib/api';
+import { MonstersTab } from './Monsters';
 import { useAuth } from '../store/authStore';
 
 const tabs = [
@@ -14,6 +15,7 @@ const tabs = [
   { id: 'characters', label: 'Personagens', icon: ScrollText },
   { id: 'campaigns', label: 'Campanhas', icon: Swords },
   { id: 'friends', label: 'Amigos', icon: Users },
+  { id: 'monsters', label: 'Monstros', icon: Skull },
   { id: 'settings', label: 'Configuracoes', icon: Settings },
   { id: 'personalization', label: 'Personalizacao', icon: Palette }
 ];
@@ -97,6 +99,7 @@ export default function Dashboard() {
             {active === 'characters' && <CharactersTab characters={characters} onRemove={removeCharacter} />}
             {active === 'campaigns' && <CampaignsTab campaigns={campaigns} onReload={load} />}
             {active === 'friends' && <FriendsTab />}
+            {active === 'monsters' && <MonstersTab />}
             {active === 'settings' && <SettingsTab />}
             {active === 'personalization' && <PersonalizationTab />}
           </>

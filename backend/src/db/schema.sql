@@ -151,6 +151,49 @@ create table if not exists friend_messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists monsters (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null,
+  image_url text,
+  token_url text,
+  category text not null default 'Outros',
+  difficulty text not null default 'Media',
+  base_health int not null default 8 check (base_health >= 0),
+  min_health int not null default 4 check (min_health >= 0),
+  max_health int not null default 12 check (max_health >= 0),
+  armor int not null default 10 check (armor >= 0),
+  items jsonb not null default '[]',
+  description text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table monsters add column if not exists image_url text;
+alter table monsters add column if not exists token_url text;
+alter table monsters add column if not exists category text not null default 'Outros';
+alter table monsters add column if not exists difficulty text not null default 'Media';
+alter table monsters add column if not exists base_health int not null default 8;
+alter table monsters add column if not exists min_health int not null default 4;
+alter table monsters add column if not exists max_health int not null default 12;
+alter table monsters add column if not exists armor int not null default 10;
+alter table monsters add column if not exists items jsonb not null default '[]';
+alter table monsters add column if not exists description text;
+alter table monsters add column if not exists updated_at timestamptz not null default now();
+
+create table if not exists monster_attacks (
+  id uuid primary key default uuid_generate_v4(),
+  monster_id uuid not null references monsters(id) on delete cascade,
+  name text not null,
+  damage_formula text not null,
+  description text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table monster_attacks add column if not exists description text;
+alter table monster_attacks add column if not exists updated_at timestamptz not null default now();
+create index if not exists monster_attacks_monster_idx on monster_attacks (monster_id);
+
 delete from races current
 using races duplicate
 where lower(current.name) = lower(duplicate.name)
@@ -166,9 +209,15 @@ using origins duplicate
 where lower(current.name) = lower(duplicate.name)
   and current.ctid < duplicate.ctid;
 
+delete from monsters current
+using monsters duplicate
+where lower(current.name) = lower(duplicate.name)
+  and current.ctid < duplicate.ctid;
+
 create unique index if not exists races_name_unique on races (lower(name));
 create unique index if not exists classes_name_unique on classes (lower(name));
 create unique index if not exists origins_name_unique on origins (lower(name));
+create unique index if not exists monsters_name_unique on monsters (lower(name));
 
 insert into races (name, image, attribute_modifiers)
 values
@@ -245,6 +294,36 @@ values
   ('Sacerdote', 'Cura, suporte, fé e proteção espiritual.', '', '[{"level":1,"mana":2,"feature":"Prece de cura"},{"level":5,"mana":4,"feature":"Benção protetora"},{"level":10,"mana":6,"feature":"Rito de purificação"},{"level":15,"mana":8,"feature":"Milagre menor"},{"level":20,"mana":10,"feature":"Voz do santuário"}]'),
   ('Feiticeiro', 'Magia instável, poder bruto e presença arcana.', '', '[{"level":1,"mana":3,"feature":"Surto arcano"},{"level":5,"mana":5,"feature":"Energia instável"},{"level":10,"mana":7,"feature":"Poder bruto"},{"level":15,"mana":9,"feature":"Ruptura mística"},{"level":20,"mana":12,"feature":"Cataclisma pessoal"}]')
 on conflict ((lower(name))) do update set description = excluded.description, image = excluded.image, progression = excluded.progression;
+
+insert into monsters (name, image_url, token_url, category, difficulty, base_health, min_health, max_health, armor, items, description)
+values
+  ('Guardião de Cinzas', '/assets/haunted-ruins.svg', '/assets/haunted-ruins.svg', 'Elementais', 'Média', 20, 16, 24, 12, '["Fragmento de Cinza","Núcleo Flamejante"]', 'Uma sentinela de brasas antigas que protege ruínas esquecidas.')
+on conflict ((lower(name))) do update set
+  image_url = excluded.image_url,
+  token_url = excluded.token_url,
+  category = excluded.category,
+  difficulty = excluded.difficulty,
+  base_health = excluded.base_health,
+  min_health = excluded.min_health,
+  max_health = excluded.max_health,
+  armor = excluded.armor,
+  items = excluded.items,
+  description = excluded.description,
+  updated_at = now();
+
+insert into monster_attacks (monster_id, name, damage_formula, description)
+select m.id, attack.name, attack.damage_formula, attack.description
+from monsters m
+cross join (
+  values
+    ('Punho Ardente', '1d8+2', 'Um golpe pesado envolto em cinzas vivas.'),
+    ('Explosão de Cinzas', '2d6+1', 'A criatura libera uma onda breve de calor e fuligem.')
+) as attack(name, damage_formula, description)
+where m.name = 'Guardião de Cinzas'
+  and not exists (
+    select 1 from monster_attacks existing
+    where existing.monster_id = m.id and lower(existing.name) = lower(attack.name)
+  );
 
 insert into users (name, email, password_hash, role)
 values

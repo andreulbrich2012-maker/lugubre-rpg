@@ -4,6 +4,7 @@ import authRoutes from './routes/auth.routes.js';
 import catalogRoutes from './routes/catalog.routes.js';
 import characterRoutes from './routes/character.routes.js';
 import campaignRoutes from './routes/campaign.routes.js';
+import monsterRoutes from './routes/monster.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import friendRoutes from './routes/friend.routes.js';
@@ -20,6 +21,7 @@ export function createApp() {
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/characters', characterRoutes);
   app.use('/api/campaigns', campaignRoutes);
+  app.use('/api/monsters', monsterRoutes);
   app.use('/api/friends', friendRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/admin', adminRoutes);

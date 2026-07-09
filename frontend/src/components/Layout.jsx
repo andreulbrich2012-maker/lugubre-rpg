@@ -14,6 +14,7 @@ export default function Layout({ children }) {
             {user && <NavLink to="/dashboard" className="text-mist hover:text-white">Dashboard</NavLink>}
             <NavLink to="/characters" className="text-mist hover:text-white">Personagens</NavLink>
             <NavLink to="/campaigns" className="text-mist hover:text-white">Campanhas</NavLink>
+            {user && <NavLink to="/monsters" className="text-mist hover:text-white">Monstros</NavLink>}
             {user?.role === 'admin' && <NavLink to="/admin" className="text-mist hover:text-white">Admin</NavLink>}
             {user ? (
               <Button variant="ghost" onClick={logout} title="Sair"><LogOut size={16} /></Button>

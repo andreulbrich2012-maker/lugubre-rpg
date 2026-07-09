@@ -5,7 +5,7 @@ import { SKILL_DEFINITIONS } from '../utils/rules.js';
 
 const dataDir = process.env.VERCEL ? '/tmp/lugubre-data' : path.resolve('data');
 const dataFile = path.join(dataDir, 'local-db.json');
-const seedVersion = '2026-07-rpg-sheet-v7';
+const seedVersion = '2026-07-rpg-sheet-v8-monsters';
 let cachedData = null;
 let writeQueue = Promise.resolve();
 
@@ -33,6 +33,28 @@ const defaultData = {
   messages: [],
   friends: [],
   friend_messages: [],
+  monsters: [
+    {
+      id: 'monster-guardian-ashes',
+      name: 'Guardião de Cinzas',
+      image_url: '/assets/haunted-ruins.svg',
+      token_url: '/assets/haunted-ruins.svg',
+      category: 'Elementais',
+      difficulty: 'Média',
+      base_health: 20,
+      min_health: 16,
+      max_health: 24,
+      armor: 12,
+      items: ['Fragmento de Cinza', 'Núcleo Flamejante'],
+      description: 'Uma sentinela de brasas antigas que protege ruínas esquecidas.',
+      attacks: [
+        { id: 'monster-guardian-ashes-punch', name: 'Punho Ardente', damage_formula: '1d8+2', description: 'Um golpe pesado envolto em cinzas vivas.' },
+        { id: 'monster-guardian-ashes-burst', name: 'Explosão de Cinzas', damage_formula: '2d6+1', description: 'A criatura libera uma onda breve de calor e fuligem.' }
+      ],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+  ],
   skills: defaultSkills,
   origins: [
     { id: 'origin-survivor', name: 'Sobrevivente', description: 'Escapou de terras hostis e aprendeu a resistir quando tudo desaba.', skill_modifiers: { atletismo: 5, vontade: 5 } },
@@ -100,6 +122,46 @@ export function getSeedPassword(email) {
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
+}
+
+function healthRange(baseHealth) {
+  const base = Math.max(0, Number(baseHealth || 0));
+  return {
+    base_health: base,
+    min_health: Math.max(0, base - 4),
+    max_health: base + 4
+  };
+}
+
+function normalizeLocalMonster(monster = {}) {
+  const range = healthRange(monster.base_health ?? monster.baseHealth ?? 8);
+  const now = new Date().toISOString();
+  const items = Array.isArray(monster.items)
+    ? monster.items.map((item) => String(item).trim()).filter(Boolean)
+    : String(monster.items || '').split(',').map((item) => item.trim()).filter(Boolean);
+  return {
+    id: monster.id || crypto.randomUUID(),
+    name: monster.name || 'Monstro',
+    image_url: monster.image_url ?? monster.imageUrl ?? '',
+    token_url: monster.token_url ?? monster.tokenUrl ?? monster.image_url ?? monster.imageUrl ?? '',
+    category: monster.category || 'Outros',
+    difficulty: monster.difficulty || 'Média',
+    ...range,
+    armor: Math.max(0, Number(monster.armor ?? 10)),
+    items,
+    description: monster.description || '',
+    attacks: (Array.isArray(monster.attacks) ? monster.attacks : []).map((attack) => ({
+      id: attack.id || crypto.randomUUID(),
+      monster_id: monster.id || attack.monster_id,
+      name: attack.name || 'Ataque',
+      damage_formula: attack.damage_formula || attack.damageFormula || '1d4',
+      description: attack.description || '',
+      created_at: attack.created_at || now,
+      updated_at: attack.updated_at || now
+    })),
+    created_at: monster.created_at || now,
+    updated_at: monster.updated_at || now
+  };
 }
 
 async function createSeedUser(seed) {
@@ -216,6 +278,7 @@ async function ensureStore() {
       character.save_history = Array.isArray(character.save_history) ? character.save_history.slice(0, 3) : [];
       character.updated_at = character.updated_at || character.created_at || new Date().toISOString();
     }
+    data.monsters = data.monsters.map(normalizeLocalMonster);
     for (const key of ['races', 'classes', 'skills']) {
       for (const item of defaultData[key]) {
         const index = data[key].findIndex((row) => (
@@ -231,6 +294,11 @@ async function ensureStore() {
       const index = data.origins.findIndex((row) => row.id === item.id || normalizeEmail(row.name) === normalizeEmail(item.name));
       if (index >= 0) data.origins[index] = { ...data.origins[index], ...item };
       else data.origins.push(item);
+    }
+    for (const item of defaultData.monsters) {
+      const index = data.monsters.findIndex((row) => row.id === item.id || normalizeEmail(row.name) === normalizeEmail(item.name));
+      if (index >= 0) data.monsters[index] = normalizeLocalMonster({ ...data.monsters[index], ...item });
+      else data.monsters.push(normalizeLocalMonster(item));
     }
     await ensureSeedUsers(data);
     await writeStore(data);
@@ -362,6 +430,107 @@ export async function deleteLocalCatalogItem(type, id) {
   const data = await ensureStore();
   data[type] = data[type].filter((item) => item.id !== id);
   await writeStore(data);
+}
+
+export async function listLocalMonsters(category = '') {
+  const data = await ensureStore();
+  const normalized = String(category || '').toLowerCase();
+  return data.monsters
+    .filter((monster) => !normalized || monster.category.toLowerCase() === normalized)
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function getLocalMonster(id) {
+  const data = await ensureStore();
+  return data.monsters.find((monster) => monster.id === id) || null;
+}
+
+export async function createLocalMonster(monster) {
+  const data = await ensureStore();
+  const row = normalizeLocalMonster(monster);
+  row.attacks = row.attacks.map((attack) => ({ ...attack, monster_id: row.id }));
+  data.monsters.push(row);
+  await writeStore(data);
+  return row;
+}
+
+export async function updateLocalMonster(id, monster) {
+  const data = await ensureStore();
+  const index = data.monsters.findIndex((row) => row.id === id);
+  if (index === -1) return null;
+  const existingAttacks = data.monsters[index].attacks || [];
+  data.monsters[index] = normalizeLocalMonster({
+    ...data.monsters[index],
+    ...monster,
+    id,
+    attacks: Array.isArray(monster.attacks) ? monster.attacks : existingAttacks,
+    updated_at: new Date().toISOString()
+  });
+  data.monsters[index].attacks = data.monsters[index].attacks.map((attack) => ({ ...attack, monster_id: id }));
+  await writeStore(data);
+  return data.monsters[index];
+}
+
+export async function deleteLocalMonster(id) {
+  const data = await ensureStore();
+  const before = data.monsters.length;
+  data.monsters = data.monsters.filter((monster) => monster.id !== id);
+  await writeStore(data);
+  return data.monsters.length !== before;
+}
+
+export async function createLocalMonsterAttack(monsterId, attack) {
+  const data = await ensureStore();
+  const monster = data.monsters.find((row) => row.id === monsterId);
+  if (!monster) return null;
+  const now = new Date().toISOString();
+  const row = {
+    id: crypto.randomUUID(),
+    monster_id: monsterId,
+    name: attack.name || 'Ataque',
+    damage_formula: attack.damage_formula || attack.damageFormula || '1d4',
+    description: attack.description || '',
+    created_at: now,
+    updated_at: now
+  };
+  monster.attacks = [...(monster.attacks || []), row];
+  monster.updated_at = now;
+  await writeStore(data);
+  return row;
+}
+
+export async function updateLocalMonsterAttack(attackId, attack) {
+  const data = await ensureStore();
+  for (const monster of data.monsters) {
+    const index = (monster.attacks || []).findIndex((row) => row.id === attackId);
+    if (index >= 0) {
+      monster.attacks[index] = {
+        ...monster.attacks[index],
+        name: attack.name || monster.attacks[index].name,
+        damage_formula: attack.damage_formula || attack.damageFormula || monster.attacks[index].damage_formula,
+        description: attack.description ?? monster.attacks[index].description,
+        updated_at: new Date().toISOString()
+      };
+      monster.updated_at = new Date().toISOString();
+      await writeStore(data);
+      return monster.attacks[index];
+    }
+  }
+  return null;
+}
+
+export async function deleteLocalMonsterAttack(attackId) {
+  const data = await ensureStore();
+  for (const monster of data.monsters) {
+    const before = (monster.attacks || []).length;
+    monster.attacks = (monster.attacks || []).filter((attack) => attack.id !== attackId);
+    if (monster.attacks.length !== before) {
+      monster.updated_at = new Date().toISOString();
+      await writeStore(data);
+      return true;
+    }
+  }
+  return false;
 }
 
 export async function listLocalCharacters(ownerId) {

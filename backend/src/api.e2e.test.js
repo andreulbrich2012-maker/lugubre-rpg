@@ -578,6 +578,96 @@ describe('fluxo principal da API', () => {
     expect(damageRoll.body.isCritical).toBe(true);
     expect(damageRoll.body.total).toBe(damageRoll.body.baseTotal * 3);
 
+    const monster = await request(app)
+      .post('/api/admin/monsters')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: `Guardiao Teste ${stamp}`,
+        imageUrl: '/assets/haunted-ruins.svg',
+        category: 'Elementais',
+        difficulty: 'Média',
+        baseHealth: 20,
+        armor: 12,
+        items: ['Fragmento de Cinza', 'Nucleo Flamejante'],
+        description: 'Monstro criado pelo teste.',
+        attacks: [{ name: 'Punho Ardente', damageFormula: '1d8+2', description: 'Golpe flamejante.' }]
+      })
+      .expect(201);
+
+    expect(monster.body.min_health).toBe(16);
+    expect(monster.body.max_health).toBe(24);
+
+    const editedMonster = await request(app)
+      .put(`/api/admin/monsters/${monster.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: `Guardiao Editado ${stamp}`,
+        imageUrl: '/assets/crypt-gate.svg',
+        category: 'Mortos-vivos',
+        difficulty: 'Alta',
+        baseHealth: 30,
+        armor: 14,
+        items: 'Osso Antigo, Cinzas Frias',
+        description: 'Monstro editado pelo teste.',
+        attacks: [{ name: 'Garra Sombria', damageFormula: '1d6+1', description: 'Corte escuro.' }]
+      })
+      .expect(200);
+
+    expect(editedMonster.body.min_health).toBe(26);
+    expect(editedMonster.body.max_health).toBe(34);
+
+    const listedMonsters = await request(app)
+      .get('/api/monsters?category=Mortos-vivos')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    const persistedMonster = listedMonsters.body.find((item) => item.id === monster.body.id);
+    expect(persistedMonster).toMatchObject({
+      name: `Guardiao Editado ${stamp}`,
+      armor: 14,
+      category: 'Mortos-vivos'
+    });
+    expect(persistedMonster.items).toEqual(expect.arrayContaining(['Osso Antigo', 'Cinzas Frias']));
+    expect(persistedMonster.attacks).toHaveLength(1);
+
+    const monsterAttack = await request(app)
+      .post(`/api/admin/monsters/${monster.body.id}/attacks`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Mordida Brutal', damageFormula: '2d4+3', description: 'Mordida pesada.' })
+      .expect(201);
+
+    const editedAttack = await request(app)
+      .put(`/api/admin/monster-attacks/${monsterAttack.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Mordida Brutal Editada', damageFormula: '2d6+3', description: 'Mordida ainda pior.' })
+      .expect(200);
+
+    const monsterRoll = await request(app)
+      .post(`/api/monsters/${monster.body.id}/attacks/${editedAttack.body.id}/roll`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(monsterRoll.body.monster.name).toBe(`Guardiao Editado ${stamp}`);
+    expect(monsterRoll.body.attack.name).toBe('Mordida Brutal Editada');
+    expect(monsterRoll.body.rolls).toHaveLength(2);
+    expect(monsterRoll.body.bonus).toBe(3);
+    expect(monsterRoll.body.total).toBe(monsterRoll.body.rolls.reduce((sum, value) => sum + value, 0) + 3);
+
+    await request(app)
+      .delete(`/api/admin/monster-attacks/${editedAttack.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(204);
+
+    await request(app)
+      .delete(`/api/admin/monsters/${monster.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(204);
+
+    await request(app)
+      .get(`/api/monsters/${monster.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404);
+
     await request(app)
       .delete(`/api/characters/${character.body.id}/powers/spells/${spellId}`)
       .set('Authorization', `Bearer ${token}`)

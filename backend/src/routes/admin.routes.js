@@ -67,6 +67,21 @@ const monsterSchema = z.object({
   description: z.string().optional().default(''),
   attacks: z.array(monsterAttackSchema).optional()
 });
+const powerElements = ['Érebo', 'Nix', 'Tártaro', 'Ananque', 'Éter', 'Gaia', 'Caos', 'Hemera', 'Ponto'];
+const powerLibrarySchema = z.object({
+  name: z.string().min(2).max(140),
+  type: z.enum(['magia', 'poder']).default('magia'),
+  element: z.string().optional().nullable(),
+  description: z.string().optional().default(''),
+  manaCost: z.coerce.number().min(0).default(0),
+  damageFormula: z.string().optional().default(''),
+  range: z.string().optional().default(''),
+  duration: z.string().optional().default(''),
+  requirement: z.string().optional().default(''),
+  recommendedClass: z.string().optional().default(''),
+  recommendedLevel: z.coerce.number().min(1).max(20).default(1),
+  imageUrl: z.string().optional().default('')
+});
 
 function toJson(value) {
   return JSON.stringify(value ?? null);
@@ -141,6 +156,31 @@ function attackPayload(body) {
     name: parsed.name,
     damage_formula: parsed.damageFormula,
     description: parsed.description || ''
+  };
+}
+
+function normalizePowerElement(type, element) {
+  if (type !== 'magia') return null;
+  const value = String(element || '').trim();
+  return powerElements.includes(value) ? value : 'Érebo';
+}
+
+function powerPayload(body) {
+  const parsed = powerLibrarySchema.parse(body);
+  if (parsed.damageFormula) parseDiceFormula(parsed.damageFormula);
+  return {
+    name: parsed.name.trim(),
+    type: parsed.type,
+    element: normalizePowerElement(parsed.type, parsed.element),
+    description: parsed.description || '',
+    mana_cost: parsed.manaCost,
+    damage_formula: parsed.damageFormula || '',
+    range: parsed.range || '',
+    duration: parsed.duration || '',
+    requirement: parsed.requirement || '',
+    recommended_class: parsed.recommendedClass || '',
+    recommended_level: parsed.recommendedLevel,
+    image_url: parsed.imageUrl || ''
   };
 }
 
@@ -305,6 +345,37 @@ router.put('/monster-attacks/:attackId', async (req, res) => {
 router.delete('/monster-attacks/:attackId', async (req, res) => {
   const result = await tryQuery('delete from monster_attacks where id=$1', [req.params.attackId]);
   if (!result) await deleteLocalMonsterAttack(req.params.attackId);
+  res.status(204).end();
+});
+
+router.post('/powers', async (req, res) => {
+  const payload = powerPayload(req.body);
+  const result = await tryQuery(
+    `insert into power_library (name, type, element, description, mana_cost, damage_formula, range, duration, requirement, recommended_class, recommended_level, image_url)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+     returning *`,
+    [payload.name, payload.type, payload.element, payload.description, payload.mana_cost, payload.damage_formula, payload.range, payload.duration, payload.requirement, payload.recommended_class, payload.recommended_level, payload.image_url]
+  );
+  res.status(201).json(result.rows[0]);
+});
+
+router.put('/powers/:id', async (req, res) => {
+  const payload = powerPayload(req.body);
+  const result = await tryQuery(
+    `update power_library
+     set name=$1, type=$2, element=$3, description=$4, mana_cost=$5, damage_formula=$6,
+         range=$7, duration=$8, requirement=$9, recommended_class=$10, recommended_level=$11, image_url=$12, updated_at=now()
+     where id=$13
+     returning *`,
+    [payload.name, payload.type, payload.element, payload.description, payload.mana_cost, payload.damage_formula, payload.range, payload.duration, payload.requirement, payload.recommended_class, payload.recommended_level, payload.image_url, req.params.id]
+  );
+  if (!result.rowCount) return res.status(404).json({ message: 'Poder ou magia não encontrado.' });
+  res.json(result.rows[0]);
+});
+
+router.delete('/powers/:id', async (req, res) => {
+  const result = await tryQuery('delete from power_library where id=$1', [req.params.id]);
+  if (result && !result.rowCount) return res.status(404).json({ message: 'Poder ou magia não encontrado.' });
   res.status(204).end();
 });
 

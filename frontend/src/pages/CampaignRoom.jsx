@@ -5,8 +5,10 @@ import { Send } from 'lucide-react';
 import Alert from '../components/Alert';
 import Button from '../components/Button';
 import CampaignActions from '../components/campaigns/CampaignActions';
+import CampaignDiaryTab from '../components/campaigns/CampaignDiaryTab';
 import CampaignMembersList from '../components/campaigns/CampaignMembersList';
 import CampaignMessageBubble from '../components/campaigns/CampaignMessageBubble';
+import CampaignShopsTab from '../components/campaigns/CampaignShopsTab';
 import ShareCharacterWithGM from '../components/campaigns/ShareCharacterWithGM';
 import SharedCharacterPreview from '../components/campaigns/SharedCharacterPreview';
 import { API_URL, api } from '../lib/api';
@@ -16,6 +18,8 @@ const tabs = [
   { id: 'chat', label: 'Chat' },
   { id: 'members', label: 'Jogadores' },
   { id: 'sheets', label: 'Fichas' },
+  { id: 'diary', label: 'Diário' },
+  { id: 'shops', label: 'Loja' },
   { id: 'actions', label: 'Acoes' }
 ];
 
@@ -306,7 +310,7 @@ export default function CampaignRoom() {
             </div>
           </header>
 
-          <div className="mb-4 flex gap-2 overflow-x-auto pb-1 lg:hidden">
+          <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
@@ -356,7 +360,7 @@ export default function CampaignRoom() {
             </aside>
 
             <div className="min-w-0 space-y-4">
-              <div className={activeTab === 'chat' ? 'block' : 'hidden lg:block'}>
+              <div className={activeTab === 'chat' ? 'block' : 'hidden'}>
                 <ChatPanel
                   messages={messages}
                   currentUserId={user?.id}
@@ -373,11 +377,17 @@ export default function CampaignRoom() {
                   deleteMessage={deleteMessage}
                 />
               </div>
-              <section className={`${activeTab === 'sheets' ? 'block' : 'hidden lg:block'} gothic-panel rounded-md p-4`}>
+              <section className={`${activeTab === 'sheets' ? 'block' : 'hidden'} gothic-panel rounded-md p-4`}>
                 <h2 className="font-display text-3xl text-ember">Fichas compartilhadas</h2>
                 <p className="mb-4 text-sm text-mist">O GM vê sempre a versão atual da ficha vinculada pelo jogador.</p>
                 <SharedCharacterPreview members={room.members || []} />
               </section>
+              <div className={activeTab === 'diary' ? 'block' : 'hidden'}>
+                <CampaignDiaryTab campaignId={id} isMaster={isMaster} currentUserId={user?.id} />
+              </div>
+              <div className={activeTab === 'shops' ? 'block' : 'hidden'}>
+                <CampaignShopsTab campaignId={id} isMaster={isMaster} characters={characters} />
+              </div>
             </div>
           </div>
         </>

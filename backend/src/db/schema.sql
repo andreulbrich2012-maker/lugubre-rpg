@@ -159,6 +159,118 @@ alter table messages add column if not exists deleted_at timestamptz;
 alter table messages add column if not exists updated_at timestamptz not null default now();
 create index if not exists messages_campaign_created_idx on messages (campaign_id, created_at);
 
+create table if not exists campaign_diary_entries (
+  id uuid primary key default uuid_generate_v4(),
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
+  character_id uuid references characters(id) on delete set null,
+  title text not null,
+  content text not null,
+  marker text,
+  is_gm_private boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table campaign_diary_entries add column if not exists character_id uuid references characters(id) on delete set null;
+alter table campaign_diary_entries add column if not exists marker text;
+alter table campaign_diary_entries add column if not exists is_gm_private boolean not null default false;
+alter table campaign_diary_entries add column if not exists updated_at timestamptz not null default now();
+create index if not exists campaign_diary_entries_campaign_user_idx on campaign_diary_entries (campaign_id, user_id, created_at desc);
+
+create table if not exists campaign_shops (
+  id uuid primary key default uuid_generate_v4(),
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  name text not null,
+  description text,
+  category text not null,
+  visible_to_players boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table campaign_shops add column if not exists visible_to_players boolean not null default true;
+alter table campaign_shops add column if not exists updated_at timestamptz not null default now();
+create index if not exists campaign_shops_campaign_idx on campaign_shops (campaign_id, category, name);
+
+create table if not exists campaign_shop_items (
+  id uuid primary key default uuid_generate_v4(),
+  shop_id uuid not null references campaign_shops(id) on delete cascade,
+  name text not null,
+  description text,
+  price_dracmas int not null default 0 check (price_dracmas >= 0),
+  stock int not null default 0 check (stock >= 0),
+  category text,
+  weight numeric not null default 0,
+  available boolean not null default true,
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table campaign_shop_items add column if not exists available boolean not null default true;
+alter table campaign_shop_items add column if not exists note text;
+alter table campaign_shop_items add column if not exists updated_at timestamptz not null default now();
+create index if not exists campaign_shop_items_shop_idx on campaign_shop_items (shop_id, name);
+
+create table if not exists shop_purchase_requests (
+  id uuid primary key default uuid_generate_v4(),
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  shop_id uuid not null references campaign_shops(id) on delete cascade,
+  item_id uuid not null references campaign_shop_items(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
+  character_id uuid references characters(id) on delete set null,
+  quantity int not null default 1 check (quantity > 0),
+  total_price int not null default 0 check (total_price >= 0),
+  status text not null default 'pending' check (status in ('pending', 'approved', 'denied')),
+  gm_note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table shop_purchase_requests add column if not exists gm_note text;
+alter table shop_purchase_requests add column if not exists updated_at timestamptz not null default now();
+create index if not exists shop_purchase_requests_campaign_idx on shop_purchase_requests (campaign_id, status, created_at desc);
+
+create table if not exists power_library (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null,
+  type text not null default 'magia' check (type in ('magia', 'poder')),
+  element text,
+  description text not null default '',
+  mana_cost int not null default 0 check (mana_cost >= 0),
+  damage_formula text,
+  range text,
+  duration text,
+  requirement text,
+  recommended_class text,
+  recommended_level int not null default 1 check (recommended_level between 1 and 20),
+  image_url text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table power_library add column if not exists image_url text;
+alter table power_library add column if not exists updated_at timestamptz not null default now();
+alter table power_library drop constraint if exists power_library_type_check;
+alter table power_library add constraint power_library_type_check check (type in ('magia', 'poder'));
+create unique index if not exists power_library_name_type_unique on power_library (lower(name), type);
+
+create table if not exists character_powers (
+  id uuid primary key default uuid_generate_v4(),
+  character_id uuid not null references characters(id) on delete cascade,
+  power_id uuid references power_library(id) on delete set null,
+  custom_name text,
+  custom_description text,
+  custom_damage_formula text,
+  custom_mana_cost int,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table character_powers add column if not exists updated_at timestamptz not null default now();
+create index if not exists character_powers_character_idx on character_powers (character_id, created_at desc);
+
 create table if not exists friends (
   id uuid primary key default uuid_generate_v4(),
   user_id uuid not null references users(id) on delete cascade,
@@ -363,6 +475,24 @@ where m.name = 'Guardião de Cinzas'
     select 1 from monster_attacks existing
     where existing.monster_id = m.id and lower(existing.name) = lower(attack.name)
   );
+
+insert into power_library (name, type, element, description, mana_cost, damage_formula, range, duration, requirement, recommended_class, recommended_level, image_url)
+values
+  ('Raio Sombrio', 'magia', 'Érebo', 'Um raio de energia sombria atinge o alvo.', 3, '1d10+2', 'Médio', 'Instantânea', '', 'Mago', 1, ''),
+  ('Benção de Éter', 'magia', 'Éter', 'Luz celestial fecha feridas e afasta o desespero.', 4, '1d8+3', 'Curto', 'Instantânea', '', 'Sacerdote', 1, ''),
+  ('Golpe Guardião', 'poder', null, 'Uma técnica defensiva que transforma bloqueio em contra-ataque.', 0, '1d8+1', 'Corpo a corpo', 'Instantânea', 'Escudo equipado', 'Cavaleiro', 1, '')
+on conflict ((lower(name)), type) do update set
+  element = excluded.element,
+  description = excluded.description,
+  mana_cost = excluded.mana_cost,
+  damage_formula = excluded.damage_formula,
+  range = excluded.range,
+  duration = excluded.duration,
+  requirement = excluded.requirement,
+  recommended_class = excluded.recommended_class,
+  recommended_level = excluded.recommended_level,
+  image_url = excluded.image_url,
+  updated_at = now();
 
 insert into users (name, email, password_hash, role)
 values

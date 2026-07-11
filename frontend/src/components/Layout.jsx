@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { Home, LogOut, Menu, MoreHorizontal, Palette, ScrollText, Settings, Shield, Skull, Swords, Users, X } from 'lucide-react';
+import { BookOpen, Home, LogOut, Menu, MoreHorizontal, Palette, ScrollText, Settings, Shield, Skull, Swords, Users, X } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../store/authStore';
 import Button from './Button';
@@ -12,6 +12,7 @@ export default function Layout({ children }) {
     user && { to: '/dashboard', label: 'Dashboard' },
     { to: '/characters', label: 'Personagens' },
     { to: '/campaigns', label: 'Campanhas' },
+    user && { to: '/powers', label: 'Biblioteca' },
     user && { to: '/monsters', label: 'Monstros' },
     user?.role === 'admin' && { to: '/admin', label: 'Admin' }
   ].filter(Boolean);
@@ -23,6 +24,7 @@ export default function Layout({ children }) {
   ].filter(Boolean);
   const drawerLinks = [
     user && { to: '/dashboard?tab=friends', label: 'Amigos', icon: Users },
+    user && { to: '/powers', label: 'Biblioteca', icon: BookOpen },
     user && { to: '/dashboard?tab=settings', label: 'Configurações', icon: Settings },
     user && { to: '/dashboard?tab=personalization', label: 'Personalização', icon: Palette },
     user?.role === 'admin' && { to: '/admin', label: 'Admin', icon: Shield }

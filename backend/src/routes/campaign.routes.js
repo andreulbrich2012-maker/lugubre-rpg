@@ -36,6 +36,38 @@ const shareCharacterSchema = z.object({
 const colorSchema = z.object({
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/)
 });
+const diarySchema = z.object({
+  title: z.string().min(2).max(140),
+  content: z.string().min(1).max(12000),
+  marker: z.string().optional().default(''),
+  characterId: z.string().uuid().optional().nullable(),
+  isGmPrivate: z.coerce.boolean().optional().default(false)
+});
+const shopCategories = ['Taverna', 'Ferreiro', 'Alquimista', 'Mercado Geral', 'Loja Mística', 'Estábulo', 'Alfaiate', 'Contrabandista', 'Templo', 'Biblioteca', 'Armazém', 'Curandeiro'];
+const shopSchema = z.object({
+  name: z.string().min(2).max(120),
+  description: z.string().optional().default(''),
+  category: z.string().min(2),
+  visibleToPlayers: z.coerce.boolean().default(true)
+});
+const shopItemSchema = z.object({
+  name: z.string().min(1).max(140),
+  description: z.string().optional().default(''),
+  priceDracmas: z.coerce.number().min(0).default(0),
+  stock: z.coerce.number().min(0).default(1),
+  category: z.string().optional().default('Outros'),
+  weight: z.coerce.number().min(0).default(0),
+  available: z.coerce.boolean().default(true),
+  note: z.string().optional().default('')
+});
+const purchaseSchema = z.object({
+  itemId: z.string().uuid(),
+  characterId: z.string().uuid().optional().nullable(),
+  quantity: z.coerce.number().min(1).max(99).default(1)
+});
+const purchaseDecisionSchema = z.object({
+  note: z.string().optional().default('')
+});
 
 function memberColor(userId = '') {
   const total = String(userId).split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
@@ -54,6 +86,60 @@ function parseJson(value, fallback) {
 
 function isMaster(member, campaign, user) {
   return user.role === 'admin' || member?.role === 'master' || campaign?.master_id === user.id;
+}
+
+function normalizeShopCategory(category) {
+  const value = String(category || '').trim();
+  return shopCategories.includes(value) ? value : 'Mercado Geral';
+}
+
+function parseJsonField(value, fallback) {
+  if (value == null) return fallback;
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function toJson(value) {
+  return JSON.stringify(value ?? null);
+}
+
+function walletTotal(wallet = {}) {
+  return Number(wallet.bronze || 0) + Number(wallet.silver || 0) * 10 + Number(wallet.platinum || 0) * 100 + Number(wallet.gold || 0) * 500;
+}
+
+function walletFromTotal(total) {
+  return { bronze: Math.max(0, Number(total || 0)), silver: 0, platinum: 0, gold: 0 };
+}
+
+async function requireCampaignMember(campaignId, user) {
+  const member = await dbMember(campaignId, user.id);
+  if (!member) {
+    const error = new Error('Você não participa desta campanha.');
+    error.status = 403;
+    throw error;
+  }
+  const campaignResult = await query('select * from campaigns where id = $1', [campaignId]);
+  const campaign = campaignResult.rows[0];
+  if (!campaign) {
+    const error = new Error('Campanha não encontrada.');
+    error.status = 404;
+    throw error;
+  }
+  return { member, campaign, master: isMaster(member, campaign, user) };
+}
+
+async function assertCampaignMaster(campaignId, user) {
+  const context = await requireCampaignMember(campaignId, user);
+  if (!context.master) {
+    const error = new Error('Apenas o mestre pode fazer esta ação.');
+    error.status = 403;
+    throw error;
+  }
+  return context;
 }
 
 function sharedCharacter(row) {
@@ -476,6 +562,348 @@ router.delete('/:id/messages/:messageId', async (req, res) => {
     res.status(204).end();
   } catch (error) {
     res.status(error.status || 400).json({ message: error.message || 'Não foi possível excluir a mensagem.' });
+  }
+});
+
+router.get('/:id/diary', async (req, res) => {
+  try {
+    const { member, campaign, master } = await requireCampaignMember(req.params.id, req.user);
+    const search = String(req.query.search || '').trim();
+    const marker = String(req.query.marker || '').trim();
+    const selectedUserId = String(req.query.userId || '').trim();
+    const params = [req.params.id];
+    const filters = ['e.campaign_id = $1'];
+
+    if (master && selectedUserId) {
+      params.push(selectedUserId);
+      filters.push(`e.user_id = $${params.length}`);
+      if (selectedUserId !== req.user.id) filters.push('e.is_gm_private = false');
+    } else if (master) {
+      filters.push('(e.is_gm_private = false or e.user_id = $2)');
+      params.push(req.user.id);
+    } else {
+      filters.push('e.user_id = $2 and e.is_gm_private = false');
+      params.push(req.user.id);
+    }
+    if (search) {
+      params.push(`%${search.toLowerCase()}%`);
+      filters.push(`(lower(e.title) like $${params.length} or lower(e.content) like $${params.length})`);
+    }
+    if (marker) {
+      params.push(marker);
+      filters.push(`e.marker = $${params.length}`);
+    }
+
+    const entries = await query(
+      `select e.*, u.name as author_name, c.character_name
+       from campaign_diary_entries e
+       join users u on u.id = e.user_id
+       left join characters c on c.id = e.character_id
+       where ${filters.join(' and ')}
+       order by e.created_at desc`,
+      params
+    );
+    const members = master ? await loadDbMembers(req.params.id, req.user) : [];
+    res.json({ entries: entries.rows, members, role: member.role, isMaster: master, campaign });
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message || 'Não foi possível carregar o diário.' });
+  }
+});
+
+router.post('/:id/diary', async (req, res) => {
+  try {
+    const body = diarySchema.parse(req.body);
+    const { member, master } = await requireCampaignMember(req.params.id, req.user);
+    await assertOwnedCharacter(body.characterId, req.user.id);
+    const isGmPrivate = Boolean(master && body.isGmPrivate);
+    const created = await query(
+      `insert into campaign_diary_entries (campaign_id, user_id, character_id, title, content, marker, is_gm_private)
+       values ($1,$2,$3,$4,$5,$6,$7)
+       returning *`,
+      [req.params.id, req.user.id, body.characterId || member.shared_character_id || member.character_id || null, body.title.trim(), body.content.trim(), body.marker || '', isGmPrivate]
+    );
+    res.status(201).json(created.rows[0]);
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message || 'Não foi possível criar a anotação.' });
+  }
+});
+
+router.put('/:id/diary/:entryId', async (req, res) => {
+  try {
+    const body = diarySchema.parse(req.body);
+    const { master } = await requireCampaignMember(req.params.id, req.user);
+    await assertOwnedCharacter(body.characterId, req.user.id);
+    const existing = await query('select * from campaign_diary_entries where id = $1 and campaign_id = $2', [req.params.entryId, req.params.id]);
+    if (!existing.rowCount) return res.status(404).json({ message: 'Anotação não encontrada.' });
+    if (existing.rows[0].user_id !== req.user.id) return res.status(403).json({ message: 'Você só pode editar seu próprio diário.' });
+    const updated = await query(
+      `update campaign_diary_entries
+       set title=$1, content=$2, marker=$3, character_id=$4, is_gm_private=$5, updated_at=now()
+       where id=$6 and campaign_id=$7 and user_id=$8
+       returning *`,
+      [body.title.trim(), body.content.trim(), body.marker || '', body.characterId || null, Boolean(master && body.isGmPrivate), req.params.entryId, req.params.id, req.user.id]
+    );
+    res.json(updated.rows[0]);
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message || 'Não foi possível editar a anotação.' });
+  }
+});
+
+router.delete('/:id/diary/:entryId', async (req, res) => {
+  try {
+    await requireCampaignMember(req.params.id, req.user);
+    const deleted = await query(
+      'delete from campaign_diary_entries where id = $1 and campaign_id = $2 and user_id = $3',
+      [req.params.entryId, req.params.id, req.user.id]
+    );
+    if (!deleted.rowCount) return res.status(404).json({ message: 'Anotação não encontrada.' });
+    res.status(204).end();
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message || 'Não foi possível excluir a anotação.' });
+  }
+});
+
+async function loadShopPayload(campaignId, user) {
+  const { master } = await requireCampaignMember(campaignId, user);
+  const shops = await query(
+    `select s.*
+     from campaign_shops s
+     where s.campaign_id = $1 and ($2 = true or s.visible_to_players = true)
+     order by s.category, s.name`,
+    [campaignId, master]
+  );
+  const shopIds = shops.rows.map((shop) => shop.id);
+  const items = shopIds.length
+    ? await query('select * from campaign_shop_items where shop_id = any($1::uuid[]) order by name', [shopIds])
+    : { rows: [] };
+  const requests = master
+    ? await query(
+      `select pr.*, i.name as item_name, s.name as shop_name, u.name as user_name, c.character_name
+       from shop_purchase_requests pr
+       join campaign_shop_items i on i.id = pr.item_id
+       join campaign_shops s on s.id = pr.shop_id
+       join users u on u.id = pr.user_id
+       left join characters c on c.id = pr.character_id
+       where pr.campaign_id = $1
+       order by pr.created_at desc`,
+      [campaignId]
+    )
+    : await query(
+      `select pr.*, i.name as item_name, s.name as shop_name, c.character_name
+       from shop_purchase_requests pr
+       join campaign_shop_items i on i.id = pr.item_id
+       join campaign_shops s on s.id = pr.shop_id
+       left join characters c on c.id = pr.character_id
+       where pr.campaign_id = $1 and pr.user_id = $2
+       order by pr.created_at desc`,
+      [campaignId, user.id]
+    );
+  return {
+    shops: shops.rows.map((shop) => ({ ...shop, items: items.rows.filter((item) => item.shop_id === shop.id) })),
+    requests: requests.rows,
+    isMaster: master,
+    categories: shopCategories
+  };
+}
+
+router.get('/:id/shops', async (req, res) => {
+  try {
+    res.json(await loadShopPayload(req.params.id, req.user));
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message || 'Não foi possível carregar lojas.' });
+  }
+});
+
+router.post('/:id/shops', async (req, res) => {
+  try {
+    await assertCampaignMaster(req.params.id, req.user);
+    const body = shopSchema.parse(req.body);
+    const created = await query(
+      `insert into campaign_shops (campaign_id, name, description, category, visible_to_players)
+       values ($1,$2,$3,$4,$5) returning *`,
+      [req.params.id, body.name.trim(), body.description, normalizeShopCategory(body.category), body.visibleToPlayers]
+    );
+    res.status(201).json(created.rows[0]);
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message || 'Não foi possível criar loja.' });
+  }
+});
+
+router.put('/:id/shops/:shopId', async (req, res) => {
+  try {
+    await assertCampaignMaster(req.params.id, req.user);
+    const body = shopSchema.parse(req.body);
+    const updated = await query(
+      `update campaign_shops set name=$1, description=$2, category=$3, visible_to_players=$4, updated_at=now()
+       where id=$5 and campaign_id=$6 returning *`,
+      [body.name.trim(), body.description, normalizeShopCategory(body.category), body.visibleToPlayers, req.params.shopId, req.params.id]
+    );
+    if (!updated.rowCount) return res.status(404).json({ message: 'Loja não encontrada.' });
+    res.json(updated.rows[0]);
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message || 'Não foi possível editar loja.' });
+  }
+});
+
+router.delete('/:id/shops/:shopId', async (req, res) => {
+  try {
+    await assertCampaignMaster(req.params.id, req.user);
+    const deleted = await query('delete from campaign_shops where id=$1 and campaign_id=$2', [req.params.shopId, req.params.id]);
+    if (!deleted.rowCount) return res.status(404).json({ message: 'Loja não encontrada.' });
+    res.status(204).end();
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message || 'Não foi possível excluir loja.' });
+  }
+});
+
+router.post('/:id/shops/:shopId/items', async (req, res) => {
+  try {
+    await assertCampaignMaster(req.params.id, req.user);
+    const body = shopItemSchema.parse(req.body);
+    const shop = await query('select id from campaign_shops where id=$1 and campaign_id=$2', [req.params.shopId, req.params.id]);
+    if (!shop.rowCount) return res.status(404).json({ message: 'Loja não encontrada.' });
+    const created = await query(
+      `insert into campaign_shop_items (shop_id, name, description, price_dracmas, stock, category, weight, available, note)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`,
+      [req.params.shopId, body.name.trim(), body.description, body.priceDracmas, body.stock, body.category, body.weight, body.available, body.note]
+    );
+    res.status(201).json(created.rows[0]);
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message || 'Não foi possível criar item.' });
+  }
+});
+
+router.put('/:id/shop-items/:itemId', async (req, res) => {
+  try {
+    await assertCampaignMaster(req.params.id, req.user);
+    const body = shopItemSchema.parse(req.body);
+    const updated = await query(
+      `update campaign_shop_items i set name=$1, description=$2, price_dracmas=$3, stock=$4, category=$5, weight=$6, available=$7, note=$8, updated_at=now()
+       from campaign_shops s
+       where i.shop_id = s.id and s.campaign_id=$9 and i.id=$10
+       returning i.*`,
+      [body.name.trim(), body.description, body.priceDracmas, body.stock, body.category, body.weight, body.available, body.note, req.params.id, req.params.itemId]
+    );
+    if (!updated.rowCount) return res.status(404).json({ message: 'Item não encontrado.' });
+    res.json(updated.rows[0]);
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message || 'Não foi possível editar item.' });
+  }
+});
+
+router.delete('/:id/shop-items/:itemId', async (req, res) => {
+  try {
+    await assertCampaignMaster(req.params.id, req.user);
+    const deleted = await query(
+      `delete from campaign_shop_items i using campaign_shops s
+       where i.shop_id=s.id and s.campaign_id=$1 and i.id=$2`,
+      [req.params.id, req.params.itemId]
+    );
+    if (!deleted.rowCount) return res.status(404).json({ message: 'Item não encontrado.' });
+    res.status(204).end();
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message || 'Não foi possível remover item.' });
+  }
+});
+
+router.post('/:id/purchase-requests', async (req, res) => {
+  try {
+    await requireCampaignMember(req.params.id, req.user);
+    const body = purchaseSchema.parse(req.body);
+    await assertOwnedCharacter(body.characterId, req.user.id);
+    const item = await query(
+      `select i.*, s.campaign_id, s.visible_to_players
+       from campaign_shop_items i
+       join campaign_shops s on s.id = i.shop_id
+       where i.id=$1 and s.campaign_id=$2 and s.visible_to_players=true and i.available=true`,
+      [body.itemId, req.params.id]
+    );
+    if (!item.rowCount) return res.status(404).json({ message: 'Item não disponível.' });
+    if (item.rows[0].stock < body.quantity) return res.status(400).json({ message: 'Estoque insuficiente.' });
+    const total = Number(item.rows[0].price_dracmas || 0) * body.quantity;
+    const created = await query(
+      `insert into shop_purchase_requests (campaign_id, shop_id, item_id, user_id, character_id, quantity, total_price)
+       values ($1,$2,$3,$4,$5,$6,$7) returning *`,
+      [req.params.id, item.rows[0].shop_id, body.itemId, req.user.id, body.characterId || null, body.quantity, total]
+    );
+    res.status(201).json(created.rows[0]);
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message || 'Não foi possível solicitar compra.' });
+  }
+});
+
+async function decidePurchase(req, status) {
+  const { note } = purchaseDecisionSchema.parse(req.body);
+  await assertCampaignMaster(req.params.id, req.user);
+  const existing = await query(
+    `select pr.*, i.name as item_name, i.description as item_description, i.weight, i.stock, i.price_dracmas
+     from shop_purchase_requests pr
+     join campaign_shop_items i on i.id = pr.item_id
+     where pr.id=$1 and pr.campaign_id=$2`,
+    [req.params.requestId, req.params.id]
+  );
+  if (!existing.rowCount) {
+    const error = new Error('Solicitação não encontrada.');
+    error.status = 404;
+    throw error;
+  }
+  const request = existing.rows[0];
+  if (request.status !== 'pending') return request;
+  if (status === 'approved') {
+    if (request.stock < request.quantity) {
+      const error = new Error('Estoque insuficiente.');
+      error.status = 400;
+      throw error;
+    }
+    if (request.character_id) {
+      const character = await query('select * from characters where id=$1 and owner_id=$2', [request.character_id, request.user_id]);
+      if (character.rowCount) {
+        const wallet = parseJsonField(character.rows[0].wallet, {});
+        const total = walletTotal(wallet);
+        if (total < request.total_price) {
+          const error = new Error('Dracmas insuficientes na carteira do personagem.');
+          error.status = 400;
+          throw error;
+        }
+        const inventory = parseJsonField(character.rows[0].inventory, []);
+        inventory.push({
+          id: crypto.randomUUID(),
+          quantity: request.quantity,
+          weight: Number(request.weight || 0),
+          name: request.item_name,
+          category: 'Compras',
+          description: request.item_description || '',
+          defenseBonus: 0
+        });
+        await query(
+          'update characters set wallet=$1, inventory=$2, updated_at=now() where id=$3',
+          [toJson(walletFromTotal(total - request.total_price)), toJson(inventory), request.character_id]
+        );
+      }
+    }
+    await query('update campaign_shop_items set stock = greatest(0, stock - $1), updated_at=now() where id=$2', [request.quantity, request.item_id]);
+  }
+  const updated = await query(
+    `update shop_purchase_requests set status=$1, gm_note=$2, updated_at=now()
+     where id=$3 and campaign_id=$4 returning *`,
+    [status, note, req.params.requestId, req.params.id]
+  );
+  return updated.rows[0];
+}
+
+router.put('/:id/purchase-requests/:requestId/approve', async (req, res) => {
+  try {
+    res.json(await decidePurchase(req, 'approved'));
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message || 'Não foi possível aprovar compra.' });
+  }
+});
+
+router.put('/:id/purchase-requests/:requestId/deny', async (req, res) => {
+  try {
+    res.json(await decidePurchase(req, 'denied'));
+  } catch (error) {
+    res.status(error.status || 400).json({ message: error.message || 'Não foi possível negar compra.' });
   }
 });
 

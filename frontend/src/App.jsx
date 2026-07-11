@@ -12,6 +12,7 @@ import CharacterSheet from './pages/CharacterSheet';
 import Campaigns from './pages/Campaigns';
 import CampaignRoom from './pages/CampaignRoom';
 import Monsters from './pages/Monsters';
+import PowerLibrary from './pages/PowerLibrary';
 import Admin from './pages/Admin';
 import { useAuth } from './store/authStore';
 
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="/campaigns" element={<ProtectedRoute><Campaigns /></ProtectedRoute>} />
         <Route path="/campaigns/:id" element={<ProtectedRoute><CampaignRoom /></ProtectedRoute>} />
         <Route path="/monsters" element={<ProtectedRoute><Monsters /></ProtectedRoute>} />
+        <Route path="/powers" element={<ProtectedRoute><PowerLibrary /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute role="admin"><Admin /></ProtectedRoute>} />
       </Routes>
     </Layout>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Camera, Eye, EyeOff, LayoutDashboard, Menu, MessageCircle, Palette, ScrollText, Settings, Shield, Skull, Swords, Trash2, Users, X } from 'lucide-react';
+import { BookOpen, Camera, Eye, EyeOff, LayoutDashboard, Menu, MessageCircle, Palette, ScrollText, Settings, Shield, Skull, Swords, Trash2, Users, X } from 'lucide-react';
 import Alert from '../components/Alert';
 import Avatar from '../components/Avatar';
 import Button from '../components/Button';
@@ -157,7 +157,7 @@ function DashboardTab({ summary, user }) {
           <Metric label="Campanhas" value={summary?.campaigns_count || 0} />
         </div>
       </section>
-      <section className="grid gap-4 md:grid-cols-2">
+      <section className="grid gap-4 md:grid-cols-3">
         <Link to="/characters/new" className="gothic-panel soft-motion rounded-md p-5">
           <h3 className="font-display text-2xl text-white">Criar personagem</h3>
           <p className="mt-2 text-sm text-mist">Comece uma nova ficha com raça, classe, origem e inventário.</p>
@@ -165,6 +165,11 @@ function DashboardTab({ summary, user }) {
         <Link to="/campaigns" className="gothic-panel soft-motion rounded-md p-5">
           <h3 className="font-display text-2xl text-white">Campanhas</h3>
           <p className="mt-2 text-sm text-mist">Crie uma mesa ou entre com um código de convite.</p>
+        </Link>
+        <Link to="/powers" className="gothic-panel soft-motion rounded-md p-5">
+          <BookOpen className="mb-3 text-ember" size={24} />
+          <h3 className="font-display text-2xl text-white">Biblioteca</h3>
+          <p className="mt-2 text-sm text-mist">Busque magias e poderes e adicione direto na ficha.</p>
         </Link>
       </section>
     </div>

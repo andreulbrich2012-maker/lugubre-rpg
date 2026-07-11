@@ -13,7 +13,7 @@ const attributes = [
 ];
 
 const itemCategories = ['Todos os itens', 'Comida', 'Armas', 'Carteira', 'Outros'];
-const spellElements = ['Érebo', 'Nix', 'Tártaro', 'Ananque', 'Éter', 'Gaia', 'Caos', 'Hemera'];
+const spellElements = ['Érebo', 'Nix', 'Tártaro', 'Ananque', 'Éter', 'Gaia', 'Caos', 'Hemera', 'Ponto'];
 const quickDice = [4, 6, 8, 10, 12, 16, 20];
 
 const blankItem = { quantity: 1, weight: 0, name: '', category: 'Outros', description: '', defenseBonus: 0 };
@@ -644,6 +644,7 @@ function PowersPanel({ attacks, spells, editing, draft, setDraft, onRoll, onAdd,
           <p className="mt-1 text-sm text-mist">Ataques e magias organizados para consulta rápida durante a sessão.</p>
         </div>
         <div className="grid gap-2 sm:flex sm:shrink-0">
+          <Link to="/powers"><Button type="button" className="min-h-11 w-full justify-center sm:w-auto">Biblioteca</Button></Link>
           <Button type="button" variant="ghost" className="min-h-11 justify-center" onClick={() => onAdd('attacks')}><Plus size={16} className="inline" /> Adicionar Ataque</Button>
           <Button type="button" variant="ghost" className="min-h-11 justify-center" onClick={() => onAdd('spells')}><Plus size={16} className="inline" /> Adicionar Magia</Button>
         </div>

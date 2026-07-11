@@ -407,10 +407,34 @@ router.post('/:id/powers', async (req, res) => {
   const row = await findOwnedCharacter(req.params.id, req.user.id);
   if (!row) return res.status(404).json({ message: 'Ficha nao encontrada.' });
   const body = z.object({ type: z.string().default('attacks') }).passthrough().parse(req.body);
-  const field = powerField(body.type);
+  let source = body;
+  if (body.powerId) {
+    const library = await tryQuery('select * from power_library where id = $1', [body.powerId]);
+    if (!library?.rowCount) return res.status(404).json({ message: 'Poder ou magia da biblioteca não encontrado.' });
+    const power = library.rows[0];
+    source = {
+      type: power.type === 'magia' ? 'spells' : 'attacks',
+      name: power.name,
+      damage: power.damage_formula || '1d4',
+      range: power.range || '-',
+      skill: power.type === 'magia' ? 'Ocultismo' : 'Luta',
+      element: power.element || 'Érebo',
+      image: power.image_url || '',
+      manaCost: power.mana_cost || 0,
+      description: power.description || '',
+      criticalValue: 20,
+      criticalMultiplier: 2
+    };
+    await tryQuery(
+      `insert into character_powers (character_id, power_id, custom_name, custom_description, custom_damage_formula, custom_mana_cost)
+       values ($1,$2,$3,$4,$5,$6)`,
+      [req.params.id, body.powerId, source.name, source.description, source.damage, source.manaCost]
+    );
+  }
+  const field = powerField(source.type);
   if (!field) return res.status(400).json({ message: 'Tipo de poder invalido.' });
   const list = parseJsonField(row[field], []);
-  const power = normalizePower(body);
+  const power = normalizePower(source);
   res.status(201).json(await persistPlayLists(req, row, { [field]: [...list, power] }, field === 'spells' ? 'Magia adicionada' : 'Ataque adicionado'));
 });
 

@@ -36,14 +36,30 @@
   --panel-c: rgba(3, 13, 22, .98);
 }
 
+html {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
+  width: 100%;
+  min-width: 0;
   min-height: 100vh;
   overflow-x: hidden;
   background: var(--color-abyss);
   color: #f2eee6;
   font-feature-settings: "liga" 1, "kern" 1;
   transition: background .25s ease, color .25s ease;
+}
+
+#root {
+  width: 100%;
+  min-width: 0;
+  min-height: 100vh;
+  overflow-x: clip;
 }
 
 .gothic-panel {

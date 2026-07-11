@@ -56,10 +56,10 @@ export default function Login() {
 
 export function AuthShell({ title, subtitle, children }) {
   return (
-    <main className="grid min-h-[calc(100vh-144px)] place-items-center px-4 py-12">
-      <section className="gothic-panel w-full max-w-md rounded-md p-6 shadow-2xl">
+    <main className="grid min-h-[calc(100vh-144px)] place-items-center px-3 py-8 sm:px-4 sm:py-12">
+      <section className="gothic-panel w-full max-w-md rounded-md p-4 shadow-2xl sm:p-6">
         <p className="text-xs uppercase tracking-[0.3em] text-ember/70">Lugubre RPG</p>
-        <h1 className="mt-2 font-display text-4xl text-ember">{title}</h1>
+        <h1 className="mt-2 font-display text-3xl text-ember sm:text-4xl">{title}</h1>
         {subtitle && <p className="mt-2 text-sm text-mist">{subtitle}</p>}
         <div className="mt-6">{children}</div>
       </section>

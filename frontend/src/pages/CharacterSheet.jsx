@@ -916,8 +916,35 @@ function ModalFrame({ title, children, onClose }) {
 function SkillTable({ sheet, skills, skillBonuses, skillsCatalog, onTrainingChange, onOtherChange, onRoll, roll }) {
   return (
     <>
-      <div className="mt-4 overflow-x-auto pb-2">
-          <div className="min-w-[560px]">
+      <div className="mt-4 grid gap-3 sm:hidden">
+        {skillsCatalog.map((skill) => (
+          <article key={skill.key} className="rounded-md border border-white/10 bg-black/25 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="truncate font-semibold text-white">{skill.name}</h3>
+                <p className="text-xs uppercase tracking-[.14em] text-ember">Dado ({sheet.attributes?.[skill.attribute] ?? 2})</p>
+              </div>
+              <button type="button" className="grid h-11 w-11 shrink-0 place-items-center rounded border border-ember/30 text-ember" onClick={() => onRoll(skill, skills?.[skill.key] ?? 0, skillBonuses?.[skill.key] ?? 0)}><Dice5 size={17} /></button>
+            </div>
+            <div className="mt-3 grid gap-2">
+              <label className="text-xs uppercase tracking-[.12em] text-mist">
+                Treino
+                <div className="mt-1 grid grid-cols-[44px_1fr_44px] items-center rounded border border-white/10 bg-black/25">
+                  <button type="button" className="h-11 text-mist hover:text-white" onClick={() => onTrainingChange(skill.key, Number(skills?.[skill.key] || 0) - 5)}>-</button>
+                  <span className="text-center text-blue-400">{skills?.[skill.key] ?? 0}</span>
+                  <button type="button" className="h-11 text-mist hover:text-white" onClick={() => onTrainingChange(skill.key, Number(skills?.[skill.key] || 0) + 5)}>+</button>
+                </div>
+              </label>
+              <label className="text-xs uppercase tracking-[.12em] text-mist">
+                Outros
+                <input type="number" className="mt-1 h-11 w-full rounded border border-white/10 bg-black/25 px-2 text-center text-mist" value={skillBonuses?.[skill.key] ?? 0} onChange={(event) => onOtherChange(skill.key, event.target.value)} />
+              </label>
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className="mt-4 hidden overflow-x-auto pb-2 sm:block">
+        <div className="min-w-[560px]">
           <div className="grid grid-cols-[minmax(120px,1fr)_52px_116px_64px_44px] gap-x-2 text-xs uppercase text-mist sm:grid-cols-[1fr_64px_132px_72px_44px] sm:gap-x-3">
             <span>Perícia</span><span>Dado</span><span>Treino</span><span>Outros</span><span>Rolar</span>
           </div>

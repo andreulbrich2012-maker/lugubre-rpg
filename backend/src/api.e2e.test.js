@@ -226,6 +226,21 @@ describe('fluxo principal da API', () => {
     let token = user.body.token;
     const profileImage = 'data:image/png;base64,iVBORw0KGgo=';
 
+    const deniedEdit = await request(app)
+      .put(`/api/admin/races/${race.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: `Raça Bloqueada ${stamp}`, image: '', attributeModifiers: { forca: 1 } })
+      .expect(403);
+
+    expect(deniedEdit.body.message).toBe('Acesso negado.');
+
+    const deniedDelete = await request(app)
+      .delete(`/api/admin/classes/${klass.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(403);
+
+    expect(deniedDelete.body.message).toBe('Acesso negado.');
+
     await request(app)
       .post('/api/auth/login')
       .send({ email: `nao-existe-${stamp}@lugubre.local`, password: 'adm123' })

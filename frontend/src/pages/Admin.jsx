@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Edit, Trash2 } from 'lucide-react';
+import Alert from '../components/Alert';
 import Button from '../components/Button';
 import AdminMonstersPage from '../components/monsters/AdminMonstersPage';
 import { api } from '../lib/api';
@@ -13,6 +15,8 @@ export default function Admin() {
   const [skill, setSkill] = useState({ name: '', key: '', attribute: 'presenca' });
   const [editor, setEditor] = useState(null);
   const [adminSection, setAdminSection] = useState('catalogs');
+  const [message, setMessage] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   async function load() {
     const [races, classes, origins, skills] = await Promise.all([
@@ -57,6 +61,8 @@ export default function Admin() {
 
   async function remove(endpoint, id) {
     await api.delete(`/admin/${endpoint}/${id}`);
+    setConfirmDelete(null);
+    setMessage({ type: 'success', text: 'Item deletado com sucesso.' });
     load();
   }
 
@@ -92,6 +98,7 @@ export default function Admin() {
       });
     }
     setEditor(null);
+    setMessage({ type: 'success', text: 'Item editado com sucesso.' });
     load();
   }
 
@@ -109,12 +116,13 @@ export default function Admin() {
         <div className="mt-8"><AdminMonstersPage /></div>
       ) : (
         <>
+      {message && <div className="mt-6"><Alert type={message.type}>{message.text}</Alert></div>}
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <Panel title="Raças" onSubmit={addRace}>
           <Input placeholder="Nome" value={race.name} onChange={(name) => setRace({ ...race, name })} />
           <ModifierGrid title="Modificadores de atributos" keysList={attributes} values={race.attributeModifiers} onChange={(attributeModifiers) => setRace({ ...race, attributeModifiers })} />
           <Button>Adicionar raça</Button>
-          <List items={catalog.races} endpoint="races" onEdit={(item) => setEditor({ type: 'races', item: { ...item, attribute_modifiers: { ...item.attribute_modifiers } } })} onRemove={remove} />
+          <List items={catalog.races} endpoint="races" onEdit={(item) => { setMessage(null); setEditor({ type: 'races', item: { ...item, attribute_modifiers: { ...item.attribute_modifiers } } }); }} onRemove={(endpoint, item) => setConfirmDelete({ endpoint, item })} />
         </Panel>
 
         <Panel title="Classes" onSubmit={addClass}>
@@ -122,7 +130,7 @@ export default function Admin() {
           <Input placeholder="Descrição curta" value={klass.description} onChange={(description) => setKlass({ ...klass, description })} />
           <textarea className="w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" placeholder="Progressão nível 1" value={klass.progression[0].feature} onChange={(event) => setKlass({ ...klass, progression: [{ level: 1, mana: 0, feature: event.target.value }] })} />
           <Button>Adicionar classe</Button>
-          <List items={catalog.classes} endpoint="classes" onEdit={(item) => setEditor({ type: 'classes', item: { ...item } })} onRemove={remove} />
+          <List items={catalog.classes} endpoint="classes" onEdit={(item) => { setMessage(null); setEditor({ type: 'classes', item: { ...item } }); }} onRemove={(endpoint, item) => setConfirmDelete({ endpoint, item })} />
         </Panel>
 
         <Panel title="Origens" onSubmit={addOrigin}>
@@ -130,7 +138,7 @@ export default function Admin() {
           <textarea className="w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" placeholder="Descrição" value={origin.description} onChange={(event) => setOrigin({ ...origin, description: event.target.value })} />
           <ModifierGrid title="Bônus de perícias" keysList={catalog.skills.map((item) => item.key)} labels={catalog.skills} values={origin.skillModifiers} onChange={(skillModifiers) => setOrigin({ ...origin, skillModifiers })} />
           <Button>Adicionar origem</Button>
-          <List items={catalog.origins} endpoint="origins" onEdit={(item) => setEditor({ type: 'origins', item: { ...item, skill_modifiers: { ...(item.skill_modifiers || {}) } } })} onRemove={remove} />
+          <List items={catalog.origins} endpoint="origins" onEdit={(item) => { setMessage(null); setEditor({ type: 'origins', item: { ...item, skill_modifiers: { ...(item.skill_modifiers || {}) } } }); }} onRemove={(endpoint, item) => setConfirmDelete({ endpoint, item })} />
         </Panel>
 
         <Panel title="Perícias" onSubmit={addSkill}>
@@ -140,7 +148,7 @@ export default function Admin() {
             {attributes.map((attr) => <option key={attr} value={attr}>{attr}</option>)}
           </select>
           <Button>Adicionar perícia</Button>
-          <List items={catalog.skills} endpoint="skills" onEdit={(item) => setEditor({ type: 'skills', item: { ...item } })} onRemove={remove} />
+          <List items={catalog.skills} endpoint="skills" onEdit={(item) => { setMessage(null); setEditor({ type: 'skills', item: { ...item } }); }} onRemove={(endpoint, item) => setConfirmDelete({ endpoint, item })} />
         </Panel>
       </div>
 
@@ -169,6 +177,13 @@ export default function Admin() {
             </div>
           </section>
         </div>
+      )}
+      {confirmDelete && (
+        <ConfirmDialog
+          title={`Deletar ${confirmDelete.item.name}?`}
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => remove(confirmDelete.endpoint, confirmDelete.item.id)}
+        />
       )}
         </>
       )}
@@ -210,14 +225,33 @@ function List({ items, endpoint, onEdit, onRemove }) {
         <li className="rounded-md border border-white/10 bg-black/20 p-2 text-sm text-mist" key={item.id}>
           <div className="flex items-center justify-between gap-2">
             <span>{item.name}</span>
-            <span className="shrink-0 space-x-2">
-              <button type="button" className="text-ember" onClick={() => onEdit(item)}>editar</button>
-              <button type="button" className="text-red-300" onClick={() => onRemove(endpoint, item.id)}>remover</button>
+            <span className="flex shrink-0 flex-wrap gap-2">
+              <Button type="button" variant="ghost" className="px-3 py-1.5 text-xs" onClick={() => onEdit(item)}>
+                <span className="inline-flex items-center gap-1"><Edit size={13} /> Editar</span>
+              </Button>
+              <Button type="button" variant="ghost" className="px-3 py-1.5 text-xs text-red-200" onClick={() => onRemove(endpoint, item)}>
+                <span className="inline-flex items-center gap-1"><Trash2 size={13} /> Deletar</span>
+              </Button>
             </span>
           </div>
         </li>
       ))}
     </ul>
+  );
+}
+
+function ConfirmDialog({ title, onCancel, onConfirm }) {
+  return (
+    <div className="fixed inset-0 z-40 grid place-items-center bg-black/75 p-4">
+      <section className="gothic-panel w-full max-w-md rounded-md p-6">
+        <h2 className="font-display text-3xl text-ember">{title}</h2>
+        <p className="mt-3 text-sm leading-relaxed text-mist">Tem certeza que deseja deletar este item? Essa ação não poderá ser desfeita.</p>
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
+          <Button type="button" className="border-red-500/70 bg-red-900/70 hover:bg-red-800" onClick={onConfirm}>Deletar</Button>
+        </div>
+      </section>
+    </div>
   );
 }
 

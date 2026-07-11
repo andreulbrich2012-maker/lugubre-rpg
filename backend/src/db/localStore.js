@@ -24,6 +24,7 @@ function publicUser(user) {
 }
 
 const defaultSkills = SKILL_DEFINITIONS.map(([key, name, attribute]) => ({ id: `skill-${key}`, key, name, attribute }));
+const monsterCategories = ['Caos', 'Gaia', 'Ponto', 'Érebo', 'Nix', 'Tártaro', 'Éter', 'Ananque'];
 
 const defaultData = {
   users: [],
@@ -39,7 +40,7 @@ const defaultData = {
       name: 'Guardião de Cinzas',
       image_url: '/assets/haunted-ruins.svg',
       token_url: '/assets/haunted-ruins.svg',
-      category: 'Elementais',
+      category: 'Caos',
       difficulty: 'Média',
       base_health: 20,
       min_health: 16,
@@ -133,6 +134,33 @@ function healthRange(baseHealth) {
   };
 }
 
+function normalizeMonsterCategory(category) {
+  const value = String(category || '').trim();
+  if (monsterCategories.includes(value)) return value;
+  const key = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const aliases = {
+    caos: 'Caos',
+    gaia: 'Gaia',
+    ponto: 'Ponto',
+    erebo: 'Érebo',
+    nix: 'Nix',
+    tartaro: 'Tártaro',
+    eter: 'Éter',
+    ananque: 'Ananque',
+    elementais: 'Caos',
+    'criaturas do caos': 'Caos',
+    feras: 'Gaia',
+    'mortos-vivos': 'Tártaro',
+    demonios: 'Tártaro',
+    aberracoes: 'Tártaro',
+    humanoides: 'Ananque',
+    construtos: 'Ananque',
+    espiritos: 'Nix',
+    outros: 'Caos'
+  };
+  return aliases[key] || 'Caos';
+}
+
 function normalizeLocalMonster(monster = {}) {
   const range = healthRange(monster.base_health ?? monster.baseHealth ?? 8);
   const now = new Date().toISOString();
@@ -144,7 +172,7 @@ function normalizeLocalMonster(monster = {}) {
     name: monster.name || 'Monstro',
     image_url: monster.image_url ?? monster.imageUrl ?? '',
     token_url: monster.token_url ?? monster.tokenUrl ?? monster.image_url ?? monster.imageUrl ?? '',
-    category: monster.category || 'Outros',
+    category: normalizeMonsterCategory(monster.category),
     difficulty: monster.difficulty || 'Média',
     ...range,
     armor: Math.max(0, Number(monster.armor ?? 10)),

@@ -156,7 +156,7 @@ create table if not exists monsters (
   name text not null,
   image_url text,
   token_url text,
-  category text not null default 'Outros',
+  category text not null default 'Caos',
   difficulty text not null default 'Media',
   base_health int not null default 8 check (base_health >= 0),
   min_health int not null default 4 check (min_health >= 0),
@@ -170,7 +170,7 @@ create table if not exists monsters (
 
 alter table monsters add column if not exists image_url text;
 alter table monsters add column if not exists token_url text;
-alter table monsters add column if not exists category text not null default 'Outros';
+alter table monsters add column if not exists category text not null default 'Caos';
 alter table monsters add column if not exists difficulty text not null default 'Media';
 alter table monsters add column if not exists base_health int not null default 8;
 alter table monsters add column if not exists min_health int not null default 4;
@@ -179,6 +179,19 @@ alter table monsters add column if not exists armor int not null default 10;
 alter table monsters add column if not exists items jsonb not null default '[]';
 alter table monsters add column if not exists description text;
 alter table monsters add column if not exists updated_at timestamptz not null default now();
+alter table monsters alter column category set default 'Caos';
+update monsters
+set category = case
+  when category in ('Caos', 'Gaia', 'Ponto', 'Érebo', 'Nix', 'Tártaro', 'Éter', 'Ananque') then category
+  when category = 'Feras' then 'Gaia'
+  when category in ('Mortos-vivos', 'Demônios', 'Demonios', 'Aberrações', 'Aberracoes') then 'Tártaro'
+  when category in ('Humanoides', 'Construtos') then 'Ananque'
+  when category in ('Espíritos', 'Espiritos') then 'Nix'
+  else 'Caos'
+end
+where category not in ('Caos', 'Gaia', 'Ponto', 'Érebo', 'Nix', 'Tártaro', 'Éter', 'Ananque');
+alter table monsters drop constraint if exists monsters_category_check;
+alter table monsters add constraint monsters_category_check check (category in ('Caos', 'Gaia', 'Ponto', 'Érebo', 'Nix', 'Tártaro', 'Éter', 'Ananque'));
 
 create table if not exists monster_attacks (
   id uuid primary key default uuid_generate_v4(),
@@ -297,7 +310,7 @@ on conflict ((lower(name))) do update set description = excluded.description, im
 
 insert into monsters (name, image_url, token_url, category, difficulty, base_health, min_health, max_health, armor, items, description)
 values
-  ('Guardião de Cinzas', '/assets/haunted-ruins.svg', '/assets/haunted-ruins.svg', 'Elementais', 'Média', 20, 16, 24, 12, '["Fragmento de Cinza","Núcleo Flamejante"]', 'Uma sentinela de brasas antigas que protege ruínas esquecidas.')
+  ('Guardião de Cinzas', '/assets/haunted-ruins.svg', '/assets/haunted-ruins.svg', 'Caos', 'Média', 20, 16, 24, 12, '["Fragmento de Cinza","Núcleo Flamejante"]', 'Uma sentinela de brasas antigas que protege ruínas esquecidas.')
 on conflict ((lower(name))) do update set
   image_url = excluded.image_url,
   token_url = excluded.token_url,

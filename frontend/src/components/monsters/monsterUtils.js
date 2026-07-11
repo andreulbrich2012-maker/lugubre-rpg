@@ -1,15 +1,24 @@
 export const monsterCategories = [
-  'Elementais',
-  'Mortos-vivos',
-  'Feras',
-  'Demônios',
-  'Aberrações',
-  'Humanoides',
-  'Construtos',
-  'Espíritos',
-  'Criaturas do Caos',
-  'Outros'
+  'Caos',
+  'Gaia',
+  'Ponto',
+  'Érebo',
+  'Nix',
+  'Tártaro',
+  'Éter',
+  'Ananque'
 ];
+
+export const monsterCategoryDescriptions = {
+  Caos: 'Caos representa criação, destruição, magia primordial e o desconhecido.',
+  Gaia: 'Gaia representa vida, natureza, proteção e resistência.',
+  Ponto: 'Ponto representa oceanos, profundezas, névoa e tempestades.',
+  Érebo: 'Érebo representa escuridão, sombras, silêncio e segredos.',
+  Nix: 'Nix representa noite, sonhos, pesadelos e mistério.',
+  Tártaro: 'Tártaro representa corrupção, monstros, aprisionamento e maldições.',
+  Éter: 'Éter representa luz divina, esperança, cura e energia celestial.',
+  Ananque: 'Ananque representa destino, tempo, ordem e inevitabilidade.'
+};
 
 export const difficultyOptions = ['Baixa', 'Média', 'Alta', 'Mortal', 'Lendária'];
 
@@ -27,7 +36,7 @@ export function blankMonster() {
     name: '',
     imageUrl: '',
     tokenUrl: '',
-    category: 'Outros',
+    category: 'Caos',
     difficulty: 'Média',
     baseHealth: 8,
     armor: 10,
@@ -43,7 +52,7 @@ export function monsterToForm(monster) {
     name: monster.name || '',
     imageUrl: monster.image_url || '',
     tokenUrl: monster.token_url || monster.image_url || '',
-    category: monster.category || 'Outros',
+    category: monster.category || 'Caos',
     difficulty: monster.difficulty || 'Média',
     baseHealth: monster.base_health ?? 8,
     armor: monster.armor ?? 10,

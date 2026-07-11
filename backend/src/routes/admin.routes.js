@@ -18,6 +18,8 @@ import { parseDiceFormula } from '../utils/rules.js';
 const router = Router();
 router.use(requireAuth, requireRole('admin'));
 
+const monsterCategories = ['Caos', 'Gaia', 'Ponto', 'Érebo', 'Nix', 'Tártaro', 'Éter', 'Ananque'];
+
 const raceSchema = z.object({
   name: z.string().min(2),
   image: z.string().optional().nullable(),
@@ -57,7 +59,7 @@ const monsterSchema = z.object({
   name: z.string().min(2),
   imageUrl: z.string().optional().default(''),
   tokenUrl: z.string().optional().default(''),
-  category: z.string().min(2).default('Outros'),
+  category: z.string().min(2).default('Caos'),
   difficulty: z.string().min(2).default('Média'),
   baseHealth: z.coerce.number().min(0).default(8),
   armor: z.coerce.number().min(0).default(10),
@@ -84,6 +86,33 @@ function normalizeItems(items) {
   return String(items || '').split(',').map((item) => item.trim()).filter(Boolean);
 }
 
+function normalizeMonsterCategory(category) {
+  const value = String(category || '').trim();
+  if (monsterCategories.includes(value)) return value;
+  const key = value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const aliases = {
+    caos: 'Caos',
+    gaia: 'Gaia',
+    ponto: 'Ponto',
+    erebo: 'Érebo',
+    nix: 'Nix',
+    tartaro: 'Tártaro',
+    eter: 'Éter',
+    ananque: 'Ananque',
+    elementais: 'Caos',
+    'criaturas do caos': 'Caos',
+    feras: 'Gaia',
+    'mortos-vivos': 'Tártaro',
+    demonios: 'Tártaro',
+    aberracoes: 'Tártaro',
+    humanoides: 'Ananque',
+    construtos: 'Ananque',
+    espiritos: 'Nix',
+    outros: 'Caos'
+  };
+  return aliases[key] || 'Caos';
+}
+
 function monsterPayload(body) {
   const parsed = monsterSchema.parse(body);
   for (const attack of parsed.attacks || []) parseDiceFormula(attack.damageFormula);
@@ -91,7 +120,7 @@ function monsterPayload(body) {
     name: parsed.name,
     image_url: parsed.imageUrl || '',
     token_url: parsed.tokenUrl || parsed.imageUrl || '',
-    category: parsed.category,
+    category: normalizeMonsterCategory(parsed.category),
     difficulty: parsed.difficulty,
     ...healthRange(parsed.baseHealth),
     armor: parsed.armor,

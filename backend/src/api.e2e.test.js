@@ -584,7 +584,7 @@ describe('fluxo principal da API', () => {
       .send({
         name: `Guardiao Teste ${stamp}`,
         imageUrl: '/assets/haunted-ruins.svg',
-        category: 'Elementais',
+        category: 'Caos',
         difficulty: 'Média',
         baseHealth: 20,
         armor: 12,
@@ -603,7 +603,7 @@ describe('fluxo principal da API', () => {
       .send({
         name: `Guardiao Editado ${stamp}`,
         imageUrl: '/assets/crypt-gate.svg',
-        category: 'Mortos-vivos',
+        category: 'Gaia',
         difficulty: 'Alta',
         baseHealth: 30,
         armor: 14,
@@ -617,7 +617,7 @@ describe('fluxo principal da API', () => {
     expect(editedMonster.body.max_health).toBe(34);
 
     const listedMonsters = await request(app)
-      .get('/api/monsters?category=Mortos-vivos')
+      .get('/api/monsters?category=Gaia')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
@@ -625,7 +625,7 @@ describe('fluxo principal da API', () => {
     expect(persistedMonster).toMatchObject({
       name: `Guardiao Editado ${stamp}`,
       armor: 14,
-      category: 'Mortos-vivos'
+      category: 'Gaia'
     });
     expect(persistedMonster.items).toEqual(expect.arrayContaining(['Osso Antigo', 'Cinzas Frias']));
     expect(persistedMonster.attacks).toHaveLength(1);

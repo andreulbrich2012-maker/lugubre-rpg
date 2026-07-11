@@ -5,7 +5,7 @@ import { SKILL_DEFINITIONS } from '../utils/rules.js';
 
 const dataDir = process.env.VERCEL ? '/tmp/lugubre-data' : path.resolve('data');
 const dataFile = path.join(dataDir, 'local-db.json');
-const seedVersion = '2026-07-rpg-sheet-v8-monsters';
+const seedVersion = '2026-07-rpg-sheet-v9-campaigns';
 let cachedData = null;
 let writeQueue = Promise.resolve();
 
@@ -25,6 +25,7 @@ function publicUser(user) {
 
 const defaultSkills = SKILL_DEFINITIONS.map(([key, name, attribute]) => ({ id: `skill-${key}`, key, name, attribute }));
 const monsterCategories = ['Caos', 'Gaia', 'Ponto', 'Érebo', 'Nix', 'Tártaro', 'Éter', 'Ananque'];
+const memberColors = ['#d6a65f', '#9b8ac7', '#4fb6a8', '#cf6f8f', '#8fb3ff', '#d08a3e', '#8bd17c', '#e0d27a'];
 
 const defaultData = {
   users: [],
@@ -159,6 +160,45 @@ function normalizeMonsterCategory(category) {
     outros: 'Caos'
   };
   return aliases[key] || 'Caos';
+}
+
+function colorForUser(userId = '') {
+  const total = String(userId).split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return memberColors[total % memberColors.length];
+}
+
+function parseLocalJson(value, fallback) {
+  if (value == null) return fallback;
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function localSharedCharacter(character) {
+  if (!character) return null;
+  return {
+    id: character.id,
+    character_name: character.character_name || character.characterName,
+    player_name: character.player_name || character.playerName,
+    photo: character.photo || '',
+    level: character.level || 1,
+    life_current: Number(character.life_current ?? character.lifeCurrent ?? 0),
+    life_max: Number(character.life_max ?? character.lifeMax ?? 0),
+    sanity_current: Number(character.sanity_current ?? character.sanityCurrent ?? 0),
+    sanity_max: Number(character.sanity_max ?? character.sanityMax ?? 0),
+    mana: Number(character.mana ?? 0),
+    mana_max: Number(character.mana_max ?? character.manaMax ?? character.mana ?? 0),
+    defense: Number(character.defense ?? 10),
+    attributes: parseLocalJson(character.attributes, {}),
+    skills: parseLocalJson(character.skills, {}),
+    skill_bonuses: parseLocalJson(character.skill_bonuses ?? character.skillBonuses, {}),
+    inventory: parseLocalJson(character.inventory, []),
+    attacks: parseLocalJson(character.attacks, []),
+    spells: parseLocalJson(character.spells, [])
+  };
 }
 
 function normalizeLocalMonster(monster = {}) {
@@ -305,6 +345,22 @@ async function ensureStore() {
       }
       character.save_history = Array.isArray(character.save_history) ? character.save_history.slice(0, 3) : [];
       character.updated_at = character.updated_at || character.created_at || new Date().toISOString();
+    }
+    for (const member of data.campaign_members) {
+      member.id = member.id || crypto.randomUUID();
+      member.shared_character_id = member.shared_character_id ?? member.character_id ?? null;
+      member.character_id = member.character_id ?? member.shared_character_id ?? null;
+      member.color = member.color || colorForUser(member.user_id);
+      member.updated_at = member.updated_at || member.joined_at || new Date().toISOString();
+    }
+    for (const campaign of data.campaigns) {
+      campaign.updated_at = campaign.updated_at || campaign.created_at || new Date().toISOString();
+    }
+    for (const message of data.messages) {
+      message.character_id = message.character_id || null;
+      message.edited_at = message.edited_at || null;
+      message.deleted_at = message.deleted_at || null;
+      message.updated_at = message.updated_at || message.created_at || new Date().toISOString();
     }
     data.monsters = data.monsters.map(normalizeLocalMonster);
     for (const key of ['races', 'classes', 'skills']) {
@@ -652,19 +708,25 @@ export async function listLocalCampaigns(userId) {
 
 export async function createLocalCampaign(masterId, campaign) {
   const data = await ensureStore();
+  const now = new Date().toISOString();
   const row = {
     ...campaign,
     id: crypto.randomUUID(),
     master_id: masterId,
-    created_at: new Date().toISOString()
+    created_at: now,
+    updated_at: now
   };
   data.campaigns.push(row);
   data.campaign_members.push({
+    id: crypto.randomUUID(),
     campaign_id: row.id,
     user_id: masterId,
     character_id: null,
+    shared_character_id: null,
     role: 'master',
-    joined_at: new Date().toISOString()
+    color: memberColors[0],
+    joined_at: now,
+    updated_at: now
   });
   await writeStore(data);
   return row;
@@ -679,7 +741,7 @@ export async function updateLocalCampaign(campaignId, userId, role, campaign) {
     error.status = 403;
     throw error;
   }
-  data.campaigns[index] = { ...data.campaigns[index], ...campaign };
+  data.campaigns[index] = { ...data.campaigns[index], ...campaign, updated_at: new Date().toISOString() };
   await writeStore(data);
   return data.campaigns[index];
 }
@@ -704,9 +766,31 @@ export async function joinLocalCampaign(inviteCode, userId, characterId = null) 
   const data = await ensureStore();
   const campaign = data.campaigns.find((row) => row.invite_code === inviteCode.toUpperCase());
   if (!campaign) return null;
+  if (characterId && !data.characters.some((character) => character.id === characterId && character.owner_id === userId)) {
+    const error = new Error('Este personagem não pertence a você.');
+    error.status = 403;
+    throw error;
+  }
   const existing = data.campaign_members.find((member) => member.campaign_id === campaign.id && member.user_id === userId);
-  if (existing) existing.character_id = characterId;
-  else data.campaign_members.push({ campaign_id: campaign.id, user_id: userId, character_id: characterId, role: 'player', joined_at: new Date().toISOString() });
+  const now = new Date().toISOString();
+  if (existing) {
+    existing.character_id = characterId ?? existing.character_id ?? null;
+    existing.shared_character_id = characterId ?? existing.shared_character_id ?? null;
+    existing.color = existing.color || colorForUser(userId);
+    existing.updated_at = now;
+  } else {
+    data.campaign_members.push({
+      id: crypto.randomUUID(),
+      campaign_id: campaign.id,
+      user_id: userId,
+      character_id: characterId,
+      shared_character_id: characterId,
+      role: 'player',
+      color: colorForUser(userId),
+      joined_at: now,
+      updated_at: now
+    });
+  }
   await writeStore(data);
   return campaign;
 }
@@ -716,16 +800,44 @@ export async function getLocalCampaignRoom(campaignId, userId) {
   const member = data.campaign_members.find((row) => row.campaign_id === campaignId && row.user_id === userId);
   if (!member) return null;
   const campaign = data.campaigns.find((row) => row.id === campaignId);
+  const canSeeFullSheet = member.role === 'master' || campaign?.master_id === userId;
   const members = data.campaign_members
     .filter((row) => row.campaign_id === campaignId)
     .map((row) => {
       const user = data.users.find((item) => item.id === row.user_id);
-      const character = data.characters.find((item) => item.id === row.character_id);
-      return { id: row.user_id, name: user?.name || 'Jogador', role: row.role, character_id: character?.id, character_name: character?.character_name };
+      const characterId = row.shared_character_id || row.character_id;
+      const character = data.characters.find((item) => item.id === characterId);
+      const sharedCharacter = canSeeFullSheet || row.user_id === userId ? localSharedCharacter(character) : null;
+      return {
+        id: row.user_id,
+        user_id: row.user_id,
+        name: user?.name || 'Jogador',
+        profile_image_url: user?.profile_image_url || '',
+        role: row.role,
+        color: row.color || colorForUser(row.user_id),
+        character_id: character?.id || null,
+        shared_character_id: character?.id || null,
+        character_name: character?.character_name || null,
+        character_photo: character?.photo || '',
+        display_name: character?.character_name || user?.name || 'Jogador',
+        display_avatar: character?.photo || user?.profile_image_url || '',
+        shared_character: sharedCharacter
+      };
     });
   const messages = data.messages
     .filter((row) => row.campaign_id === campaignId)
-    .map((row) => ({ ...row, user_name: data.users.find((user) => user.id === row.user_id)?.name || 'Jogador' }));
+    .filter((row) => !row.deleted_at)
+    .map((row) => {
+      const user = data.users.find((item) => item.id === row.user_id);
+      const messageMember = members.find((item) => item.user_id === row.user_id);
+      return {
+        ...row,
+        user_name: messageMember?.display_name || user?.name || 'Jogador',
+        user_avatar: messageMember?.display_avatar || user?.profile_image_url || '',
+        color: messageMember?.color || colorForUser(row.user_id)
+      };
+    })
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
   return { campaign, members, messages, role: member.role };
 }
 
@@ -733,10 +845,128 @@ export async function createLocalMessage(campaignId, userId, content) {
   const data = await ensureStore();
   const member = data.campaign_members.find((row) => row.campaign_id === campaignId && row.user_id === userId);
   if (!member) return null;
-  const row = { id: crypto.randomUUID(), campaign_id: campaignId, user_id: userId, content, created_at: new Date().toISOString() };
+  const user = data.users.find((item) => item.id === userId);
+  const character = data.characters.find((item) => item.id === (member.shared_character_id || member.character_id));
+  const now = new Date().toISOString();
+  const row = {
+    id: crypto.randomUUID(),
+    campaign_id: campaignId,
+    user_id: userId,
+    character_id: character?.id || null,
+    content,
+    edited_at: null,
+    deleted_at: null,
+    created_at: now,
+    updated_at: now
+  };
   data.messages.push(row);
   await writeStore(data);
-  return { ...row, user_name: data.users.find((user) => user.id === userId)?.name || 'Jogador' };
+  return {
+    ...row,
+    user_name: character?.character_name || user?.name || 'Jogador',
+    user_avatar: character?.photo || user?.profile_image_url || '',
+    color: member.color || colorForUser(userId)
+  };
+}
+
+export async function leaveLocalCampaign(campaignId, userId) {
+  const data = await ensureStore();
+  const campaign = data.campaigns.find((row) => row.id === campaignId);
+  const member = data.campaign_members.find((row) => row.campaign_id === campaignId && row.user_id === userId);
+  if (!campaign || !member) return null;
+  if (campaign.master_id === userId || member.role === 'master') {
+    const error = new Error('O mestre deve excluir a campanha.');
+    error.status = 400;
+    throw error;
+  }
+  data.campaign_members = data.campaign_members.filter((row) => row.campaign_id !== campaignId || row.user_id !== userId);
+  await writeStore(data);
+  return true;
+}
+
+export async function removeLocalCampaignMember(campaignId, gmId, targetUserId, role = 'user') {
+  const data = await ensureStore();
+  const campaign = data.campaigns.find((row) => row.id === campaignId);
+  if (!campaign) return null;
+  const gm = data.campaign_members.find((row) => row.campaign_id === campaignId && row.user_id === gmId);
+  if ((campaign.master_id !== gmId && gm?.role !== 'master' && role !== 'admin') || targetUserId === gmId) {
+    const error = new Error(targetUserId === gmId ? 'O mestre não pode remover a si mesmo.' : 'Apenas o mestre pode remover jogadores.');
+    error.status = 403;
+    throw error;
+  }
+  const before = data.campaign_members.length;
+  data.campaign_members = data.campaign_members.filter((row) => row.campaign_id !== campaignId || row.user_id !== targetUserId);
+  await writeStore(data);
+  return data.campaign_members.length !== before;
+}
+
+export async function updateLocalCampaignMemberCharacter(campaignId, userId, characterId) {
+  const data = await ensureStore();
+  const member = data.campaign_members.find((row) => row.campaign_id === campaignId && row.user_id === userId);
+  if (!member) return null;
+  if (characterId && !data.characters.some((character) => character.id === characterId && character.owner_id === userId)) {
+    const error = new Error('Este personagem não pertence a você.');
+    error.status = 403;
+    throw error;
+  }
+  member.character_id = characterId || null;
+  member.shared_character_id = characterId || null;
+  member.updated_at = new Date().toISOString();
+  await writeStore(data);
+  return member;
+}
+
+export async function updateLocalCampaignMemberColor(campaignId, gmId, targetUserId, color, role = 'user') {
+  const data = await ensureStore();
+  const campaign = data.campaigns.find((row) => row.id === campaignId);
+  const gm = data.campaign_members.find((row) => row.campaign_id === campaignId && row.user_id === gmId);
+  if (!campaign) return null;
+  if (campaign.master_id !== gmId && gm?.role !== 'master' && role !== 'admin') {
+    const error = new Error('Apenas o mestre pode alterar cores.');
+    error.status = 403;
+    throw error;
+  }
+  const member = data.campaign_members.find((row) => row.campaign_id === campaignId && row.user_id === targetUserId);
+  if (!member) return null;
+  member.color = color;
+  member.updated_at = new Date().toISOString();
+  await writeStore(data);
+  return member;
+}
+
+export async function updateLocalCampaignMessage(campaignId, userId, messageId, content) {
+  const data = await ensureStore();
+  const member = data.campaign_members.find((row) => row.campaign_id === campaignId && row.user_id === userId);
+  const message = data.messages.find((row) => row.id === messageId && row.campaign_id === campaignId && !row.deleted_at);
+  if (!member || !message) return null;
+  if (message.user_id !== userId) {
+    const error = new Error('Você só pode editar suas próprias mensagens.');
+    error.status = 403;
+    throw error;
+  }
+  message.content = content;
+  message.edited_at = new Date().toISOString();
+  message.updated_at = message.edited_at;
+  await writeStore(data);
+  return (await getLocalCampaignRoom(campaignId, userId))?.messages.find((row) => row.id === messageId) || message;
+}
+
+export async function deleteLocalCampaignMessage(campaignId, userId, role, messageId) {
+  const data = await ensureStore();
+  const member = data.campaign_members.find((row) => row.campaign_id === campaignId && row.user_id === userId);
+  const message = data.messages.find((row) => row.id === messageId && row.campaign_id === campaignId && !row.deleted_at);
+  if (!member || !message) return null;
+  const isOwner = message.user_id === userId;
+  const isMaster = member.role === 'master' || role === 'admin';
+  if (!isOwner && !isMaster) {
+    const error = new Error('Você não pode excluir mensagens de outros jogadores.');
+    error.status = 403;
+    throw error;
+  }
+  message.deleted_at = new Date().toISOString();
+  message.updated_at = message.deleted_at;
+  await writeStore(data);
+  return true;
 }
 
 export async function getLocalDashboard(userId) {

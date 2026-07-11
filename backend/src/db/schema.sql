@@ -113,25 +113,51 @@ create table if not exists campaigns (
   name text not null,
   description text,
   invite_code text not null unique,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
+alter table campaigns add column if not exists updated_at timestamptz not null default now();
+
 create table if not exists campaign_members (
+  id uuid not null default uuid_generate_v4(),
   campaign_id uuid not null references campaigns(id) on delete cascade,
   user_id uuid not null references users(id) on delete cascade,
   character_id uuid references characters(id) on delete set null,
+  shared_character_id uuid references characters(id) on delete set null,
   role text not null default 'player' check (role in ('player', 'master')),
+  color text not null default '#d6a65f',
   joined_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   primary key (campaign_id, user_id)
 );
+
+alter table campaign_members add column if not exists id uuid not null default uuid_generate_v4();
+alter table campaign_members add column if not exists shared_character_id uuid references characters(id) on delete set null;
+alter table campaign_members add column if not exists color text not null default '#d6a65f';
+alter table campaign_members add column if not exists updated_at timestamptz not null default now();
+update campaign_members set shared_character_id = character_id where shared_character_id is null and character_id is not null;
+update campaign_members
+set color = (array['#d6a65f', '#9b8ac7', '#4fb6a8', '#cf6f8f', '#8fb3ff', '#d08a3e', '#8bd17c', '#e0d27a'])[1 + ((('x' || substr(md5(user_id::text), 1, 6))::bit(24)::int) % 8)]
+where color is null or color = '';
 
 create table if not exists messages (
   id uuid primary key default uuid_generate_v4(),
   campaign_id uuid not null references campaigns(id) on delete cascade,
   user_id uuid not null references users(id) on delete cascade,
+  character_id uuid references characters(id) on delete set null,
   content text not null,
-  created_at timestamptz not null default now()
+  edited_at timestamptz,
+  deleted_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
+
+alter table messages add column if not exists character_id uuid references characters(id) on delete set null;
+alter table messages add column if not exists edited_at timestamptz;
+alter table messages add column if not exists deleted_at timestamptz;
+alter table messages add column if not exists updated_at timestamptz not null default now();
+create index if not exists messages_campaign_created_idx on messages (campaign_id, created_at);
 
 create table if not exists friends (
   id uuid primary key default uuid_generate_v4(),

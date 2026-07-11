@@ -17,12 +17,12 @@ export default function MonsterCard({ monster, rollResult, onRoll, onWarning }) 
   return (
     <article className="gothic-panel soft-motion overflow-hidden rounded-md">
       <div className="grid gap-4 p-4 sm:grid-cols-[150px_1fr]">
-        <EntityImage src={monster.image_url} label="Monstro" name={monster.name} className="aspect-square w-full" />
+        <EntityImage src={monster.image_url} label="Monstro" name={monster.name} className="aspect-[4/3] w-full sm:aspect-square" />
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <p className="text-xs uppercase tracking-[.22em] text-ember/70">{monster.category}</p>
-              <h2 className="font-display text-3xl text-white">{monster.name}</h2>
+              <h2 className="break-words font-display text-3xl text-white">{monster.name}</h2>
               <p className="text-sm text-mist">{monster.difficulty}</p>
             </div>
             <MonsterPngDownloadButton monster={monster} onWarning={onWarning} />
@@ -44,8 +44,8 @@ export default function MonsterCard({ monster, rollResult, onRoll, onWarning }) 
             </label>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button type="button" variant="ghost" onClick={() => setOpen((value) => !value)}>
+          <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
+            <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => setOpen((value) => !value)}>
               <span className="inline-flex items-center gap-2">{open ? <ChevronUp size={16} /> : <ChevronDown size={16} />} Detalhes</span>
             </Button>
           </div>

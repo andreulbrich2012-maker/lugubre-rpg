@@ -102,7 +102,7 @@ export default function CharacterBuilder() {
 
   return (
     <main className="min-h-[calc(100vh-64px)] bg-[radial-gradient(circle_at_top_left,rgba(143,29,44,.28),transparent_34%),#050507]">
-      <section className="mx-auto flex min-h-[calc(100vh-64px)] max-w-7xl flex-col px-4 py-6">
+      <section className="mx-auto flex min-h-[calc(100vh-64px)] max-w-7xl flex-col px-3 pb-28 pt-5 sm:px-4 sm:py-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[.32em] text-ember">Criação de ficha</p>
@@ -114,9 +114,16 @@ export default function CharacterBuilder() {
         <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/5">
           <div className="h-full bg-blood transition-all" style={{ width: `${((step + 1) / steps.length) * 100}%` }} />
         </div>
+        <div className="mt-4 flex gap-2 overflow-x-auto pb-2 lg:hidden">
+          {steps.map((item, index) => (
+            <span key={item} className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold ${index === step ? 'border-ember bg-ember/15 text-white' : index < step ? 'border-ember/25 bg-black/25 text-ember' : 'border-white/10 bg-black/15 text-mist'}`}>
+              {index + 1}. {item}
+            </span>
+          ))}
+        </div>
 
-        <div className="grid flex-1 items-center gap-8 py-8 lg:grid-cols-[1fr_360px]">
-          <section className="gothic-panel min-h-[420px] rounded-md p-4 sm:p-6 md:min-h-[520px] md:p-10">
+        <div className="grid flex-1 items-start gap-5 py-5 sm:py-8 lg:grid-cols-[1fr_360px] lg:items-center">
+          <section className="gothic-panel min-h-[360px] rounded-md p-4 sm:p-6 md:min-h-[520px] md:p-10">
             {step === 0 && <BigInput label="Nome do jogador" value={form.playerName} onChange={(playerName) => setForm({ ...form, playerName })} />}
             {step === 1 && <BigInput label="Nome do personagem" value={form.characterName} onChange={(characterName) => setForm({ ...form, characterName })} />}
             {step === 2 && <PhotoStep form={form} setForm={setForm} />}
@@ -129,13 +136,20 @@ export default function CharacterBuilder() {
             {error && <p className="mt-6 text-sm text-red-300">{error}</p>}
           </section>
 
-          <aside className="gothic-panel rounded-md p-5">
+          <details className="gothic-panel rounded-md p-4 lg:hidden">
+            <summary className="cursor-pointer font-display text-2xl text-ember">Preview da ficha</summary>
+            <div className="mt-4">
+              <SheetPreview form={form} attributes={finalAttributes} catalog={catalog} />
+            </div>
+          </details>
+
+          <aside className="gothic-panel hidden rounded-md p-5 lg:block">
             <SheetPreview form={form} attributes={finalAttributes} catalog={catalog} />
           </aside>
         </div>
 
-        <div className="flex flex-col-reverse gap-3 pb-4 sm:flex-row sm:justify-between">
-          <Button variant="ghost" disabled={step === 0} onClick={() => setStep((current) => Math.max(current - 1, 0))}>
+        <div className="fixed inset-x-0 bottom-20 z-20 grid gap-2 border-t border-ember/10 bg-abyss/95 p-3 backdrop-blur sm:static sm:flex sm:flex-row sm:justify-between sm:border-0 sm:bg-transparent sm:p-0 sm:pb-4">
+          <Button variant="ghost" className="w-full sm:w-auto" disabled={step === 0} onClick={() => setStep((current) => Math.max(current - 1, 0))}>
             <ArrowLeft size={18} className="inline" /> Voltar
           </Button>
           {step < steps.length - 1 ? (
@@ -150,7 +164,7 @@ export default function CharacterBuilder() {
 }
 
 function BigInput({ label, value, onChange }) {
-  return <label className="block"><span className="text-sm uppercase tracking-[.22em] text-ember">{label}</span><input autoFocus className="mt-5 w-full border-0 border-b border-ember/30 bg-transparent px-0 py-4 text-3xl font-semibold outline-none focus:border-ember sm:text-4xl" value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+  return <label className="block"><span className="text-sm uppercase tracking-[.22em] text-ember">{label}</span><input autoFocus className="mt-5 w-full border-0 border-b border-ember/30 bg-transparent px-0 py-4 text-2xl font-semibold outline-none focus:border-ember sm:text-4xl" value={value} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
 function PhotoStep({ form, setForm }) {
@@ -165,7 +179,7 @@ function PhotoStep({ form, setForm }) {
 }
 
 function PickList({ title, label, items, value, onChange }) {
-  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">{title}</p><div className="mt-6 grid gap-4 md:grid-cols-3">{items.map((item) => <button key={item.id} onClick={() => onChange(item.id)} className={`gothic-panel rounded-md p-4 text-left soft-motion ${value === item.id ? 'border-ember bg-ember/10' : ''}`}><EntityImage src={item.image} label={label} name={item.name} className="mb-4 h-24" /><strong>{item.name}</strong>{item.description && <p className="mt-2 text-sm text-mist">{item.description}</p>}</button>)}</div></div>;
+  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">{title}</p><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{items.map((item) => <button key={item.id} onClick={() => onChange(item.id)} className={`gothic-panel rounded-md p-4 text-left soft-motion ${value === item.id ? 'border-ember bg-ember/10' : ''}`}><EntityImage src={item.image} label={label} name={item.name} className="mb-4 h-32 sm:h-24" /><strong>{item.name}</strong>{item.description && <p className="mt-2 text-sm text-mist">{item.description}</p>}</button>)}</div></div>;
 }
 
 function OriginStep({ catalog, form, setForm }) {
@@ -174,7 +188,7 @@ function OriginStep({ catalog, form, setForm }) {
 
 function AttributePreview({ attributes, selectedRace }) {
   const modifiers = selectedRace?.attribute_modifiers || {};
-  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">Atributos calculados</p><p className="mt-3 max-w-2xl text-sm text-mist">Todos começam em 2 e são fechados automaticamente pela raça. Nesta etapa você apenas confere o resultado final.</p><div className="mt-6 grid gap-4 md:grid-cols-5">{attributeKeys.map((key) => <div key={key} className="rounded-md border border-ember/15 bg-black/20 p-4 text-center text-sm text-mist"><span>{attributeLabels[key]}</span><div className="mt-2 text-4xl font-bold text-white">{attributes[key]}</div><span className="text-xs text-ember">Base 2 {Number(modifiers[key] || 0) >= 0 ? '+' : ''}{Number(modifiers[key] || 0)}</span></div>)}</div></div>;
+  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">Atributos calculados</p><p className="mt-3 max-w-2xl text-sm text-mist">Todos começam em 2 e são fechados automaticamente pela raça. Nesta etapa você apenas confere o resultado final.</p><div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">{attributeKeys.map((key) => <div key={key} className="rounded-md border border-ember/15 bg-black/20 p-4 text-center text-sm text-mist"><span>{attributeLabels[key]}</span><div className="mt-2 text-4xl font-bold text-white">{attributes[key]}</div><span className="text-xs text-ember">Base 2 {Number(modifiers[key] || 0) >= 0 ? '+' : ''}{Number(modifiers[key] || 0)}</span></div>)}</div></div>;
 }
 
 function Inventory({ form, setForm }) {
@@ -184,7 +198,7 @@ function Inventory({ form, setForm }) {
     setForm({ ...form, inventory: [...form.inventory, item] });
     setItem({ quantity: 1, weight: 0, name: '', description: '', defenseBonus: 0 });
   }
-  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">Inventário</p><div className="mt-6 grid gap-3 md:grid-cols-4"><input type="number" min="0" placeholder="Quantidade" className="rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={item.quantity} onChange={(event) => setItem({ ...item, quantity: Number(event.target.value) })} /><input type="number" min="0" placeholder="Peso" className="rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={item.weight} onChange={(event) => setItem({ ...item, weight: Number(event.target.value) })} /><input placeholder="Nome" className="rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={item.name} onChange={(event) => setItem({ ...item, name: event.target.value })} /><Button type="button" onClick={add}>Adicionar</Button></div><textarea placeholder="Descrição" className="mt-3 w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={item.description} onChange={(event) => setItem({ ...item, description: event.target.value })} /><ul className="mt-5 space-y-2">{form.inventory.map((it, index) => <li key={`${it.name}-${index}`} className="text-mist">{Number(it.quantity ?? 1)}x {it.name} · peso {Number(it.weight || 0)}</li>)}</ul></div>;
+  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">Inventário</p><div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><input type="number" min="0" placeholder="Quantidade" className="rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={item.quantity} onChange={(event) => setItem({ ...item, quantity: Number(event.target.value) })} /><input type="number" min="0" placeholder="Peso" className="rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={item.weight} onChange={(event) => setItem({ ...item, weight: Number(event.target.value) })} /><input placeholder="Nome" className="rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={item.name} onChange={(event) => setItem({ ...item, name: event.target.value })} /><Button type="button" className="w-full" onClick={add}>Adicionar</Button></div><textarea placeholder="Descrição" className="mt-3 w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={item.description} onChange={(event) => setItem({ ...item, description: event.target.value })} /><ul className="mt-5 space-y-2">{form.inventory.map((it, index) => <li key={`${it.name}-${index}`} className="text-mist">{Number(it.quantity ?? 1)}x {it.name} · peso {Number(it.weight || 0)}</li>)}</ul></div>;
 }
 
 function Summary({ form, attributes, catalog }) {
@@ -196,7 +210,7 @@ function SheetPreview({ form, attributes, catalog }) {
   const klass = catalog.classes.find((item) => item.id === form.classId)?.name || 'Classe';
   const origin = catalog.origins.find((item) => item.id === form.originId)?.name || form.origin || 'Origem';
   const totalDefense = form.defense + form.inventory.reduce((sum, item) => sum + Number(item.defenseBonus || 0), 0);
-  return <div><h2 className="font-display text-3xl text-ember">{form.characterName || 'Personagem'}</h2><p className="text-sm text-mist">{form.playerName || 'Jogador'} · {origin}</p><p className="mt-1 text-sm text-mist">{race} · {klass}</p><div className="mt-5 grid grid-cols-3 gap-3 text-center"><Stat label="Vida" value={`${form.lifeCurrent}/${form.lifeMax}`} /><Stat label="Sanidade" value={`${form.sanityCurrent}/${form.sanityMax}`} /><Stat label="Mana" value={`${form.mana}/${form.manaMax || form.mana}`} /></div><div className="mt-3 grid grid-cols-1 gap-3 text-center"><Stat label="Defesa" value={totalDefense} /></div><div className="mt-5 grid grid-cols-5 gap-2">{attributeKeys.map((key) => <Stat key={key} label={attributeLabels[key]} value={attributes[key]} />)}</div><p className="mt-4 text-center text-sm text-mist">Esquiva {15 - attributes.agilidade}</p></div>;
+  return <div><h2 className="font-display text-3xl text-ember">{form.characterName || 'Personagem'}</h2><p className="text-sm text-mist">{form.playerName || 'Jogador'} · {origin}</p><p className="mt-1 text-sm text-mist">{race} · {klass}</p><div className="mt-5 grid grid-cols-1 gap-3 text-center sm:grid-cols-3"><Stat label="Vida" value={`${form.lifeCurrent}/${form.lifeMax}`} /><Stat label="Sanidade" value={`${form.sanityCurrent}/${form.sanityMax}`} /><Stat label="Mana" value={`${form.mana}/${form.manaMax || form.mana}`} /></div><div className="mt-3 grid grid-cols-1 gap-3 text-center"><Stat label="Defesa" value={totalDefense} /></div><div className="mt-5 grid grid-cols-2 gap-2 min-[420px]:grid-cols-5">{attributeKeys.map((key) => <Stat key={key} label={attributeLabels[key]} value={attributes[key]} />)}</div><p className="mt-4 text-center text-sm text-mist">Esquiva {15 - attributes.agilidade}</p></div>;
 }
 
 function Stat({ label, value }) {

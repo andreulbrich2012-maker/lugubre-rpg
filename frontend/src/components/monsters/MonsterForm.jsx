@@ -19,13 +19,13 @@ export default function MonsterForm({ form, setForm, editing, message, loading, 
   }
 
   return (
-    <form onSubmit={onSubmit} className="gothic-panel rounded-md p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <form onSubmit={onSubmit} className="gothic-panel rounded-md p-4 sm:p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
         <div>
           <p className="text-xs uppercase tracking-[.22em] text-ember/70">Admin</p>
           <h2 className="font-display text-3xl text-white">{editing ? 'Editar monstro' : 'Adicionar monstro'}</h2>
         </div>
-        {editing && <Button type="button" variant="ghost" onClick={onCancel}>Cancelar edição</Button>}
+        {editing && <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={onCancel}>Cancelar edição</Button>}
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
@@ -61,7 +61,7 @@ export default function MonsterForm({ form, setForm, editing, message, loading, 
       </div>
 
       {message && <div className="mt-5"><Alert type={message.type}>{message.text}</Alert></div>}
-      <Button className="mt-5" disabled={loading}>{loading ? 'Salvando...' : editing ? 'Salvar monstro' : 'Criar monstro'}</Button>
+      <Button className="mt-5 w-full sm:w-auto" disabled={loading}>{loading ? 'Salvando...' : editing ? 'Salvar monstro' : 'Criar monstro'}</Button>
     </form>
   );
 }

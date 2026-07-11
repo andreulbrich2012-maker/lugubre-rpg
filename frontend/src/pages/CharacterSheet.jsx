@@ -296,9 +296,25 @@ export default function CharacterSheet() {
   const totalDefense = (editing ? draft.defense : sheet.defense) + inventory.reduce((sum, item) => sum + Number(item.defenseBonus || 0), 0);
   const skillsCatalog = sheet.skills_catalog || [];
   const origin = sheet.origin_name || sheet.origin || 'Sem origem';
+  const mobileSections = [
+    ['#sheet-status', 'Status'],
+    ['#sheet-attributes', 'Atributos'],
+    ['#sheet-powers', 'Poderes'],
+    ['#sheet-skills', 'Perícias'],
+    ['#sheet-inventory', 'Inventário'],
+    ['#sheet-dice', 'Dados'],
+    ['#sheet-saves', 'Salvos']
+  ];
 
   return (
-    <main className="min-h-[calc(100vh-64px)] overflow-x-hidden bg-[#050506] px-2 py-3 sm:px-4 sm:py-5">
+    <main className="min-h-[calc(100vh-64px)] overflow-x-hidden bg-[#050506] px-2 pb-24 pt-3 sm:px-4 sm:py-5">
+      <nav className="mx-auto mb-3 flex w-full max-w-[1480px] gap-2 overflow-x-auto pb-1 xl:hidden" aria-label="Seções da ficha">
+        {mobileSections.map(([href, label]) => (
+          <a key={href} href={href} className="shrink-0 rounded-full border border-ember/20 bg-black/35 px-3 py-2 text-xs font-semibold uppercase tracking-[.12em] text-mist">
+            {label}
+          </a>
+        ))}
+      </nav>
       <section className="mx-auto grid w-full max-w-[1480px] gap-4 rounded-md border border-ember/40 bg-[#101011] p-2 shadow-glow sm:p-3 xl:grid-cols-[minmax(360px,0.95fr)_minmax(520px,1.35fr)]">
         <aside className="min-w-0 space-y-4">
           <header className="grid gap-3 sm:grid-cols-[96px_1fr]">
@@ -311,7 +327,7 @@ export default function CharacterSheet() {
             </div>
           </header>
 
-          <Panel>
+          <Panel id="sheet-attributes">
             <h2 className="text-center font-display text-2xl text-white">Atributos</h2>
             <div className="mt-4 grid grid-cols-2 gap-2 min-[520px]:grid-cols-5">
               {attributes.map(([key, label]) => (
@@ -323,7 +339,7 @@ export default function CharacterSheet() {
             </div>
           </Panel>
 
-          <section className="grid gap-3">
+          <section id="sheet-status" className="scroll-mt-24 grid gap-3">
             <EditableVitalsBar label="Vida" current={draft.lifeCurrent} max={draft.lifeMax} tone="red" status={vitalSaveStatus.life} onChange={(field, value) => updateManualVital('life', field, value)} onSave={() => saveManualVital('life')} />
             <EditableVitalsBar label="Sanidade" current={draft.sanityCurrent} max={draft.sanityMax} tone="purple" status={vitalSaveStatus.sanity} onChange={(field, value) => updateManualVital('sanity', field, value)} onSave={() => saveManualVital('sanity')} />
             <EditableVitalsBar label="Mana" current={draft.mana} max={draft.manaMax} tone="orange" status={vitalSaveStatus.mana} onChange={(field, value) => updateManualVital('mana', field, value)} onSave={() => saveManualVital('mana')} />
@@ -384,7 +400,7 @@ export default function CharacterSheet() {
             roll={damageRoll}
           />
 
-          <Panel>
+          <Panel id="sheet-skills">
             <h2 className="font-display text-2xl text-ember">Perícias</h2>
             {editing && <PlayEditor draft={draft} setDraft={setDraft} skillsCatalog={skillsCatalog} onRoll={rollSkill} roll={skillRoll} />}
             {!editing && <SkillTable sheet={sheet} skills={sheet.skills || {}} skillBonuses={sheet.skill_bonuses || {}} skillsCatalog={skillsCatalog} onTrainingChange={updateSkillValue} onOtherChange={updateSkillOther} onRoll={rollSkill} roll={skillRoll} />}
@@ -468,7 +484,7 @@ function InventoryPanel({ inventory, wallet, editing, draft, setDraft, onAdd, on
   }
 
   return (
-    <Panel>
+    <Panel id="sheet-inventory">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="font-display text-2xl text-ember">Inventário</h2>
         <Button type="button" variant="ghost" className="min-h-11 w-full sm:w-auto" onClick={onAdd}><Plus size={16} className="inline" /> Adicionar Item</Button>
@@ -589,7 +605,7 @@ function CoinField({ label, rate, value, onChange, onDecrease, onIncrease }) {
 
 function QuickDicePanel({ modifier, roll, onRoll, onModifierChange }) {
   return (
-    <Panel>
+    <Panel id="sheet-dice">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-2xl text-ember">Role Dados Fácil</h2>
@@ -621,7 +637,7 @@ function QuickDicePanel({ modifier, roll, onRoll, onModifierChange }) {
 
 function PowersPanel({ attacks, spells, editing, draft, setDraft, onRoll, onAdd, onEdit, onDelete, roll }) {
   return (
-    <Panel>
+    <Panel id="sheet-powers">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h2 className="font-display text-3xl text-ember">Poderes e Ataques</h2>
@@ -806,8 +822,8 @@ function ItemModal({ state, onClose, onSave }) {
           <textarea className="mt-1 min-h-24 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={form.description || ''} onChange={(event) => setForm({ ...form, description: event.target.value })} />
         </label>
         <div className="grid gap-2 pt-2 sm:flex sm:justify-end">
-          <Button type="button" variant="ghost" className="min-h-11" onClick={onClose}>Cancelar</Button>
-          <Button type="submit" className="min-h-11" disabled={!canSave}>Salvar</Button>
+          <Button type="button" variant="ghost" className="min-h-11 w-full sm:w-auto" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" className="min-h-11 w-full sm:w-auto" disabled={!canSave}>Salvar</Button>
         </div>
       </form>
     </ModalFrame>
@@ -875,8 +891,8 @@ function PowerModal({ state, skillsCatalog, onClose, onSave }) {
           <textarea className="mt-1 min-h-24 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={form.description || ''} onChange={(event) => setForm({ ...form, description: event.target.value })} />
         </label>
         <div className="grid gap-2 pt-2 sm:flex sm:justify-end">
-          <Button type="button" variant="ghost" className="min-h-11" onClick={onClose}>Cancelar</Button>
-          <Button type="submit" className="min-h-11" disabled={!canSave}>Salvar</Button>
+          <Button type="button" variant="ghost" className="min-h-11 w-full sm:w-auto" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" className="min-h-11 w-full sm:w-auto" disabled={!canSave}>Salvar</Button>
         </div>
       </form>
     </ModalFrame>
@@ -959,7 +975,7 @@ function DamageFeedback({ roll }) {
 
 function SaveHistory({ saves }) {
   return (
-    <Panel>
+    <Panel id="sheet-saves">
       <h3 className="font-display text-xl text-ember">Últimos salvamentos</h3>
       <div className="mt-3 grid gap-2 md:grid-cols-3">
         {saves.length ? saves.map((save) => (
@@ -1023,8 +1039,8 @@ function NumberInput({ value, onChange, placeholder, className = '', allowNegati
   return <input type="number" min={allowNegative ? undefined : '0'} placeholder={placeholder} className={`min-w-0 rounded border border-ember/20 bg-black/30 px-3 py-2 ${className}`} value={value} onChange={(event) => onChange(Number(event.target.value))} />;
 }
 
-function Panel({ children }) {
-  return <section className="rounded-md border border-white/10 bg-black/20 p-3 sm:p-4">{children}</section>;
+function Panel({ children, id }) {
+  return <section id={id} className="scroll-mt-24 rounded-md border border-white/10 bg-black/20 p-3 sm:p-4">{children}</section>;
 }
 
 function Metric({ label, value }) {

@@ -103,12 +103,12 @@ export default function Admin() {
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-10">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <main className="mx-auto max-w-7xl px-3 pb-24 pt-6 sm:px-4 sm:py-10">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <h1 className="font-display text-4xl text-ember">Administração</h1>
-        <div className="flex rounded-md border border-ember/15 bg-black/25 p-1">
-          <button type="button" className={`rounded px-3 py-2 text-sm ${adminSection === 'catalogs' ? 'bg-ember/15 text-white' : 'text-mist hover:text-white'}`} onClick={() => setAdminSection('catalogs')}>Catálogos</button>
-          <button type="button" className={`rounded px-3 py-2 text-sm ${adminSection === 'monsters' ? 'bg-ember/15 text-white' : 'text-mist hover:text-white'}`} onClick={() => setAdminSection('monsters')}>Monstros</button>
+        <div className="grid grid-cols-2 rounded-md border border-ember/15 bg-black/25 p-1 sm:flex">
+          <button type="button" className={`min-h-10 rounded px-3 py-2 text-sm ${adminSection === 'catalogs' ? 'bg-ember/15 text-white' : 'text-mist hover:text-white'}`} onClick={() => setAdminSection('catalogs')}>Catálogos</button>
+          <button type="button" className={`min-h-10 rounded px-3 py-2 text-sm ${adminSection === 'monsters' ? 'bg-ember/15 text-white' : 'text-mist hover:text-white'}`} onClick={() => setAdminSection('monsters')}>Monstros</button>
         </div>
       </div>
 
@@ -154,7 +154,7 @@ export default function Admin() {
 
       {editor && (
         <div className="fixed inset-0 z-30 grid place-items-center bg-black/70 p-4">
-          <section className="gothic-panel max-h-[90vh] w-full max-w-2xl overflow-auto rounded-md p-6">
+          <section className="gothic-panel max-h-[90vh] w-full max-w-2xl overflow-auto rounded-md p-4 sm:p-6">
             <h2 className="font-display text-3xl text-ember">Editar {editor.item.name}</h2>
             <div className="mt-5 space-y-4">
               <Input placeholder="Nome" value={editor.item.name} onChange={(name) => setEditor({ ...editor, item: { ...editor.item, name } })} />
@@ -171,7 +171,7 @@ export default function Admin() {
                 </>
               )}
             </div>
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 grid gap-2 sm:flex sm:justify-end">
               <Button type="button" variant="ghost" onClick={() => setEditor(null)}>Cancelar</Button>
               <Button type="button" onClick={saveEditor}>Salvar</Button>
             </div>
@@ -192,7 +192,7 @@ export default function Admin() {
 }
 
 function Panel({ title, onSubmit, children }) {
-  return <form onSubmit={onSubmit} className="gothic-panel rounded-md p-5 space-y-3"><h2 className="font-display text-2xl">{title}</h2>{children}</form>;
+  return <form onSubmit={onSubmit} className="gothic-panel rounded-md p-4 space-y-3 sm:p-5"><h2 className="font-display text-2xl">{title}</h2>{children}</form>;
 }
 
 function Input({ value, onChange, placeholder }) {
@@ -223,13 +223,13 @@ function List({ items, endpoint, onEdit, onRemove }) {
     <ul className="space-y-2 pt-3">
       {items.map((item) => (
         <li className="rounded-md border border-white/10 bg-black/20 p-2 text-sm text-mist" key={item.id}>
-          <div className="flex items-center justify-between gap-2">
-            <span>{item.name}</span>
-            <span className="flex shrink-0 flex-wrap gap-2">
-              <Button type="button" variant="ghost" className="px-3 py-1.5 text-xs" onClick={() => onEdit(item)}>
+          <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
+            <span className="break-words">{item.name}</span>
+            <span className="grid gap-2 sm:flex sm:shrink-0 sm:flex-wrap">
+              <Button type="button" variant="ghost" className="w-full px-3 py-1.5 text-xs sm:w-auto" onClick={() => onEdit(item)}>
                 <span className="inline-flex items-center gap-1"><Edit size={13} /> Editar</span>
               </Button>
-              <Button type="button" variant="ghost" className="px-3 py-1.5 text-xs text-red-200" onClick={() => onRemove(endpoint, item)}>
+              <Button type="button" variant="ghost" className="w-full px-3 py-1.5 text-xs text-red-200 sm:w-auto" onClick={() => onRemove(endpoint, item)}>
                 <span className="inline-flex items-center gap-1"><Trash2 size={13} /> Deletar</span>
               </Button>
             </span>
@@ -243,10 +243,10 @@ function List({ items, endpoint, onEdit, onRemove }) {
 function ConfirmDialog({ title, onCancel, onConfirm }) {
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/75 p-4">
-      <section className="gothic-panel w-full max-w-md rounded-md p-6">
+      <section className="gothic-panel max-h-[90vh] w-full max-w-md overflow-auto rounded-md p-4 sm:p-6">
         <h2 className="font-display text-3xl text-ember">{title}</h2>
         <p className="mt-3 text-sm leading-relaxed text-mist">Tem certeza que deseja deletar este item? Essa ação não poderá ser desfeita.</p>
-        <div className="mt-6 flex flex-wrap justify-end gap-2">
+        <div className="mt-6 grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
           <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>
           <Button type="button" className="border-red-500/70 bg-red-900/70 hover:bg-red-800" onClick={onConfirm}>Deletar</Button>
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Camera, Eye, EyeOff, LayoutDashboard, Menu, MessageCircle, Palette, ScrollText, Settings, Shield, Skull, Swords, Trash2, Users, X } from 'lucide-react';
 import Alert from '../components/Alert';
 import Avatar from '../components/Avatar';
@@ -23,6 +23,7 @@ const tabs = [
 export default function Dashboard() {
   const { user, logout, refreshMe } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [active, setActive] = useState('dashboard');
   const [summary, setSummary] = useState(null);
   const [characters, setCharacters] = useState([]);
@@ -53,13 +54,29 @@ export default function Dashboard() {
     navigate('/login');
   }
 
+  function activateTab(tabId) {
+    setActive(tabId);
+    if (tabId === 'dashboard') {
+      setSearchParams({});
+    } else {
+      setSearchParams({ tab: tabId });
+    }
+  }
+
   useEffect(() => {
     load();
     refreshMe().catch(() => null);
   }, []);
 
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    if (requestedTab && tabs.some((tab) => tab.id === requestedTab)) {
+      setActive(requestedTab);
+    }
+  }, [searchParams]);
+
   return (
-    <main className="mx-auto grid max-w-7xl gap-6 px-3 py-5 sm:px-4 sm:py-8 lg:grid-cols-[260px_1fr]">
+    <main className="mx-auto grid max-w-7xl gap-6 px-3 pb-24 pt-5 sm:px-4 sm:py-8 lg:grid-cols-[260px_1fr]">
       {sidebarOpen && <button className="fixed inset-0 z-30 bg-black/70 lg:hidden" onClick={() => setSidebarOpen(false)} />}
       <aside className={`gothic-panel fixed left-3 right-3 top-20 z-40 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-md p-4 lg:sticky lg:left-auto lg:right-auto lg:top-24 lg:z-auto lg:block lg:h-[calc(100vh-140px)] ${sidebarOpen ? 'block' : 'hidden'}`}>
         <div className="flex items-center gap-3 border-b border-ember/10 pb-4">
@@ -76,7 +93,7 @@ export default function Dashboard() {
             return (
               <button
                 key={tab.id}
-                onClick={() => { setActive(tab.id); setSidebarOpen(false); }}
+                onClick={() => { activateTab(tab.id); setSidebarOpen(false); }}
                 className={`flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors ${active === tab.id ? 'border-ember/50 bg-ember/15 text-white' : 'border-transparent text-mist hover:border-ember/20 hover:text-white'}`}
               >
                 <Icon size={17} />
@@ -88,7 +105,7 @@ export default function Dashboard() {
       </aside>
 
       <section className="min-h-[640px] min-w-0">
-        <DashboardTopbar user={user} onMenu={() => setSidebarOpen(true)} onSettings={() => setActive('settings')} onLogout={signOut} />
+        <DashboardTopbar user={user} onMenu={() => setSidebarOpen(true)} onSettings={() => activateTab('settings')} onLogout={signOut} />
         {loading ? (
           <div className="gothic-panel grid min-h-80 place-items-center rounded-md">
             <span className="h-8 w-8 animate-spin rounded-full border-2 border-ember/30 border-t-ember" />
@@ -111,7 +128,7 @@ export default function Dashboard() {
 
 function DashboardTopbar({ user, onMenu, onSettings, onLogout }) {
   return (
-    <div className="mb-5 flex items-center justify-between gap-4">
+    <div className="mb-5 flex items-center justify-between gap-4 rounded-md border border-ember/10 bg-black/20 p-3 sm:border-0 sm:bg-transparent sm:p-0">
       <div className="min-w-0">
         <p className="text-xs uppercase tracking-[0.28em] text-ember/70">Painel</p>
         <h2 className="truncate font-display text-2xl text-white sm:text-3xl">Conta e grimorio</h2>
@@ -127,11 +144,11 @@ function DashboardTopbar({ user, onMenu, onSettings, onLogout }) {
 function DashboardTab({ summary, user }) {
   return (
     <div className="space-y-6">
-      <section className="gothic-panel rounded-md p-6">
+      <section className="gothic-panel rounded-md p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-sm text-mist">Bem-vindo de volta,</p>
-            <h2 className="font-display text-4xl text-ember">{user?.name}</h2>
+            <h2 className="break-words font-display text-3xl text-ember sm:text-4xl">{user?.name}</h2>
           </div>
           <Shield className="text-ember" size={34} />
         </div>
@@ -165,8 +182,8 @@ function Metric({ label, value }) {
 
 function CharactersTab({ characters, onRemove }) {
   return (
-    <div className="gothic-panel rounded-md p-6">
-      <Header title="Personagens" action={<Link to="/characters/new"><Button>Criar personagem</Button></Link>} />
+    <div className="gothic-panel rounded-md p-4 sm:p-6">
+      <Header title="Personagens" action={<Link to="/characters/new"><Button className="w-full sm:w-auto">Criar personagem</Button></Link>} />
       {characters.length === 0 ? (
         <Empty text="Voce ainda nao criou nenhum personagem." />
       ) : (
@@ -175,10 +192,10 @@ function CharactersTab({ characters, onRemove }) {
             <article key={character.id} className="rounded-md border border-ember/15 bg-black/25 p-4">
               <h3 className="font-display text-2xl text-white">{character.character_name}</h3>
               <p className="text-sm text-mist">{character.race_name || 'Sem raca'} · {character.class_name || 'Sem classe'}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Link to={`/characters/${character.id}`}><Button variant="ghost">Abrir ficha</Button></Link>
-                <Link to={`/characters/${character.id}/edit`}><Button variant="ghost">Editar</Button></Link>
-                <Button variant="ghost" onClick={() => onRemove(character.id)}><Trash2 size={16} /></Button>
+              <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
+                <Link to={`/characters/${character.id}`}><Button variant="ghost" className="w-full sm:w-auto">Abrir ficha</Button></Link>
+                <Link to={`/characters/${character.id}/edit`}><Button variant="ghost" className="w-full sm:w-auto">Editar</Button></Link>
+                <Button variant="ghost" className="w-full sm:w-auto" onClick={() => onRemove(character.id)}><Trash2 size={16} /></Button>
               </div>
             </article>
           ))}
@@ -228,24 +245,24 @@ function CampaignsTab({ campaigns, onReload }) {
 
   return (
     <div className="space-y-6">
-      <section className="gothic-panel rounded-md p-6">
+      <section className="gothic-panel rounded-md p-4 sm:p-6">
         <Header title="Campanhas" />
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <form onSubmit={createCampaign} className="space-y-3 rounded-md border border-ember/15 bg-black/25 p-4">
             <h3 className="font-display text-2xl">Criar campanha</h3>
             <input className="w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" placeholder="Nome" value={create.name} onChange={(event) => setCreate({ ...create, name: event.target.value })} />
             <textarea className="w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" placeholder="Descricao" value={create.description} onChange={(event) => setCreate({ ...create, description: event.target.value })} />
-            <LoadingButton loading={loading} loadingText="Salvando...">Criar</LoadingButton>
+            <LoadingButton loading={loading} loadingText="Salvando..." className="w-full">Criar</LoadingButton>
           </form>
           <form onSubmit={joinCampaign} className="space-y-3 rounded-md border border-ember/15 bg-black/25 p-4">
             <h3 className="font-display text-2xl">Entrar em campanha</h3>
             <input className="w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" placeholder="Codigo de convite" value={inviteCode} onChange={(event) => setInviteCode(event.target.value)} />
-            <LoadingButton loading={loading} loadingText="Entrando...">Entrar</LoadingButton>
+            <LoadingButton loading={loading} loadingText="Entrando..." className="w-full">Entrar</LoadingButton>
           </form>
         </div>
         {message && <div className="mt-4"><Alert type={message.type}>{message.text}</Alert></div>}
       </section>
-      <section className="gothic-panel rounded-md p-6">
+      <section className="gothic-panel rounded-md p-4 sm:p-6">
         {campaigns.length === 0 ? (
           <Empty text="Voce ainda nao participa de nenhuma campanha." />
         ) : (
@@ -326,7 +343,7 @@ function FriendsTab() {
   }, [activeFriend?.id]);
 
   return (
-    <div className="gothic-panel rounded-md p-6">
+    <div className="gothic-panel rounded-md p-4 sm:p-6">
       <Header title="Amigos" />
       <div className="mt-5 grid gap-5 lg:grid-cols-[280px_1fr]">
         <aside className={`space-y-4 ${mobileChatOpen ? 'hidden lg:block' : 'block'}`}>
@@ -360,7 +377,7 @@ function FriendsTab() {
             <Button variant="ghost" className="px-3 lg:hidden" onClick={() => setMobileChatOpen(false)}>Voltar</Button>
             <h3 className="font-display text-2xl">{activeFriend?.name || 'Conversa'}</h3>
           </div>
-          <div className="h-[55vh] space-y-2 overflow-y-auto p-4 lg:h-80">
+          <div className="h-[58vh] space-y-2 overflow-y-auto p-3 sm:p-4 lg:h-80">
             {!activeFriend && <Empty text="Selecione ou adicione um amigo para conversar." compact />}
             {messages.map((message) => {
               const mine = message.sender_id === user?.id;
@@ -373,7 +390,7 @@ function FriendsTab() {
               );
             })}
           </div>
-          <form onSubmit={send} className="flex gap-2 border-t border-ember/10 p-4">
+          <form onSubmit={send} className="sticky bottom-20 flex gap-2 border-t border-ember/10 bg-black/35 p-3 backdrop-blur sm:static sm:p-4">
             <input className="min-w-0 flex-1 rounded-md border border-ember/20 bg-black/30 px-3 py-2" placeholder="Digite uma mensagem" value={draft} onChange={(event) => setDraft(event.target.value)} disabled={!activeFriend} />
             <Button disabled={!activeFriend}><MessageCircle size={16} /></Button>
           </form>
@@ -488,7 +505,7 @@ function SettingsTab() {
 
   return (
     <div className="space-y-6">
-      <section className="gothic-panel rounded-md p-6">
+      <section className="gothic-panel rounded-md p-4 sm:p-6">
         <Header title="Configuracoes" />
         <form onSubmit={saveProfile} className="mt-5 grid gap-6 lg:grid-cols-[220px_1fr]">
           <div className="rounded-md border border-ember/15 bg-black/25 p-4 text-center">
@@ -514,12 +531,12 @@ function SettingsTab() {
             <DashboardField label="Nome do usuario" value={profile.name} onChange={(name) => setProfile({ ...profile, name })} />
             <DashboardField label="Email do usuario" type="email" value={profile.email} onChange={(email) => setProfile({ ...profile, email })} />
             {profileMessage && <Alert type={profileMessage.type}>{profileMessage.text}</Alert>}
-            <LoadingButton loading={profileLoading} loadingText="Salvando...">Salvar perfil</LoadingButton>
+            <LoadingButton loading={profileLoading} loadingText="Salvando..." className="w-full sm:w-auto">Salvar perfil</LoadingButton>
           </div>
         </form>
       </section>
 
-      <section className="gothic-panel rounded-md p-6">
+      <section className="gothic-panel rounded-md p-4 sm:p-6">
         <Header title="Trocar senha" />
         <form onSubmit={changePassword} className="mt-5 max-w-xl space-y-4">
           <DashboardField label="Senha atual" type={showPassword ? 'text' : 'password'} value={passwords.currentPassword} onChange={(currentPassword) => setPasswords({ ...passwords, currentPassword })} />
@@ -530,7 +547,7 @@ function SettingsTab() {
             {showPassword ? 'Esconder senha' : 'Mostrar senha'}
           </button>
           {passwordMessage && <Alert type={passwordMessage.type}>{passwordMessage.text}</Alert>}
-          <LoadingButton loading={passwordLoading} loadingText="Alterando...">Alterar senha</LoadingButton>
+          <LoadingButton loading={passwordLoading} loadingText="Alterando..." className="w-full sm:w-auto">Alterar senha</LoadingButton>
         </form>
       </section>
     </div>
@@ -563,10 +580,10 @@ function PersonalizationTab() {
   }
 
   return (
-    <section className="gothic-panel rounded-md p-6">
+    <section className="gothic-panel rounded-md p-4 sm:p-6">
       <Header title="Personalizacao" />
       <p className="mt-2 text-sm text-mist">Escolha um tema visual. A mudanca aparece na hora e fica salva na sua conta.</p>
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
         {themeOptions.map((theme) => (
           <article key={theme.id} className={`rounded-md border p-4 soft-motion ${user?.theme === theme.id ? 'border-ember/70 bg-ember/10' : 'border-ember/15 bg-black/25'}`}>
             <div className="flex gap-2">
@@ -596,7 +613,7 @@ function DashboardField({ label, value, onChange, type = 'text' }) {
 
 function Header({ title, action }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <h2 className="font-display text-3xl text-ember">{title}</h2>
       {action}
     </div>

@@ -7,7 +7,7 @@ import { api } from '../lib/api';
 
 export default function Monsters() {
   return (
-    <main className="mx-auto max-w-7xl px-3 py-8 sm:px-4">
+    <main className="mx-auto max-w-7xl px-3 pb-24 pt-8 sm:px-4 sm:py-8">
       <MonstersTab />
     </main>
   );
@@ -34,14 +34,14 @@ export function MonstersTab() {
 
   return (
     <>
-      <section className="gothic-panel rounded-md p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <section className="gothic-panel rounded-md p-4 sm:p-6">
+        <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[.28em] text-ember/70">Bestiário</p>
             <h1 className="font-display text-4xl text-ember">Monstros</h1>
             <p className="mt-2 max-w-2xl text-sm text-mist">Criaturas cadastradas pelo admin para uso em campanhas, com faixas de vida, drops e rolagens de ataque.</p>
           </div>
-          <div className="rounded-md border border-ember/15 bg-black/25 p-4 text-right">
+          <div className="rounded-md border border-ember/15 bg-black/25 p-4 text-left sm:text-right">
             <Skull className="ml-auto text-ember" />
             <p className="mt-2 font-display text-3xl text-white">{monsters.length}</p>
             <p className="text-xs uppercase tracking-[.18em] text-mist">{totalAttacks} ataques</p>

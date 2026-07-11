@@ -17,7 +17,7 @@ export default function MonsterPngDownloadButton({ monster, onWarning }) {
   }
 
   return (
-    <Button type="button" variant="ghost" className="px-3 py-1.5 text-sm" onClick={downloadToken}>
+    <Button type="button" variant="ghost" className="w-full px-3 py-1.5 text-sm sm:w-auto" onClick={downloadToken}>
       <span className="inline-flex items-center gap-2"><Download size={15} /> Baixar PNG</span>
     </Button>
   );

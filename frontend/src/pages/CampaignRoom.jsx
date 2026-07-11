@@ -48,7 +48,7 @@ function ConfirmDialog({ confirm, onCancel, onConfirm }) {
 
 function ChatPanel({ messages, currentUserId, isMaster, content, setContent, send, editingId, editText, setEditText, startEdit, cancelEdit, saveEdit, deleteMessage }) {
   return (
-    <section className="gothic-panel flex min-h-[68vh] min-w-0 flex-col rounded-md p-3 sm:p-4 lg:min-h-[720px]">
+    <section className="gothic-panel flex min-h-[72vh] min-w-0 flex-col rounded-md p-3 sm:p-4 lg:min-h-[720px]">
       <div className="flex items-center justify-between border-b border-white/10 pb-3">
         <div>
           <h2 className="font-display text-3xl text-ember">Chat da campanha</h2>
@@ -73,7 +73,7 @@ function ChatPanel({ messages, currentUserId, isMaster, content, setContent, sen
         ))}
         {!messages.length ? <p className="rounded-md border border-white/10 bg-black/25 p-4 text-sm text-mist">Nenhuma mensagem ainda.</p> : null}
       </div>
-      <form onSubmit={send} className="mt-4 flex flex-col gap-2 sm:flex-row">
+      <form onSubmit={send} className="sticky bottom-20 mt-4 flex flex-col gap-2 border-t border-white/10 bg-black/30 pt-3 backdrop-blur sm:static sm:flex-row sm:border-0 sm:bg-transparent sm:pt-0">
         <textarea
           className="min-h-12 flex-1 rounded-md border border-ember/20 bg-black/35 px-3 py-2 text-sm outline-none focus:border-ember/60"
           value={content}
@@ -287,7 +287,7 @@ export default function CampaignRoom() {
   if (!room && !error) return <main className="px-4 py-10 text-mist">Carregando...</main>;
 
   return (
-    <main className="mx-auto max-w-[1500px] px-3 py-5 sm:px-4 sm:py-8">
+    <main className="mx-auto max-w-[1500px] px-3 pb-24 pt-5 sm:px-4 sm:py-8">
       {error ? <Alert type="error">{error}</Alert> : null}
       {notice ? <Alert>{notice}</Alert> : null}
 
@@ -297,7 +297,7 @@ export default function CampaignRoom() {
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.24em] text-mist">Campanha</p>
-                <h1 className="font-display text-4xl text-ember sm:text-5xl">{room.campaign.name}</h1>
+                <h1 className="break-words font-display text-3xl text-ember sm:text-5xl">{room.campaign.name}</h1>
                 <p className="mt-2 max-w-3xl text-sm text-mist">{room.campaign.description || 'Sem descrição.'}</p>
               </div>
               <div className="rounded-md border border-ember/20 bg-black/30 px-3 py-2 text-sm text-mist">
@@ -306,13 +306,13 @@ export default function CampaignRoom() {
             </div>
           </header>
 
-          <div className="mb-4 grid grid-cols-4 gap-2 lg:hidden">
+          <div className="mb-4 flex gap-2 overflow-x-auto pb-1 lg:hidden">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`rounded-md border px-2 py-2 text-xs font-semibold ${activeTab === tab.id ? 'border-ember/50 bg-ember/15 text-ember' : 'border-white/10 bg-black/25 text-mist'}`}
+                className={`min-h-10 shrink-0 rounded-md border px-3 py-2 text-xs font-semibold ${activeTab === tab.id ? 'border-ember/50 bg-ember/15 text-ember' : 'border-white/10 bg-black/25 text-mist'}`}
               >
                 {tab.label}
               </button>

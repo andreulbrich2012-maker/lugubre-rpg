@@ -298,9 +298,9 @@ export default function CharacterSheet() {
   const origin = sheet.origin_name || sheet.origin || 'Sem origem';
 
   return (
-    <main className="min-h-[calc(100vh-64px)] bg-[#050506] px-2 py-3 sm:px-4 sm:py-5">
-      <section className="mx-auto grid w-full max-w-[1480px] gap-4 border border-ember/40 bg-[#101011] p-3 shadow-glow xl:grid-cols-[minmax(360px,0.95fr)_minmax(520px,1.35fr)]">
-        <aside className="space-y-4">
+    <main className="min-h-[calc(100vh-64px)] overflow-x-hidden bg-[#050506] px-2 py-3 sm:px-4 sm:py-5">
+      <section className="mx-auto grid w-full max-w-[1480px] gap-4 rounded-md border border-ember/40 bg-[#101011] p-2 shadow-glow sm:p-3 xl:grid-cols-[minmax(360px,0.95fr)_minmax(520px,1.35fr)]">
+        <aside className="min-w-0 space-y-4">
           <header className="grid gap-3 sm:grid-cols-[96px_1fr]">
             <div className="h-24 overflow-hidden border border-ember/30 bg-black/40">
               {sheet.photo ? <img src={sheet.photo} className="h-full w-full object-cover" /> : <div className="h-full bg-[radial-gradient(circle,rgba(143,29,44,.38),transparent_58%)]" />}
@@ -355,18 +355,18 @@ export default function CharacterSheet() {
           />
         </aside>
 
-        <section className="space-y-4">
+        <section className="min-w-0 space-y-4">
           <Panel>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-display text-2xl text-ember">Ficha de jogo</h2>
-              <div className="flex flex-wrap gap-2">
-                <Link to={`/characters/${sheet.id}/edit`}><Button variant="ghost"><Edit size={16} className="inline" /> Base</Button></Link>
+              <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">
+                <Link to={`/characters/${sheet.id}/edit`}><Button variant="ghost" className="w-full sm:w-auto"><Edit size={16} className="inline" /> Base</Button></Link>
                 {editing ? (
                   <>
-                    <Button variant="ghost" onClick={() => { setDraft(makeDraft(sheet)); setEditing(false); }}><X size={16} /></Button>
-                    <Button onClick={savePlayChanges}><Save size={16} className="inline" /> Salvar</Button>
+                    <Button variant="ghost" className="w-full sm:w-auto" onClick={() => { setDraft(makeDraft(sheet)); setEditing(false); }}><X size={16} /> Cancelar</Button>
+                    <Button className="w-full sm:w-auto" onClick={savePlayChanges}><Save size={16} className="inline" /> Salvar</Button>
                   </>
-                ) : <Button onClick={() => setEditing(true)}>Modificar</Button>}
+                ) : <Button className="w-full sm:w-auto" onClick={() => setEditing(true)}>Modificar</Button>}
               </div>
             </div>
           </Panel>
@@ -469,13 +469,13 @@ function InventoryPanel({ inventory, wallet, editing, draft, setDraft, onAdd, on
 
   return (
     <Panel>
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="font-display text-2xl text-ember">Inventário</h2>
-        <Button type="button" variant="ghost" onClick={onAdd}><Plus size={16} className="inline" /> Adicionar Item</Button>
+        <Button type="button" variant="ghost" className="min-h-11 w-full sm:w-auto" onClick={onAdd}><Plus size={16} className="inline" /> Adicionar Item</Button>
       </div>
       <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
         {itemCategories.map((category) => (
-          <button key={category} type="button" className={`shrink-0 rounded border px-3 py-2 text-xs uppercase tracking-[.12em] soft-motion ${activeTab === category ? 'border-ember bg-ember/20 text-white' : 'border-white/10 bg-black/20 text-mist hover:text-white'}`} onClick={() => setActiveTab(category)}>
+          <button key={category} type="button" className={`min-h-10 shrink-0 rounded border px-3 py-2 text-xs uppercase tracking-[.12em] soft-motion ${activeTab === category ? 'border-ember bg-ember/20 text-white' : 'border-white/10 bg-black/20 text-mist hover:text-white'}`} onClick={() => setActiveTab(category)}>
             {category}
           </button>
         ))}
@@ -492,13 +492,13 @@ function InventoryPanel({ inventory, wallet, editing, draft, setDraft, onAdd, on
             <li key={item.id || `${item.name}-${index}`} className="rounded border border-white/10 bg-black/25 px-3 py-2">
               <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
                 <div className="min-w-0">
-                  <span className="text-white">{Number(item.quantity ?? 1)}x {item.name}</span>
+                  <span className="break-words text-white">{Number(item.quantity ?? 1)}x {item.name}</span>
                   <span className="ml-2 text-xs text-mist">peso {Number(item.weight || 0)}</span>
                   <span className="ml-2 rounded border border-ember/20 px-2 py-0.5 text-[11px] text-ember">{item.category || 'Outros'}</span>
                   {item.description && <p className="mt-1 text-xs text-mist">{item.description}</p>}
                 </div>
-                <Button type="button" variant="ghost" onClick={() => onEdit(item)}><Edit size={16} className="inline" /> Editar</Button>
-                <button type="button" className="grid h-10 w-10 place-items-center rounded border border-red-400/30 text-red-300 soft-motion hover:bg-red-950/30" onClick={() => onDelete(item)} aria-label="Excluir item"><Trash2 size={16} /></button>
+                <Button type="button" variant="ghost" className="min-h-11 justify-center" onClick={() => onEdit(item)}><Edit size={16} className="inline" /> Editar</Button>
+                <button type="button" className="inline-flex min-h-11 items-center justify-center gap-2 rounded border border-red-400/30 px-3 text-red-300 soft-motion hover:bg-red-950/30" onClick={() => onDelete(item)} aria-label="Excluir item"><Trash2 size={16} /> Excluir</button>
               </div>
             </li>
           )) : <li className="text-mist">{activeTab === 'Carteira' ? 'Nenhum item marcado como Carteira.' : 'Inventário vazio.'}</li>}
@@ -622,14 +622,17 @@ function QuickDicePanel({ modifier, roll, onRoll, onModifierChange }) {
 function PowersPanel({ attacks, spells, editing, draft, setDraft, onRoll, onAdd, onEdit, onDelete, roll }) {
   return (
     <Panel>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-2xl text-ember">Poderes e Ataques</h2>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="ghost" onClick={() => onAdd('attacks')}><Plus size={16} className="inline" /> Adicionar Ataque</Button>
-          <Button type="button" variant="ghost" onClick={() => onAdd('spells')}><Plus size={16} className="inline" /> Adicionar Magia</Button>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h2 className="font-display text-3xl text-ember">Poderes e Ataques</h2>
+          <p className="mt-1 text-sm text-mist">Ataques e magias organizados para consulta rápida durante a sessão.</p>
+        </div>
+        <div className="grid gap-2 sm:flex sm:shrink-0">
+          <Button type="button" variant="ghost" className="min-h-11 justify-center" onClick={() => onAdd('attacks')}><Plus size={16} className="inline" /> Adicionar Ataque</Button>
+          <Button type="button" variant="ghost" className="min-h-11 justify-center" onClick={() => onAdd('spells')}><Plus size={16} className="inline" /> Adicionar Magia</Button>
         </div>
       </div>
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div className="mt-5 grid min-w-0 gap-4 xl:grid-cols-2">
         <PowerList title="Ataques Normais" field="attacks" items={attacks} editing={editing} draft={draft} setDraft={setDraft} onRoll={(power) => onRoll(power, 'Ataque')} onEdit={(power) => onEdit('attacks', power)} onDelete={(power) => onDelete('attacks', power)} />
         <PowerList title="Magias" field="spells" items={spells} editing={editing} draft={draft} setDraft={setDraft} onRoll={(power) => onRoll(power, 'Magia')} onEdit={(power) => onEdit('spells', power)} onDelete={(power) => onDelete('spells', power)} />
       </div>
@@ -657,54 +660,123 @@ function PowerList({ title, field, items, editing, draft, setDraft, onRoll, onEd
   }
 
   return (
-    <section className="rounded border border-white/10 bg-black/20 p-3">
-      <h3 className="font-display text-xl text-white">{title}</h3>
-      <div className="mt-3 space-y-2">
+    <section className="min-w-0 rounded-md border border-white/10 bg-black/20 p-3 sm:p-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-display text-2xl text-white">{title}</h3>
+        <span className="rounded-full border border-ember/20 bg-ember/10 px-3 py-1 text-xs font-semibold uppercase tracking-[.16em] text-ember">{items.length}</span>
+      </div>
+      <div className="mt-4 grid gap-3">
         {items.length ? items.map((item, index) => (
-          <div key={item.id || `${item.name}-${index}`} className="rounded border border-white/10 bg-black/25 p-3">
-            {!editing ? (
-              <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto] sm:items-center">
-                <div className="grid min-w-0 gap-3 sm:grid-cols-[56px_1fr]">
-                  <div className="grid h-14 w-14 place-items-center overflow-hidden rounded border border-ember/25 bg-[radial-gradient(circle,rgba(142,92,246,.25),transparent_60%)] text-xs uppercase text-ember">
-                    {item.image ? <img src={item.image} className="h-full w-full object-cover" /> : (field === 'spells' ? item.element?.slice(0, 2) : 'AT')}
-                  </div>
-                  <div className="min-w-0">
-                  <p className="truncate font-semibold text-white">{item.name}</p>
-                  <p className="text-sm text-ember">{item.damage}{field === 'spells' ? ` · ${item.element || 'Érebo'} · mana ${Number(item.manaCost || 0)}` : ` · ${item.skill || 'Luta'} · ${item.range || '-'}`}</p>
-                  <p className="text-xs text-mist">Crítico {item.criticalValue || 20}+ · x{item.criticalMultiplier || 2}</p>
-                  {item.description && <p className="mt-1 text-xs text-mist">{item.description}</p>}
-                  </div>
-                </div>
-                <Button type="button" variant="ghost" onClick={() => onRoll(item)}><Dice5 size={16} className="inline" /> Rolar</Button>
-                <Button type="button" variant="ghost" onClick={() => onEdit(item)}><Edit size={16} className="inline" /> Editar</Button>
-                <button type="button" className="grid h-10 w-10 place-items-center rounded border border-red-400/30 text-red-300 soft-motion hover:bg-red-950/30" onClick={() => onDelete(item)} aria-label="Excluir poder"><Trash2 size={16} /></button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="grid gap-2 sm:grid-cols-[1fr_110px_90px_36px]">
-                  <input placeholder="Nome" className="min-w-0 rounded border border-ember/20 bg-black/30 px-3 py-2" value={item.name || ''} onChange={(event) => updatePower(index, 'name', event.target.value)} />
-                  <input placeholder="Dano" className="rounded border border-ember/20 bg-black/30 px-3 py-2" value={item.damage || ''} onChange={(event) => updatePower(index, 'damage', event.target.value)} />
-                  <NumberInput placeholder="Mana" value={item.manaCost ?? 0} onChange={(value) => updatePower(index, 'manaCost', field === 'spells' ? value : 0)} />
-                  <button type="button" className="grid h-10 place-items-center rounded border border-red-400/30 text-red-300" onClick={() => removePower(index)}><Trash2 size={16} /></button>
-                </div>
-                <textarea placeholder="Descrição" className="w-full rounded border border-ember/20 bg-black/30 px-3 py-2 text-sm" value={item.description || ''} onChange={(event) => updatePower(index, 'description', event.target.value)} />
-              </div>
-            )}
-          </div>
-        )) : <p className="text-sm text-mist">Nenhum registro.</p>}
+          <PowerCard key={item.id || `${item.name}-${index}`} item={item} field={field} editing={editing} index={index} onRoll={onRoll} onEdit={onEdit} onDelete={onDelete} onUpdate={updatePower} onRemove={removePower} />
+        )) : <p className="rounded-md border border-dashed border-white/10 bg-black/25 p-4 text-sm text-mist">Nenhum registro.</p>}
       </div>
       {editing && (
-        <div className="mt-3 rounded border border-ember/20 bg-black/20 p-3">
-          <div className="grid gap-2 sm:grid-cols-[1fr_110px_90px_auto]">
-            <input placeholder="Nome" className="min-w-0 rounded border border-ember/20 bg-black/30 px-3 py-2" value={power.name} onChange={(event) => setPower({ ...power, name: event.target.value })} />
-            <input placeholder="Dano" className="rounded border border-ember/20 bg-black/30 px-3 py-2" value={power.damage} onChange={(event) => setPower({ ...power, damage: event.target.value })} />
+        <div className="mt-4 rounded-md border border-ember/20 bg-black/20 p-3">
+          <p className="mb-3 text-xs font-bold uppercase tracking-[.18em] text-ember">Adicionar rápido</p>
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_120px_100px_auto]">
+            <input placeholder="Nome" className="min-w-0 rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={power.name} onChange={(event) => setPower({ ...power, name: event.target.value })} />
+            <input placeholder="Dano" className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={power.damage} onChange={(event) => setPower({ ...power, damage: event.target.value })} />
             <NumberInput placeholder="Mana" value={power.manaCost} onChange={(manaCost) => setPower({ ...power, manaCost: field === 'spells' ? manaCost : 0 })} />
-            <Button type="button" variant="ghost" onClick={addPower}><Plus size={16} /></Button>
+            <Button type="button" variant="ghost" className="min-h-11" onClick={addPower}><Plus size={16} className="inline" /> Adicionar</Button>
           </div>
-          <textarea placeholder="Descrição" className="mt-2 w-full rounded border border-ember/20 bg-black/30 px-3 py-2 text-sm" value={power.description} onChange={(event) => setPower({ ...power, description: event.target.value })} />
+          <textarea placeholder="Descrição" className="mt-2 w-full rounded-md border border-ember/20 bg-black/30 px-3 py-3 text-sm" value={power.description} onChange={(event) => setPower({ ...power, description: event.target.value })} />
         </div>
       )}
     </section>
+  );
+}
+
+function PowerCard({ item, field, editing, index, onRoll, onEdit, onDelete, onUpdate, onRemove }) {
+  const isSpell = field === 'spells';
+  const chips = isSpell
+    ? [
+        ['Elemento', item.element || 'Érebo'],
+        ['Mana', Number(item.manaCost || 0)],
+        ['Crítico', `${item.criticalValue || 20}+`],
+        ['Multiplicador', `x${item.criticalMultiplier || 2}`]
+      ]
+    : [
+        ['Perícia', item.skill || 'Luta'],
+        ['Alcance', item.range || '-'],
+        ['Crítico', `${item.criticalValue || 20}+`],
+        ['Multiplicador', `x${item.criticalMultiplier || 2}`]
+      ];
+
+  return (
+    <article className="min-w-0 rounded-md border border-white/10 bg-[linear-gradient(135deg,rgba(214,166,95,.08),rgba(0,0,0,.18))] p-3 shadow-lg shadow-black/20 sm:p-4">
+      {!editing ? (
+        <div className="flex h-full flex-col gap-4">
+          <div className="min-w-0">
+            <div className="flex items-start gap-3">
+              <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-md border border-ember/25 bg-[radial-gradient(circle,rgba(142,92,246,.25),transparent_62%)] text-sm font-bold uppercase text-ember">
+                {item.image ? <img src={item.image} className="h-full w-full object-cover" /> : (isSpell ? String(item.element || 'Ér').slice(0, 2) : 'AT')}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-bold uppercase tracking-[.18em] text-ember/80">{isSpell ? 'Magia' : 'Ataque Normal'}</p>
+                <h4 className="mt-1 break-words font-display text-2xl leading-tight text-white">{item.name}</h4>
+              </div>
+              <div className="shrink-0 rounded-md border border-ember/20 bg-black/35 px-3 py-2 text-right">
+                <p className="text-[10px] font-bold uppercase tracking-[.16em] text-mist">Dano</p>
+                <p className="break-all font-semibold text-ember">{item.damage || '-'}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4">
+            {chips.map(([label, value]) => <PowerChip key={label} label={label} value={value} />)}
+          </div>
+
+          {item.description ? (
+            <p className="rounded-md border border-white/10 bg-black/25 p-3 text-sm leading-relaxed text-mist">{item.description}</p>
+          ) : null}
+
+          <div className="mt-auto grid gap-2 sm:grid-cols-3">
+            <Button type="button" variant="ghost" className="min-h-11 justify-center" onClick={() => onRoll(item)}><Dice5 size={16} className="inline" /> Rolar</Button>
+            <Button type="button" variant="ghost" className="min-h-11 justify-center" onClick={() => onEdit(item)}><Edit size={16} className="inline" /> Editar</Button>
+            <button type="button" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-red-400/30 px-4 py-2 font-semibold text-red-300 soft-motion hover:bg-red-950/30" onClick={() => onDelete(item)}>
+              <Trash2 size={16} />
+              Excluir
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_120px_100px_auto]">
+            <input placeholder="Nome" className="min-w-0 rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={item.name || ''} onChange={(event) => onUpdate(index, 'name', event.target.value)} />
+            <input placeholder="Dano" className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={item.damage || ''} onChange={(event) => onUpdate(index, 'damage', event.target.value)} />
+            <NumberInput placeholder="Mana" value={item.manaCost ?? 0} onChange={(value) => onUpdate(index, 'manaCost', isSpell ? value : 0)} />
+            <button type="button" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-red-400/30 px-3 py-2 text-red-300" onClick={() => onRemove(index)}><Trash2 size={16} /> Remover</button>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {!isSpell ? (
+              <>
+                <input placeholder="Perícia" className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={item.skill || ''} onChange={(event) => onUpdate(index, 'skill', event.target.value)} />
+                <input placeholder="Alcance" className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={item.range || ''} onChange={(event) => onUpdate(index, 'range', event.target.value)} />
+              </>
+            ) : (
+              <select className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={item.element || 'Érebo'} onChange={(event) => onUpdate(index, 'element', event.target.value)}>
+                {spellElements.map((element) => <option key={element} value={element}>{element}</option>)}
+              </select>
+            )}
+            <input placeholder="Imagem" className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={item.image || ''} onChange={(event) => onUpdate(index, 'image', event.target.value)} />
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <NumberInput placeholder="Crítico" value={item.criticalValue ?? 20} onChange={(value) => onUpdate(index, 'criticalValue', value)} />
+            <NumberInput placeholder="Multiplicador" value={item.criticalMultiplier ?? 2} onChange={(value) => onUpdate(index, 'criticalMultiplier', value)} />
+          </div>
+          <textarea placeholder="Descrição" className="w-full rounded-md border border-ember/20 bg-black/30 px-3 py-3 text-sm" value={item.description || ''} onChange={(event) => onUpdate(index, 'description', event.target.value)} />
+        </div>
+      )}
+    </article>
+  );
+}
+
+function PowerChip({ label, value }) {
+  return (
+    <div className="min-w-0 rounded-md border border-white/10 bg-black/30 px-2.5 py-2">
+      <p className="text-[10px] font-bold uppercase tracking-[.14em] text-mist">{label}</p>
+      <p className="mt-0.5 break-words text-sm font-semibold text-white">{value || '-'}</p>
+    </div>
   );
 }
 
@@ -733,9 +805,9 @@ function ItemModal({ state, onClose, onSave }) {
           Descrição opcional
           <textarea className="mt-1 min-h-24 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={form.description || ''} onChange={(event) => setForm({ ...form, description: event.target.value })} />
         </label>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button type="submit" disabled={!canSave}>Salvar</Button>
+        <div className="grid gap-2 pt-2 sm:flex sm:justify-end">
+          <Button type="button" variant="ghost" className="min-h-11" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" className="min-h-11" disabled={!canSave}>Salvar</Button>
         </div>
       </form>
     </ModalFrame>
@@ -802,9 +874,9 @@ function PowerModal({ state, skillsCatalog, onClose, onSave }) {
           Descrição opcional
           <textarea className="mt-1 min-h-24 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={form.description || ''} onChange={(event) => setForm({ ...form, description: event.target.value })} />
         </label>
-        <div className="flex justify-end gap-2 pt-2">
-          <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button type="submit" disabled={!canSave}>Salvar</Button>
+        <div className="grid gap-2 pt-2 sm:flex sm:justify-end">
+          <Button type="button" variant="ghost" className="min-h-11" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" className="min-h-11" disabled={!canSave}>Salvar</Button>
         </div>
       </form>
     </ModalFrame>
@@ -813,8 +885,8 @@ function PowerModal({ state, skillsCatalog, onClose, onSave }) {
 
 function ModalFrame({ title, children, onClose }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 px-4 py-6 backdrop-blur-sm">
-      <section className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-md border border-ember/30 bg-[#0b0b0d] p-5 shadow-glow">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 px-2 py-3 backdrop-blur-sm sm:px-4 sm:py-6">
+      <section className="max-h-[94vh] w-full max-w-xl overflow-y-auto rounded-md border border-ember/30 bg-[#0b0b0d] p-4 shadow-glow sm:p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="font-display text-2xl text-ember">{title}</h2>
           <button type="button" className="grid h-10 w-10 place-items-center rounded border border-white/15 text-mist soft-motion hover:bg-white/10" onClick={onClose} aria-label="Fechar"><X size={18} /></button>
@@ -828,23 +900,27 @@ function ModalFrame({ title, children, onClose }) {
 function SkillTable({ sheet, skills, skillBonuses, skillsCatalog, onTrainingChange, onOtherChange, onRoll, roll }) {
   return (
     <>
-      <div className="mt-4 grid grid-cols-[minmax(120px,1fr)_52px_116px_64px_44px] gap-x-2 text-xs uppercase text-mist sm:grid-cols-[1fr_64px_132px_72px_44px] sm:gap-x-3">
-        <span>Perícia</span><span>Dado</span><span>Treino</span><span>Outros</span><span>Rolar</span>
-      </div>
-      <div className="mt-2 grid gap-x-5 lg:grid-cols-2">
-        {skillsCatalog.map((skill) => (
-          <div key={skill.key} className="grid grid-cols-[minmax(120px,1fr)_52px_116px_64px_44px] items-center gap-x-2 border-b border-white/10 py-1 text-sm sm:grid-cols-[1fr_64px_132px_72px_44px] sm:gap-x-3">
-            <span className="truncate text-white">{skill.name}</span>
-            <span className="text-ember">({sheet.attributes?.[skill.attribute] ?? 2})</span>
-            <div className="grid grid-cols-[28px_1fr_28px] items-center rounded border border-white/10 bg-black/25">
-              <button type="button" className="h-8 text-mist hover:text-white" onClick={() => onTrainingChange(skill.key, Number(skills?.[skill.key] || 0) - 5)}>-</button>
-              <span className="text-center text-blue-400">{skills?.[skill.key] ?? 0}</span>
-              <button type="button" className="h-8 text-mist hover:text-white" onClick={() => onTrainingChange(skill.key, Number(skills?.[skill.key] || 0) + 5)}>+</button>
-            </div>
-            <input type="number" className="h-8 w-full rounded border border-white/10 bg-black/25 px-2 text-center text-mist" value={skillBonuses?.[skill.key] ?? 0} onChange={(event) => onOtherChange(skill.key, event.target.value)} />
-            <button type="button" className="grid h-8 w-8 place-items-center rounded border border-ember/30 text-ember" onClick={() => onRoll(skill, skills?.[skill.key] ?? 0, skillBonuses?.[skill.key] ?? 0)}><Dice5 size={16} /></button>
+      <div className="mt-4 overflow-x-auto pb-2">
+          <div className="min-w-[560px]">
+          <div className="grid grid-cols-[minmax(120px,1fr)_52px_116px_64px_44px] gap-x-2 text-xs uppercase text-mist sm:grid-cols-[1fr_64px_132px_72px_44px] sm:gap-x-3">
+            <span>Perícia</span><span>Dado</span><span>Treino</span><span>Outros</span><span>Rolar</span>
           </div>
-        ))}
+          <div className="mt-2 grid gap-x-5 2xl:grid-cols-2">
+            {skillsCatalog.map((skill) => (
+              <div key={skill.key} className="grid grid-cols-[minmax(120px,1fr)_52px_116px_64px_44px] items-center gap-x-2 border-b border-white/10 py-2 text-sm sm:grid-cols-[1fr_64px_132px_72px_44px] sm:gap-x-3">
+                <span className="truncate text-white">{skill.name}</span>
+                <span className="text-ember">({sheet.attributes?.[skill.attribute] ?? 2})</span>
+                <div className="grid grid-cols-[40px_1fr_40px] items-center rounded border border-white/10 bg-black/25">
+                  <button type="button" className="h-10 text-mist hover:text-white" onClick={() => onTrainingChange(skill.key, Number(skills?.[skill.key] || 0) - 5)}>-</button>
+                  <span className="text-center text-blue-400">{skills?.[skill.key] ?? 0}</span>
+                  <button type="button" className="h-10 text-mist hover:text-white" onClick={() => onTrainingChange(skill.key, Number(skills?.[skill.key] || 0) + 5)}>+</button>
+                </div>
+                <input type="number" className="h-10 w-full rounded border border-white/10 bg-black/25 px-2 text-center text-mist" value={skillBonuses?.[skill.key] ?? 0} onChange={(event) => onOtherChange(skill.key, event.target.value)} />
+                <button type="button" className="grid h-10 w-10 place-items-center rounded border border-ember/30 text-ember" onClick={() => onRoll(skill, skills?.[skill.key] ?? 0, skillBonuses?.[skill.key] ?? 0)}><Dice5 size={16} /></button>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
       <RollFeedback roll={roll} />
     </>
@@ -944,11 +1020,11 @@ function NumberField({ label, value, onChange }) {
 }
 
 function NumberInput({ value, onChange, placeholder, className = '', allowNegative = false }) {
-  return <input type="number" min={allowNegative ? undefined : '0'} placeholder={placeholder} className={`rounded border border-ember/20 bg-black/30 px-3 py-2 ${className}`} value={value} onChange={(event) => onChange(Number(event.target.value))} />;
+  return <input type="number" min={allowNegative ? undefined : '0'} placeholder={placeholder} className={`min-w-0 rounded border border-ember/20 bg-black/30 px-3 py-2 ${className}`} value={value} onChange={(event) => onChange(Number(event.target.value))} />;
 }
 
 function Panel({ children }) {
-  return <section className="rounded-md border border-white/10 bg-black/20 p-4">{children}</section>;
+  return <section className="rounded-md border border-white/10 bg-black/20 p-3 sm:p-4">{children}</section>;
 }
 
 function Metric({ label, value }) {

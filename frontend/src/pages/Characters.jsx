@@ -32,10 +32,10 @@ export default function Characters() {
   useEffect(() => { load(); }, []);
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-10">
-      <div className="flex items-center justify-between">
+    <main className="mx-auto max-w-7xl px-3 py-6 sm:px-4 sm:py-10">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="font-display text-4xl text-ember">Personagens</h1>
-        <Link to="/characters/new"><Button>Nova ficha</Button></Link>
+        <Link to="/characters/new"><Button className="w-full sm:w-auto">Nova ficha</Button></Link>
       </div>
       <div className="mt-8 space-y-4">
         {characters.map((character) => (
@@ -55,10 +55,10 @@ export default function Characters() {
                 )) : <p className="text-xs text-mist">Nenhum salvamento registrado</p>}
               </div>
             </div>
-            <div className="flex gap-2 md:justify-end">
-              <Link to={`/characters/${character.id}/edit`}><Button variant="ghost"><Edit size={16} /></Button></Link>
-              <Button variant="ghost" onClick={() => share(character.id)}><Share2 size={16} /></Button>
-              <Button variant="ghost" onClick={() => remove(character.id)}><Trash2 size={16} /></Button>
+            <div className="grid grid-cols-3 gap-2 md:flex md:justify-end">
+              <Link to={`/characters/${character.id}/edit`}><Button variant="ghost" className="w-full"><Edit size={16} /></Button></Link>
+              <Button variant="ghost" className="w-full" onClick={() => share(character.id)}><Share2 size={16} /></Button>
+              <Button variant="ghost" className="w-full" onClick={() => remove(character.id)}><Trash2 size={16} /></Button>
             </div>
           </article>
         ))}

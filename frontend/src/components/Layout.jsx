@@ -24,9 +24,9 @@ export default function Layout({ children }) {
     user && { to: '/monsters', label: 'Monstros', icon: Skull }
   ].filter(Boolean);
   const drawerLinks = [
-    user && { to: '/dashboard', label: 'Dashboard', icon: Home },
-    { to: '/characters', label: 'Personagens', icon: ScrollText },
-    { to: '/campaigns', label: 'Campanhas', icon: Swords },
+    user && { to: '/dashboard', label: 'Painel', icon: Home },
+    { to: '/characters', label: 'Fichas / Personagens', icon: ScrollText },
+    { to: '/campaigns', label: 'Mesas / Campanhas', icon: Swords },
     user && { to: '/dashboard?tab=friends', label: 'Amigos', icon: Users },
     user && { to: '/monsters', label: 'Monstros', icon: Skull },
     inCampaignRoom && { to: `${location.pathname}?tab=diary`, label: 'Diário', icon: ScrollText },
@@ -44,14 +44,14 @@ export default function Layout({ children }) {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden pb-20 md:pb-0" style={{ background: 'var(--bg-radial)' }}>
+    <div className="min-h-screen overflow-x-hidden pb-20 lg:pb-0" style={{ background: 'var(--bg-radial)' }}>
       <nav className="sticky top-0 z-20 border-b border-ember/10 bg-abyss/90 backdrop-blur">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-3 sm:px-4">
           <Link to="/" className="font-display text-2xl text-ember">Lúgubre RPG</Link>
-          <button type="button" className="grid h-10 w-10 place-items-center rounded-md border border-ember/25 text-ember md:hidden" onClick={() => setOpen((value) => !value)} aria-label="Abrir menu">
+          <button type="button" className="grid h-10 w-10 place-items-center rounded-md border border-ember/25 text-ember lg:hidden" onClick={() => setOpen((value) => !value)} aria-label="Abrir menu">
             {open ? <X size={18} /> : <Menu size={18} />}
           </button>
-          <div className="hidden min-w-0 items-center gap-3 text-sm md:flex">
+          <div className="hidden min-w-0 items-center gap-3 text-sm lg:flex">
             {links.map((link) => <NavLink key={link.to} to={link.to} className="text-mist hover:text-white">{link.label}</NavLink>)}
             {user ? (
               <Button variant="ghost" onClick={logout} title="Sair"><LogOut size={16} /></Button>
@@ -61,7 +61,7 @@ export default function Layout({ children }) {
           </div>
         </div>
         {open && (
-          <div className="fixed inset-0 z-50 md:hidden">
+          <div className="fixed inset-0 z-50 lg:hidden">
             <button type="button" aria-label="Fechar menu" className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setOpen(false)} />
             <section role="dialog" aria-modal="true" aria-label="Menu mobile" className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-2xl border-t border-ember/25 bg-abyss/95 px-4 pb-[calc(env(safe-area-inset-bottom)+5.75rem)] pt-4 shadow-2xl shadow-black">
               <div className="mb-3 flex items-center justify-between gap-3">
@@ -102,7 +102,7 @@ export default function Layout({ children }) {
       <footer className="border-t border-ember/10 px-4 py-8 text-center text-sm text-mist">
         Lúgubre RPG, fichas, campanhas e sombras bem organizadas.
       </footer>
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-ember/20 bg-abyss/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 shadow-2xl shadow-black/70 backdrop-blur md:hidden" aria-label="Navegação principal mobile">
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-ember/20 bg-abyss/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 shadow-2xl shadow-black/70 backdrop-blur lg:hidden" aria-label="Navegação principal mobile">
         <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
           {bottomLinks.map((link) => {
             const Icon = link.icon;

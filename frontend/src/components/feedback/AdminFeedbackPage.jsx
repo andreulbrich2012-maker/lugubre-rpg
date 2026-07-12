@@ -15,6 +15,8 @@ export default function AdminFeedbackPage() {
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState(null);
   const [message, setMessage] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deletingId, setDeletingId] = useState('');
 
   const activeFilters = useMemo(() => Object.entries(filters).filter(([, value]) => value).length, [filters]);
 
@@ -58,11 +60,20 @@ export default function AdminFeedbackPage() {
   }
 
   async function deleteFeedback(feedback) {
-    if (!window.confirm('Tem certeza que deseja deletar este feedback? Essa ação não poderá ser desfeita.')) return;
-    await api.delete(`/admin/feedbacks/${feedback.id}`);
-    setSelected(null);
-    setMessage({ type: 'success', text: 'Feedback deletado.' });
-    load();
+    setDeletingId(feedback.id);
+    setMessage(null);
+    try {
+      await api.delete(`/admin/feedbacks/${feedback.id}`);
+      setFeedbacks((current) => current.filter((item) => item.id !== feedback.id));
+      setSelected(null);
+      setConfirmDelete(null);
+      setMessage({ type: 'success', text: 'Feedback deletado.' });
+      await load();
+    } catch (err) {
+      setMessage({ type: 'error', text: err?.response?.data?.message || 'Nao foi possivel deletar o feedback.' });
+    } finally {
+      setDeletingId('');
+    }
   }
 
   useEffect(() => { load(); }, []);
@@ -117,7 +128,7 @@ export default function AdminFeedbackPage() {
                 <p className="mt-3 line-clamp-2 text-sm text-mist">{feedback.description}</p>
                 <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
                   <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => openDetails(feedback)}><Edit size={15} /> Detalhes</Button>
-                  <Button type="button" variant="ghost" className="w-full text-red-200 sm:w-auto" onClick={() => deleteFeedback(feedback)}><Trash2 size={15} /> Deletar</Button>
+                  <Button type="button" variant="ghost" className="w-full text-red-200 sm:w-auto" onClick={() => setConfirmDelete(feedback)}><Trash2 size={15} /> Deletar</Button>
                 </div>
               </article>
             ))}
@@ -126,13 +137,22 @@ export default function AdminFeedbackPage() {
         )}
       </section>
 
+      {confirmDelete && (
+        <ConfirmDialog
+          title={`Deletar ${confirmDelete.title}?`}
+          loading={deletingId === confirmDelete.id}
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => deleteFeedback(confirmDelete)}
+        />
+      )}
+
       {selected && (
         <AdminFeedbackDetails
           feedback={selected}
           onClose={() => setSelected(null)}
           onStatus={saveStatus}
           onResponse={saveResponse}
-          onDelete={deleteFeedback}
+          onDelete={setConfirmDelete}
         />
       )}
     </div>
@@ -232,6 +252,21 @@ function Info({ label, value, large = false }) {
     <div className="rounded-md border border-white/10 bg-black/25 p-3">
       <p className="text-xs uppercase tracking-[.16em] text-ember">{label}</p>
       <p className={`mt-2 whitespace-pre-wrap break-words text-mist ${large ? 'text-sm leading-relaxed' : 'text-sm'}`}>{value}</p>
+    </div>
+  );
+}
+
+function ConfirmDialog({ title, onCancel, onConfirm, loading = false }) {
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/75 p-4">
+      <section className="gothic-panel max-h-[90vh] w-full max-w-md overflow-auto rounded-md p-4 sm:p-6">
+        <h2 className="break-words font-display text-3xl text-ember">{title}</h2>
+        <p className="mt-3 text-sm leading-relaxed text-mist">Tem certeza que deseja deletar este feedback? Essa acao nao podera ser desfeita.</p>
+        <div className="mt-6 grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
+          <Button type="button" variant="ghost" disabled={loading} className="w-full sm:w-auto" onClick={onCancel}>Cancelar</Button>
+          <Button type="button" disabled={loading} className="w-full border-red-500/70 bg-red-900/70 hover:bg-red-800 sm:w-auto" onClick={onConfirm}>{loading ? 'Deletando...' : 'Deletar'}</Button>
+        </div>
+      </section>
     </div>
   );
 }

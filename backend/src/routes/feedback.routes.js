@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { tryQuery } from '../db/pool.js';
+import { createLocalFeedback, listLocalFeedbacks } from '../db/localStore.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -56,7 +57,10 @@ router.get('/my', async (req, res) => {
      order by f.created_at desc`,
     [req.user.id]
   );
-  res.json(result?.rows || []);
+  if (!result) {
+    return res.json((await listLocalFeedbacks()).filter((feedback) => feedback.user_id === req.user.id));
+  }
+  res.json(result.rows);
 });
 
 router.post('/', async (req, res) => {
@@ -79,10 +83,10 @@ router.post('/', async (req, res) => {
     ]
   );
 
-  if (!result) return res.status(503).json({ message: 'Banco de dados indisponível para salvar feedback.' });
+  const created = result?.rows?.[0] || await createLocalFeedback(req.user.id, feedback);
   res.status(201).json({
-    message: 'Feedback enviado com sucesso. Obrigado por ajudar a melhorar o Lúgubre RPG.',
-    feedback: result.rows[0]
+    message: 'Feedback enviado com sucesso. Obrigado por ajudar a melhorar o Lugubre RPG.',
+    feedback: created
   });
 });
 

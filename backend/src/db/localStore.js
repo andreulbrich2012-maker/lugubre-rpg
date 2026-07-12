@@ -35,6 +35,8 @@ const defaultData = {
   messages: [],
   friends: [],
   friend_messages: [],
+  powers: [],
+  feedbacks: [],
   monsters: [
     {
       id: 'monster-guardian-ashes',
@@ -512,8 +514,10 @@ export async function updateLocalCatalogItem(type, id, item) {
 
 export async function deleteLocalCatalogItem(type, id) {
   const data = await ensureStore();
+  const before = data[type].length;
   data[type] = data[type].filter((item) => item.id !== id);
   await writeStore(data);
+  return data[type].length !== before;
 }
 
 export async function listLocalMonsters(category = '') {
@@ -615,6 +619,135 @@ export async function deleteLocalMonsterAttack(attackId) {
     }
   }
   return false;
+}
+
+export async function listLocalPowers() {
+  const data = await ensureStore();
+  return [...(data.powers || [])].sort((a, b) => (
+    `${a.type || ''}${a.element || ''}${a.recommended_level || 0}${a.name || ''}`
+      .localeCompare(`${b.type || ''}${b.element || ''}${b.recommended_level || 0}${b.name || ''}`)
+  ));
+}
+
+export async function getLocalPower(id) {
+  const data = await ensureStore();
+  return (data.powers || []).find((power) => power.id === id) || null;
+}
+
+export async function createLocalPower(power) {
+  const data = await ensureStore();
+  data.powers = data.powers || [];
+  const now = new Date().toISOString();
+  const row = {
+    id: crypto.randomUUID(),
+    ...power,
+    created_at: now,
+    updated_at: now
+  };
+  data.powers.push(row);
+  await writeStore(data);
+  return row;
+}
+
+export async function updateLocalPower(id, power) {
+  const data = await ensureStore();
+  data.powers = data.powers || [];
+  const index = data.powers.findIndex((row) => row.id === id);
+  if (index === -1) return null;
+  data.powers[index] = {
+    ...data.powers[index],
+    ...power,
+    id,
+    updated_at: new Date().toISOString()
+  };
+  await writeStore(data);
+  return data.powers[index];
+}
+
+export async function deleteLocalPower(id) {
+  const data = await ensureStore();
+  data.powers = data.powers || [];
+  const before = data.powers.length;
+  data.powers = data.powers.filter((power) => power.id !== id);
+  await writeStore(data);
+  return data.powers.length !== before;
+}
+
+function decorateLocalFeedback(data, feedback) {
+  const user = data.users.find((row) => row.id === feedback.user_id) || {};
+  const admin = data.users.find((row) => row.id === feedback.admin_id) || {};
+  return {
+    ...feedback,
+    user_name: user.name || '',
+    user_email: user.email || '',
+    admin_name: admin.name || ''
+  };
+}
+
+export async function listLocalFeedbacks(filters = {}) {
+  const data = await ensureStore();
+  const search = String(filters.search || '').trim().toLowerCase();
+  const rows = (data.feedbacks || []).filter((feedback) => {
+    const decorated = decorateLocalFeedback(data, feedback);
+    if (filters.type && feedback.type !== filters.type) return false;
+    if (filters.priority && feedback.priority !== filters.priority) return false;
+    if (filters.status && feedback.status !== filters.status) return false;
+    if (search && !`${feedback.title || ''} ${decorated.user_name} ${decorated.user_email}`.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  return rows
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+    .map((feedback) => decorateLocalFeedback(data, feedback));
+}
+
+export async function getLocalFeedback(id) {
+  const data = await ensureStore();
+  const feedback = (data.feedbacks || []).find((row) => row.id === id);
+  return feedback ? decorateLocalFeedback(data, feedback) : null;
+}
+
+export async function createLocalFeedback(userId, feedback) {
+  const data = await ensureStore();
+  data.feedbacks = data.feedbacks || [];
+  const now = new Date().toISOString();
+  const row = {
+    id: crypto.randomUUID(),
+    user_id: userId,
+    title: feedback.title,
+    type: feedback.type || 'Outro',
+    description: feedback.description,
+    priority: feedback.priority || 'Media',
+    status: 'Enviado',
+    page_context: feedback.pageContext || '',
+    attachment_url: feedback.attachmentUrl || '',
+    admin_response: '',
+    admin_id: null,
+    responded_at: null,
+    created_at: now,
+    updated_at: now
+  };
+  data.feedbacks.push(row);
+  await writeStore(data);
+  return decorateLocalFeedback(data, row);
+}
+
+export async function updateLocalFeedback(id, patch) {
+  const data = await ensureStore();
+  data.feedbacks = data.feedbacks || [];
+  const index = data.feedbacks.findIndex((row) => row.id === id);
+  if (index === -1) return null;
+  data.feedbacks[index] = { ...data.feedbacks[index], ...patch, updated_at: new Date().toISOString() };
+  await writeStore(data);
+  return decorateLocalFeedback(data, data.feedbacks[index]);
+}
+
+export async function deleteLocalFeedback(id) {
+  const data = await ensureStore();
+  data.feedbacks = data.feedbacks || [];
+  const before = data.feedbacks.length;
+  data.feedbacks = data.feedbacks.filter((feedback) => feedback.id !== id);
+  await writeStore(data);
+  return data.feedbacks.length !== before;
 }
 
 export async function listLocalCharacters(ownerId) {

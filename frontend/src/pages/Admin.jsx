@@ -75,6 +75,10 @@ export default function Admin() {
       await api.delete(`/admin/${endpoint}/${id}`);
       setConfirmDelete(null);
       if (editor?.item?.id === id) setEditor(null);
+      setCatalog((current) => ({
+        ...current,
+        [endpoint]: current[endpoint]?.filter((item) => item.id !== id) || []
+      }));
       setMessage({ type: 'success', text: 'Item deletado com sucesso.' });
     });
   }

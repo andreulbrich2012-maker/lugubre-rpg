@@ -27,6 +27,8 @@ export default function AdminPowerLibraryPage() {
   const [editingId, setEditingId] = useState(null);
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deletingId, setDeletingId] = useState('');
 
   async function load() {
     const { data } = await api.get('/powers');
@@ -77,13 +79,19 @@ export default function AdminPowerLibraryPage() {
   }
 
   async function remove(power) {
-    if (!window.confirm('Tem certeza que deseja deletar este item? Essa ação não poderá ser desfeita.')) return;
+    setDeletingId(power.id);
+    setMessage(null);
     try {
       await api.delete(`/admin/powers/${power.id}`);
+      setConfirmDelete(null);
+      setPowers((current) => current.filter((item) => item.id !== power.id));
+      if (editingId === power.id) reset();
       setMessage({ type: 'success', text: 'Magia/poder deletado.' });
       await load();
     } catch (err) {
-      setMessage({ type: 'error', text: err?.response?.data?.message || 'Não foi possível deletar.' });
+      setMessage({ type: 'error', text: err?.response?.data?.message || 'Nao foi possivel deletar.' });
+    } finally {
+      setDeletingId('');
     }
   }
 
@@ -135,7 +143,7 @@ export default function AdminPowerLibraryPage() {
               adminActions={(
                 <>
                   <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => startEdit(power)}><Edit size={15} /> Editar</Button>
-                  <Button type="button" variant="ghost" className="w-full text-red-200 sm:w-auto" onClick={() => remove(power)}><Trash2 size={15} /> Deletar</Button>
+                  <Button type="button" variant="ghost" className="w-full text-red-200 sm:w-auto" onClick={() => setConfirmDelete(power)}><Trash2 size={15} /> Deletar</Button>
                 </>
               )}
             />
@@ -143,6 +151,14 @@ export default function AdminPowerLibraryPage() {
           {!powers.length && <p className="rounded-md border border-dashed border-ember/20 p-6 text-center text-mist">Nenhum item cadastrado.</p>}
         </div>
       </section>
+      {confirmDelete && (
+        <ConfirmDialog
+          title={`Deletar ${confirmDelete.name}?`}
+          loading={deletingId === confirmDelete.id}
+          onCancel={() => setConfirmDelete(null)}
+          onConfirm={() => remove(confirmDelete)}
+        />
+      )}
     </div>
   );
 }
@@ -153,5 +169,20 @@ function NumberField({ label, value, onChange }) {
       {label}
       <input type="number" min="0" className="mt-1 w-full rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={value ?? 0} onChange={(event) => onChange(Number(event.target.value) || 0)} />
     </label>
+  );
+}
+
+function ConfirmDialog({ title, onCancel, onConfirm, loading = false }) {
+  return (
+    <div className="fixed inset-0 z-40 grid place-items-center bg-black/75 p-4">
+      <section className="gothic-panel max-h-[90vh] w-full max-w-md overflow-auto rounded-md p-4 sm:p-6">
+        <h2 className="font-display text-3xl text-ember">{title}</h2>
+        <p className="mt-3 text-sm leading-relaxed text-mist">Tem certeza que deseja deletar este item? Essa acao nao podera ser desfeita.</p>
+        <div className="mt-6 grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
+          <Button type="button" variant="ghost" disabled={loading} className="w-full sm:w-auto" onClick={onCancel}>Cancelar</Button>
+          <Button type="button" disabled={loading} className="w-full border-red-500/70 bg-red-900/70 hover:bg-red-800 sm:w-auto" onClick={onConfirm}>{loading ? 'Deletando...' : 'Deletar'}</Button>
+        </div>
+      </section>
+    </div>
   );
 }

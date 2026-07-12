@@ -5,12 +5,19 @@ import {
   createLocalCatalogItem,
   createLocalMonster,
   createLocalMonsterAttack,
+  createLocalPower,
   deleteLocalCatalogItem,
+  deleteLocalFeedback,
   deleteLocalMonster,
   deleteLocalMonsterAttack,
+  deleteLocalPower,
+  getLocalFeedback,
+  listLocalFeedbacks,
   updateLocalCatalogItem,
+  updateLocalFeedback,
   updateLocalMonster,
-  updateLocalMonsterAttack
+  updateLocalMonsterAttack,
+  updateLocalPower
 } from '../db/localStore.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { parseDiceFormula } from '../utils/rules.js';
@@ -213,6 +220,22 @@ function feedbackSelect(extra = '') {
   `;
 }
 
+async function deleteRecord({ sql, params, notFoundMessage, localDelete }) {
+  const result = await tryQuery(sql, params);
+  if (result) {
+    if (!result.rowCount) {
+      return { status: 404, body: { success: false, message: notFoundMessage } };
+    }
+    return { status: 200, body: { success: true, message: 'Item excluido com sucesso.' } };
+  }
+
+  const deleted = await localDelete?.();
+  if (!deleted) {
+    return { status: 404, body: { success: false, message: notFoundMessage } };
+  }
+  return { status: 200, body: { success: true, message: 'Item excluido com sucesso.' } };
+}
+
 function parseFeedbackFilters(query) {
   const filters = [];
   const params = [];
@@ -246,18 +269,19 @@ router.get('/feedbacks', async (req, res) => {
      limit 250`,
     params
   );
-  res.json(result?.rows || []);
+  res.json(result?.rows || await listLocalFeedbacks(req.query));
 });
 
 router.get('/feedbacks/:id', async (req, res) => {
   const result = await tryQuery(`${feedbackSelect('where f.id = $1')}`, [req.params.id]);
-  if (!result?.rowCount) return res.status(404).json({ message: 'Feedback não encontrado.' });
-  res.json(result.rows[0]);
+  const feedback = result?.rows?.[0] || await getLocalFeedback(req.params.id);
+  if (!feedback) return res.status(404).json({ message: 'Feedback nao encontrado.' });
+  res.json(feedback);
 });
 
 router.put('/feedbacks/:id/status', async (req, res) => {
   const parsed = feedbackStatusSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Status inválido.' });
+  if (!parsed.success) return res.status(400).json({ message: 'Status invalido.' });
   const result = await tryQuery(
     `update feedbacks
      set status=$1, updated_at=now()
@@ -265,13 +289,14 @@ router.put('/feedbacks/:id/status', async (req, res) => {
      returning *`,
     [parsed.data.status, req.params.id]
   );
-  if (!result?.rowCount) return res.status(404).json({ message: 'Feedback não encontrado.' });
-  res.json(result.rows[0]);
+  const feedback = result?.rows?.[0] || await updateLocalFeedback(req.params.id, { status: parsed.data.status });
+  if (!feedback) return res.status(404).json({ message: 'Feedback nao encontrado.' });
+  res.json(feedback);
 });
 
 router.put('/feedbacks/:id/response', async (req, res) => {
   const parsed = feedbackResponseSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ message: 'Resposta inválida.' });
+  if (!parsed.success) return res.status(400).json({ message: 'Resposta invalida.' });
   const response = parsed.data.adminResponse || '';
   const result = await tryQuery(
     `update feedbacks
@@ -283,14 +308,23 @@ router.put('/feedbacks/:id/response', async (req, res) => {
      returning *`,
     [response, req.user.id, req.params.id]
   );
-  if (!result?.rowCount) return res.status(404).json({ message: 'Feedback não encontrado.' });
-  res.json(result.rows[0]);
+  const feedback = result?.rows?.[0] || await updateLocalFeedback(req.params.id, {
+    admin_response: response,
+    admin_id: response ? req.user.id : null,
+    responded_at: response ? new Date().toISOString() : null
+  });
+  if (!feedback) return res.status(404).json({ message: 'Feedback nao encontrado.' });
+  res.json(feedback);
 });
 
 router.delete('/feedbacks/:id', async (req, res) => {
-  const result = await tryQuery('delete from feedbacks where id=$1', [req.params.id]);
-  if (result && !result.rowCount) return res.status(404).json({ message: 'Feedback não encontrado.' });
-  res.status(204).end();
+  const deleted = await deleteRecord({
+    sql: 'delete from feedbacks where id=$1',
+    params: [req.params.id],
+    notFoundMessage: 'Feedback nao encontrado ou ja excluido.',
+    localDelete: () => deleteLocalFeedback(req.params.id)
+  });
+  res.status(deleted.status).json(deleted.body);
 });
 
 router.post('/races', async (req, res) => {
@@ -308,9 +342,13 @@ router.put('/races/:id', async (req, res) => {
 });
 
 router.delete('/races/:id', async (req, res) => {
-  const result = await tryQuery('delete from races where id=$1', [req.params.id]);
-  if (!result) await deleteLocalCatalogItem('races', req.params.id);
-  res.status(204).end();
+  const deleted = await deleteRecord({
+    sql: 'delete from races where id=$1',
+    params: [req.params.id],
+    notFoundMessage: 'Raca nao encontrada ou ja excluida.',
+    localDelete: () => deleteLocalCatalogItem('races', req.params.id)
+  });
+  res.status(deleted.status).json(deleted.body);
 });
 
 router.post('/classes', async (req, res) => {
@@ -328,9 +366,13 @@ router.put('/classes/:id', async (req, res) => {
 });
 
 router.delete('/classes/:id', async (req, res) => {
-  const result = await tryQuery('delete from classes where id=$1', [req.params.id]);
-  if (!result) await deleteLocalCatalogItem('classes', req.params.id);
-  res.status(204).end();
+  const deleted = await deleteRecord({
+    sql: 'delete from classes where id=$1',
+    params: [req.params.id],
+    notFoundMessage: 'Classe nao encontrada ou ja excluida.',
+    localDelete: () => deleteLocalCatalogItem('classes', req.params.id)
+  });
+  res.status(deleted.status).json(deleted.body);
 });
 
 router.post('/origins', async (req, res) => {
@@ -348,9 +390,13 @@ router.put('/origins/:id', async (req, res) => {
 });
 
 router.delete('/origins/:id', async (req, res) => {
-  const result = await tryQuery('delete from origins where id=$1', [req.params.id]);
-  if (!result) await deleteLocalCatalogItem('origins', req.params.id);
-  res.status(204).end();
+  const deleted = await deleteRecord({
+    sql: 'delete from origins where id=$1',
+    params: [req.params.id],
+    notFoundMessage: 'Origem nao encontrada ou ja excluida.',
+    localDelete: () => deleteLocalCatalogItem('origins', req.params.id)
+  });
+  res.status(deleted.status).json(deleted.body);
 });
 
 router.post('/skills', async (req, res) => {
@@ -366,9 +412,13 @@ router.put('/skills/:id', async (req, res) => {
 });
 
 router.delete('/skills/:id', async (req, res) => {
-  const result = await tryQuery('delete from skills where id=$1', [req.params.id]);
-  if (!result) await deleteLocalCatalogItem('skills', req.params.id);
-  res.status(204).end();
+  const deleted = await deleteRecord({
+    sql: 'delete from skills where id=$1',
+    params: [req.params.id],
+    notFoundMessage: 'Pericia nao encontrada ou ja excluida.',
+    localDelete: () => deleteLocalCatalogItem('skills', req.params.id)
+  });
+  res.status(deleted.status).json(deleted.body);
 });
 
 router.post('/monsters', async (req, res) => {
@@ -424,9 +474,13 @@ router.put('/monsters/:id', async (req, res) => {
 });
 
 router.delete('/monsters/:id', async (req, res) => {
-  const result = await tryQuery('delete from monsters where id=$1', [req.params.id]);
-  if (!result) await deleteLocalMonster(req.params.id);
-  res.status(204).end();
+  const deleted = await deleteRecord({
+    sql: 'delete from monsters where id=$1',
+    params: [req.params.id],
+    notFoundMessage: 'Monstro nao encontrado ou ja excluido.',
+    localDelete: () => deleteLocalMonster(req.params.id)
+  });
+  res.status(deleted.status).json(deleted.body);
 });
 
 router.post('/monsters/:id/attacks', async (req, res) => {
@@ -452,9 +506,13 @@ router.put('/monster-attacks/:attackId', async (req, res) => {
 });
 
 router.delete('/monster-attacks/:attackId', async (req, res) => {
-  const result = await tryQuery('delete from monster_attacks where id=$1', [req.params.attackId]);
-  if (!result) await deleteLocalMonsterAttack(req.params.attackId);
-  res.status(204).end();
+  const deleted = await deleteRecord({
+    sql: 'delete from monster_attacks where id=$1',
+    params: [req.params.attackId],
+    notFoundMessage: 'Ataque nao encontrado ou ja excluido.',
+    localDelete: () => deleteLocalMonsterAttack(req.params.attackId)
+  });
+  res.status(deleted.status).json(deleted.body);
 });
 
 router.post('/powers', async (req, res) => {
@@ -465,7 +523,7 @@ router.post('/powers', async (req, res) => {
      returning *`,
     [payload.name, payload.type, payload.element, payload.description, payload.mana_cost, payload.damage_formula, payload.range, payload.duration, payload.requirement, payload.recommended_class, payload.recommended_level, payload.image_url]
   );
-  res.status(201).json(result.rows[0]);
+  res.status(201).json(result?.rows?.[0] || await createLocalPower(payload));
 });
 
 router.put('/powers/:id', async (req, res) => {
@@ -478,14 +536,19 @@ router.put('/powers/:id', async (req, res) => {
      returning *`,
     [payload.name, payload.type, payload.element, payload.description, payload.mana_cost, payload.damage_formula, payload.range, payload.duration, payload.requirement, payload.recommended_class, payload.recommended_level, payload.image_url, req.params.id]
   );
-  if (!result.rowCount) return res.status(404).json({ message: 'Poder ou magia não encontrado.' });
-  res.json(result.rows[0]);
+  const power = result?.rows?.[0] || await updateLocalPower(req.params.id, payload);
+  if (!power) return res.status(404).json({ message: 'Poder ou magia nao encontrado.' });
+  res.json(power);
 });
 
 router.delete('/powers/:id', async (req, res) => {
-  const result = await tryQuery('delete from power_library where id=$1', [req.params.id]);
-  if (result && !result.rowCount) return res.status(404).json({ message: 'Poder ou magia não encontrado.' });
-  res.status(204).end();
+  const deleted = await deleteRecord({
+    sql: 'delete from power_library where id=$1',
+    params: [req.params.id],
+    notFoundMessage: 'Poder ou magia nao encontrado ou ja excluido.',
+    localDelete: () => deleteLocalPower(req.params.id)
+  });
+  res.status(deleted.status).json(deleted.body);
 });
 
 export default router;

@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { query } from '../db/pool.js';
+import { tryQuery } from '../db/pool.js';
+import { getLocalPower, listLocalPowers } from '../db/localStore.js';
 import { requireAuth } from '../middleware/auth.js';
 
 const router = Router();
@@ -38,20 +39,35 @@ function filters(req) {
 
 router.get('/', async (req, res) => {
   const { params, sql } = filters(req);
-  const result = await query(
+  const result = await tryQuery(
     `select *
      from power_library
      ${sql}
      order by type, element nulls last, recommended_level, name`,
     params
   );
-  res.json(result.rows);
+  let rows = result?.rows || await listLocalPowers();
+  if (!result) {
+    const search = String(req.query.search || '').trim().toLowerCase();
+    const type = String(req.query.type || '').trim();
+    const element = String(req.query.element || '').trim();
+    const recommendedClass = String(req.query.class || '').trim().toLowerCase();
+    rows = rows.filter((power) => {
+      if (search && !`${power.name || ''} ${power.description || ''}`.toLowerCase().includes(search)) return false;
+      if (type && power.type !== type) return false;
+      if (element && power.element !== element) return false;
+      if (recommendedClass && !String(power.recommended_class || '').toLowerCase().includes(recommendedClass)) return false;
+      return true;
+    });
+  }
+  res.json(rows);
 });
 
 router.get('/:id', async (req, res) => {
-  const result = await query('select * from power_library where id = $1', [req.params.id]);
-  if (!result.rowCount) return res.status(404).json({ message: 'Poder ou magia não encontrado.' });
-  res.json(result.rows[0]);
+  const result = await tryQuery('select * from power_library where id = $1', [req.params.id]);
+  const power = result?.rows?.[0] || await getLocalPower(req.params.id);
+  if (!power) return res.status(404).json({ message: 'Poder ou magia nao encontrado.' });
+  res.json(power);
 });
 
 export default router;

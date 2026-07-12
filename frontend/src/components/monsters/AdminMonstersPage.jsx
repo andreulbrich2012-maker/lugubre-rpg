@@ -13,6 +13,7 @@ export default function AdminMonstersPage() {
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [deletingId, setDeletingId] = useState('');
 
   async function load() {
     const { data } = await api.get('/monsters');
@@ -45,9 +46,12 @@ export default function AdminMonstersPage() {
   }
 
   async function removeMonster(monster) {
+    setDeletingId(monster.id);
+    setMessage(null);
     try {
       await api.delete(`/admin/monsters/${monster.id}`);
       setConfirmDelete(null);
+      setMonsters((current) => current.filter((item) => item.id !== monster.id));
       setMessage({ type: 'success', text: 'Monstro deletado com sucesso.' });
       if (editingId === monster.id) {
         setEditingId('');
@@ -55,7 +59,9 @@ export default function AdminMonstersPage() {
       }
       await load();
     } catch (err) {
-      setMessage({ type: 'error', text: err?.response?.data?.message || 'Não foi possível deletar o monstro.' });
+      setMessage({ type: 'error', text: err?.response?.data?.message || 'Nao foi possivel deletar o monstro.' });
+    } finally {
+      setDeletingId('');
     }
   }
 
@@ -112,6 +118,7 @@ export default function AdminMonstersPage() {
         <ConfirmDialog
           title={`Deletar ${confirmDelete.name}?`}
           onCancel={() => setConfirmDelete(null)}
+          loading={deletingId === confirmDelete.id}
           onConfirm={() => removeMonster(confirmDelete)}
         />
       )}
@@ -119,15 +126,15 @@ export default function AdminMonstersPage() {
   );
 }
 
-function ConfirmDialog({ title, onCancel, onConfirm }) {
+function ConfirmDialog({ title, onCancel, onConfirm, loading = false }) {
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/75 p-4">
       <section className="gothic-panel max-h-[90vh] w-full max-w-md overflow-auto rounded-md p-4 sm:p-6">
         <h2 className="font-display text-3xl text-ember">{title}</h2>
         <p className="mt-3 text-sm leading-relaxed text-mist">Tem certeza que deseja deletar este item? Essa ação não poderá ser desfeita.</p>
         <div className="mt-6 grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
-          <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={onCancel}>Cancelar</Button>
-          <Button type="button" className="w-full border-red-500/70 bg-red-900/70 hover:bg-red-800 sm:w-auto" onClick={onConfirm}>Deletar</Button>
+          <Button type="button" variant="ghost" disabled={loading} className="w-full sm:w-auto" onClick={onCancel}>Cancelar</Button>
+          <Button type="button" disabled={loading} className="w-full border-red-500/70 bg-red-900/70 hover:bg-red-800 sm:w-auto" onClick={onConfirm}>{loading ? 'Deletando...' : 'Deletar'}</Button>
         </div>
       </section>
     </div>

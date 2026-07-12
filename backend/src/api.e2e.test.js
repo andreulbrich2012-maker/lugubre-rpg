@@ -25,6 +25,22 @@ async function loginAdmin() {
   return body.token;
 }
 
+async function expectAdminDelete(path, token) {
+  const deleted = await request(app)
+    .delete(path)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+
+  expect(deleted.body).toMatchObject({ success: true });
+
+  const missing = await request(app)
+    .delete(path)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(404);
+
+  expect(missing.body).toMatchObject({ success: false });
+}
+
 describe('fluxo principal da API', () => {
   it('autentica os perfis seed admin e demo', async () => {
     const admin = await request(app)
@@ -218,6 +234,20 @@ describe('fluxo principal da API', () => {
       .send({ name: `Origem ${stamp}`, description: 'Teste', skillModifiers: { [skill.body.key]: 5 } })
       .expect(201);
 
+    const libraryPower = await request(app)
+      .post('/api/admin/powers')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        name: `Magia Admin ${stamp}`,
+        type: 'magia',
+        element: 'Hemera',
+        description: 'Magia temporaria para teste de delete.',
+        manaCost: 2,
+        damageFormula: '1d6+1',
+        recommendedLevel: 1
+      })
+      .expect(201);
+
     const user = await request(app)
       .post('/api/auth/register')
       .send({ name: 'Jogador Teste', email: `jogador-${stamp}@lugubre.local`, password: 'adm123' })
@@ -299,6 +329,17 @@ describe('fluxo principal da API', () => {
       .send({ email: `jogador-editado-${stamp}@lugubre.local`, password: 'nova123' })
       .expect(200);
     token = loginAfterPasswordChange.body.token;
+
+    const feedback = await request(app)
+      .post('/api/feedbacks')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: `Feedback delete ${stamp}`,
+        type: 'Bug',
+        description: 'Feedback temporario criado para testar delete real.',
+        priority: 'Baixa'
+      })
+      .expect(201);
 
     const expectedRaceAttributes = {
       Humano: { forca: 2, agilidade: 2, presenca: 2, intelecto: 2, vigor: 2 },
@@ -668,20 +709,20 @@ describe('fluxo principal da API', () => {
     expect(monsterRoll.body.bonus).toBe(3);
     expect(monsterRoll.body.total).toBe(monsterRoll.body.rolls.reduce((sum, value) => sum + value, 0) + 3);
 
-    await request(app)
-      .delete(`/api/admin/monster-attacks/${editedAttack.body.id}`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .expect(204);
+    await expectAdminDelete(`/api/admin/monster-attacks/${editedAttack.body.id}`, adminToken);
 
-    await request(app)
-      .delete(`/api/admin/monsters/${monster.body.id}`)
-      .set('Authorization', `Bearer ${adminToken}`)
-      .expect(204);
+    await expectAdminDelete(`/api/admin/monsters/${monster.body.id}`, adminToken);
 
     await request(app)
       .get(`/api/monsters/${monster.body.id}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(404);
+
+    const monstersAfterDelete = await request(app)
+      .get('/api/monsters')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(monstersAfterDelete.body.some((item) => item.id === monster.body.id)).toBe(false);
 
     await request(app)
       .delete(`/api/characters/${character.body.id}/powers/spells/${spellId}`)
@@ -756,6 +797,28 @@ describe('fluxo principal da API', () => {
       .delete(`/api/characters/${character.body.id}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(204);
+
+    await expectAdminDelete(`/api/admin/races/${editedRace.body.id}`, adminToken);
+    await expectAdminDelete(`/api/admin/classes/${klass.body.id}`, adminToken);
+    await expectAdminDelete(`/api/admin/origins/${origin.body.id}`, adminToken);
+    await expectAdminDelete(`/api/admin/skills/${skill.body.id}`, adminToken);
+    await expectAdminDelete(`/api/admin/powers/${libraryPower.body.id}`, adminToken);
+    await expectAdminDelete(`/api/admin/feedbacks/${feedback.body.feedback.id}`, adminToken);
+
+    const catalogAfterDelete = await Promise.all([
+      request(app).get('/api/catalog/races').expect(200),
+      request(app).get('/api/catalog/classes').expect(200),
+      request(app).get('/api/catalog/origins').expect(200),
+      request(app).get('/api/catalog/skills').expect(200),
+      request(app).get('/api/powers').set('Authorization', `Bearer ${token}`).expect(200),
+      request(app).get('/api/admin/feedbacks').set('Authorization', `Bearer ${adminToken}`).expect(200)
+    ]);
+    expect(catalogAfterDelete[0].body.some((item) => item.id === editedRace.body.id)).toBe(false);
+    expect(catalogAfterDelete[1].body.some((item) => item.id === klass.body.id)).toBe(false);
+    expect(catalogAfterDelete[2].body.some((item) => item.id === origin.body.id)).toBe(false);
+    expect(catalogAfterDelete[3].body.some((item) => item.id === skill.body.id)).toBe(false);
+    expect(catalogAfterDelete[4].body.some((item) => item.id === libraryPower.body.id)).toBe(false);
+    expect(catalogAfterDelete[5].body.some((item) => item.id === feedback.body.feedback.id)).toBe(false);
 
     await request(app)
       .delete(`/api/campaigns/${campaign.body.id}`)

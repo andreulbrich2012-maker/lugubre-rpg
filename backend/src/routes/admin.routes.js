@@ -19,6 +19,15 @@ import { feedbackPriorities, feedbackStatuses, feedbackTypes } from './feedback.
 const router = Router();
 router.use(requireAuth, requireRole('admin'));
 
+function asyncRoute(handler) {
+  return (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
+}
+
+for (const method of ['get', 'post', 'put', 'delete', 'patch']) {
+  const original = router[method].bind(router);
+  router[method] = (...args) => original(...args.map((arg) => (typeof arg === 'function' ? asyncRoute(arg) : arg)));
+}
+
 const monsterCategories = ['Caos', 'Gaia', 'Ponto', 'Érebo', 'Nix', 'Tártaro', 'Éter', 'Ananque'];
 
 const raceSchema = z.object({

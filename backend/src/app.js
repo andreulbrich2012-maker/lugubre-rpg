@@ -32,6 +32,18 @@ export function createApp() {
 
   app.use((err, req, res, next) => {
     console.error(err);
+    if (err?.issues) {
+      return res.status(400).json({
+        message: 'Verifique os campos enviados.',
+        issues: err.issues.map((issue) => issue.message)
+      });
+    }
+    if (err?.code === '23503') {
+      return res.status(409).json({ message: 'Este item está sendo usado e não pode ser excluído.' });
+    }
+    if (err?.code === '23505') {
+      return res.status(409).json({ message: 'Já existe um item cadastrado com estes dados.' });
+    }
     res.status(500).json({ message: 'Erro interno.' });
   });
 

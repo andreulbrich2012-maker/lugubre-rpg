@@ -103,7 +103,7 @@ export default function AdminMonstersPage() {
                     <Button type="button" variant="ghost" className="w-full px-3 py-1.5 text-sm sm:w-auto" onClick={() => editMonster(monster)}>
                       <span className="inline-flex items-center gap-2"><Edit size={15} /> Editar</span>
                     </Button>
-                    <Button type="button" variant="ghost" className="w-full px-3 py-1.5 text-sm text-red-200 sm:w-auto" onClick={() => setConfirmDelete(monster)}>
+                    <Button type="button" variant="ghost" data-admin-delete-id={monster.id} data-admin-delete-endpoint="monsters" className="w-full px-3 py-1.5 text-sm text-red-200 sm:w-auto" onClick={() => setConfirmDelete(monster)}>
                       <span className="inline-flex items-center gap-2"><Trash2 size={15} /> Deletar</span>
                     </Button>
                   </div>

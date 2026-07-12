@@ -143,7 +143,7 @@ export default function AdminPowerLibraryPage() {
               adminActions={(
                 <>
                   <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => startEdit(power)}><Edit size={15} /> Editar</Button>
-                  <Button type="button" variant="ghost" className="w-full text-red-200 sm:w-auto" onClick={() => setConfirmDelete(power)}><Trash2 size={15} /> Deletar</Button>
+                  <Button type="button" variant="ghost" data-admin-delete-id={power.id} data-admin-delete-endpoint="powers" className="w-full text-red-200 sm:w-auto" onClick={() => setConfirmDelete(power)}><Trash2 size={15} /> Deletar</Button>
                 </>
               )}
             />

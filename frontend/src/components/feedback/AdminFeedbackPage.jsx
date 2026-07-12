@@ -128,7 +128,7 @@ export default function AdminFeedbackPage() {
                 <p className="mt-3 line-clamp-2 text-sm text-mist">{feedback.description}</p>
                 <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
                   <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => openDetails(feedback)}><Edit size={15} /> Detalhes</Button>
-                  <Button type="button" variant="ghost" className="w-full text-red-200 sm:w-auto" onClick={() => setConfirmDelete(feedback)}><Trash2 size={15} /> Deletar</Button>
+                  <Button type="button" variant="ghost" data-admin-delete-id={feedback.id} data-admin-delete-endpoint="feedbacks" className="w-full text-red-200 sm:w-auto" onClick={() => setConfirmDelete(feedback)}><Trash2 size={15} /> Deletar</Button>
                 </div>
               </article>
             ))}
@@ -239,7 +239,7 @@ function AdminFeedbackDetails({ feedback, onClose, onStatus, onResponse, onDelet
               <LoadingButton loading={savingResponse} loadingText="Salvando..." className="mt-3 min-h-11 w-full">Salvar resposta</LoadingButton>
             </form>
 
-            <Button type="button" variant="ghost" className="min-h-11 w-full text-red-200" onClick={() => onDelete(feedback)}><Trash2 size={15} /> Deletar feedback</Button>
+            <Button type="button" variant="ghost" data-admin-delete-id={feedback.id} data-admin-delete-endpoint="feedbacks" className="min-h-11 w-full text-red-200" onClick={() => onDelete(feedback)}><Trash2 size={15} /> Deletar feedback</Button>
           </div>
         </div>
       </section>

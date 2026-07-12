@@ -311,7 +311,7 @@ function List({ items, endpoint, onEdit, onRemove }) {
               <Button type="button" variant="ghost" className="w-full px-3 py-1.5 text-xs sm:w-auto" onClick={() => onEdit(item)}>
                 <span className="inline-flex items-center gap-1"><Edit size={13} /> Editar</span>
               </Button>
-              <Button type="button" variant="ghost" className="w-full px-3 py-1.5 text-xs text-red-200 sm:w-auto" onClick={() => onRemove(endpoint, item)}>
+              <Button type="button" variant="ghost" data-admin-delete-id={item.id} data-admin-delete-endpoint={endpoint} className="w-full px-3 py-1.5 text-xs text-red-200 sm:w-auto" onClick={() => onRemove(endpoint, item)}>
                 <span className="inline-flex items-center gap-1"><Trash2 size={13} /> Deletar</span>
               </Button>
             </span>

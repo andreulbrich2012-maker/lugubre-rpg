@@ -14,6 +14,7 @@ import {
 } from '../db/localStore.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { parseDiceFormula } from '../utils/rules.js';
+import { feedbackPriorities, feedbackStatuses, feedbackTypes } from './feedback.routes.js';
 
 const router = Router();
 router.use(requireAuth, requireRole('admin'));
@@ -81,6 +82,12 @@ const powerLibrarySchema = z.object({
   recommendedClass: z.string().optional().default(''),
   recommendedLevel: z.coerce.number().min(1).max(20).default(1),
   imageUrl: z.string().optional().default('')
+});
+const feedbackStatusSchema = z.object({
+  status: z.enum(feedbackStatuses)
+});
+const feedbackResponseSchema = z.object({
+  adminResponse: z.string().trim().max(8000).optional().default('')
 });
 
 function toJson(value) {
@@ -183,6 +190,99 @@ function powerPayload(body) {
     image_url: parsed.imageUrl || ''
   };
 }
+
+function feedbackSelect(extra = '') {
+  return `
+    select f.*,
+           u.name as user_name,
+           u.email as user_email,
+           admin.name as admin_name
+    from feedbacks f
+    join users u on u.id = f.user_id
+    left join users admin on admin.id = f.admin_id
+    ${extra}
+  `;
+}
+
+function parseFeedbackFilters(query) {
+  const filters = [];
+  const params = [];
+  if (feedbackTypes.includes(query.type)) {
+    params.push(query.type);
+    filters.push(`f.type = $${params.length}`);
+  }
+  if (feedbackPriorities.includes(query.priority)) {
+    params.push(query.priority);
+    filters.push(`f.priority = $${params.length}`);
+  }
+  if (feedbackStatuses.includes(query.status)) {
+    params.push(query.status);
+    filters.push(`f.status = $${params.length}`);
+  }
+  if (String(query.search || '').trim()) {
+    params.push(`%${String(query.search).trim()}%`);
+    filters.push(`(f.title ilike $${params.length} or u.name ilike $${params.length} or u.email ilike $${params.length})`);
+  }
+  return {
+    where: filters.length ? `where ${filters.join(' and ')}` : '',
+    params
+  };
+}
+
+router.get('/feedbacks', async (req, res) => {
+  const { where, params } = parseFeedbackFilters(req.query);
+  const result = await tryQuery(
+    `${feedbackSelect(where)}
+     order by f.created_at desc
+     limit 250`,
+    params
+  );
+  res.json(result?.rows || []);
+});
+
+router.get('/feedbacks/:id', async (req, res) => {
+  const result = await tryQuery(`${feedbackSelect('where f.id = $1')}`, [req.params.id]);
+  if (!result?.rowCount) return res.status(404).json({ message: 'Feedback não encontrado.' });
+  res.json(result.rows[0]);
+});
+
+router.put('/feedbacks/:id/status', async (req, res) => {
+  const parsed = feedbackStatusSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Status inválido.' });
+  const result = await tryQuery(
+    `update feedbacks
+     set status=$1, updated_at=now()
+     where id=$2
+     returning *`,
+    [parsed.data.status, req.params.id]
+  );
+  if (!result?.rowCount) return res.status(404).json({ message: 'Feedback não encontrado.' });
+  res.json(result.rows[0]);
+});
+
+router.put('/feedbacks/:id/response', async (req, res) => {
+  const parsed = feedbackResponseSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Resposta inválida.' });
+  const response = parsed.data.adminResponse || '';
+  const result = await tryQuery(
+    `update feedbacks
+     set admin_response=$1,
+         admin_id=$2,
+         responded_at=case when $1 = '' then null else now() end,
+         updated_at=now()
+     where id=$3
+     returning *`,
+    [response, req.user.id, req.params.id]
+  );
+  if (!result?.rowCount) return res.status(404).json({ message: 'Feedback não encontrado.' });
+  res.json(result.rows[0]);
+});
+
+router.delete('/feedbacks/:id', async (req, res) => {
+  const result = await tryQuery('delete from feedbacks where id=$1', [req.params.id]);
+  if (result && !result.rowCount) return res.status(404).json({ message: 'Feedback não encontrado.' });
+  res.status(204).end();
+});
 
 router.post('/races', async (req, res) => {
   const body = raceSchema.parse(req.body);

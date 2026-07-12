@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { BookOpen, Camera, Eye, EyeOff, LayoutDashboard, Menu, MessageCircle, Palette, ScrollText, Settings, Shield, Skull, Swords, Trash2, Users, X } from 'lucide-react';
+import { BookOpen, Camera, Eye, EyeOff, LayoutDashboard, Menu, MessageCircle, MessageSquareText, Palette, ScrollText, Settings, Shield, Skull, Swords, Trash2, Users, X } from 'lucide-react';
 import Alert from '../components/Alert';
 import Avatar from '../components/Avatar';
 import Button from '../components/Button';
@@ -9,6 +9,7 @@ import UserMenu from '../components/UserMenu';
 import { api } from '../lib/api';
 import { MonstersTab } from './Monsters';
 import { useAuth } from '../store/authStore';
+import FeedbackPanel from '../components/feedback/FeedbackPanel';
 
 const tabs = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -16,6 +17,7 @@ const tabs = [
   { id: 'campaigns', label: 'Campanhas', icon: Swords },
   { id: 'friends', label: 'Amigos', icon: Users },
   { id: 'monsters', label: 'Monstros', icon: Skull },
+  { id: 'feedback', label: 'Feedback', icon: MessageSquareText },
   { id: 'settings', label: 'Configuracoes', icon: Settings },
   { id: 'personalization', label: 'Personalizacao', icon: Palette }
 ];
@@ -117,6 +119,7 @@ export default function Dashboard() {
             {active === 'campaigns' && <CampaignsTab campaigns={campaigns} onReload={load} />}
             {active === 'friends' && <FriendsTab />}
             {active === 'monsters' && <MonstersTab />}
+            {active === 'feedback' && <FeedbackPanel />}
             {active === 'settings' && <SettingsTab />}
             {active === 'personalization' && <PersonalizationTab />}
           </>
@@ -157,7 +160,7 @@ function DashboardTab({ summary, user }) {
           <Metric label="Campanhas" value={summary?.campaigns_count || 0} />
         </div>
       </section>
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Link to="/characters/new" className="gothic-panel soft-motion rounded-md p-5">
           <h3 className="font-display text-2xl text-white">Criar personagem</h3>
           <p className="mt-2 text-sm text-mist">Comece uma nova ficha com raça, classe, origem e inventário.</p>
@@ -170,6 +173,11 @@ function DashboardTab({ summary, user }) {
           <BookOpen className="mb-3 text-ember" size={24} />
           <h3 className="font-display text-2xl text-white">Biblioteca</h3>
           <p className="mt-2 text-sm text-mist">Busque magias e poderes e adicione direto na ficha.</p>
+        </Link>
+        <Link to="/feedback" className="gothic-panel soft-motion rounded-md p-5">
+          <MessageSquareText className="mb-3 text-ember" size={24} />
+          <h3 className="font-display text-2xl text-white">Feedback</h3>
+          <p className="mt-2 text-sm text-mist">Envie bugs, ideias e sugestões para melhorar o sistema.</p>
         </Link>
       </section>
     </div>

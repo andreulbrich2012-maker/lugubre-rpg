@@ -3,6 +3,7 @@ import { Edit, Trash2 } from 'lucide-react';
 import Alert from '../components/Alert';
 import Button from '../components/Button';
 import AdminPowerLibraryPage from '../components/admin/AdminPowerLibraryPage';
+import AdminFeedbackPage from '../components/feedback/AdminFeedbackPage';
 import AdminMonstersPage from '../components/monsters/AdminMonstersPage';
 import { api } from '../lib/api';
 
@@ -107,10 +108,11 @@ export default function Admin() {
     <main className="mx-auto max-w-7xl px-3 pb-24 pt-6 sm:px-4 sm:py-10">
       <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <h1 className="font-display text-4xl text-ember">Administração</h1>
-        <div className="grid grid-cols-3 rounded-md border border-ember/15 bg-black/25 p-1 sm:flex">
+        <div className="grid grid-cols-2 rounded-md border border-ember/15 bg-black/25 p-1 sm:flex">
           <button type="button" className={`min-h-10 rounded px-3 py-2 text-sm ${adminSection === 'catalogs' ? 'bg-ember/15 text-white' : 'text-mist hover:text-white'}`} onClick={() => setAdminSection('catalogs')}>Catálogos</button>
           <button type="button" className={`min-h-10 rounded px-3 py-2 text-sm ${adminSection === 'monsters' ? 'bg-ember/15 text-white' : 'text-mist hover:text-white'}`} onClick={() => setAdminSection('monsters')}>Monstros</button>
           <button type="button" className={`min-h-10 rounded px-3 py-2 text-sm ${adminSection === 'powers' ? 'bg-ember/15 text-white' : 'text-mist hover:text-white'}`} onClick={() => setAdminSection('powers')}>Biblioteca</button>
+          <button type="button" className={`min-h-10 rounded px-3 py-2 text-sm ${adminSection === 'feedbacks' ? 'bg-ember/15 text-white' : 'text-mist hover:text-white'}`} onClick={() => setAdminSection('feedbacks')}>Feedback</button>
         </div>
       </div>
 
@@ -118,6 +120,8 @@ export default function Admin() {
         <div className="mt-8"><AdminMonstersPage /></div>
       ) : adminSection === 'powers' ? (
         <div className="mt-8"><AdminPowerLibraryPage /></div>
+      ) : adminSection === 'feedbacks' ? (
+        <div className="mt-8"><AdminFeedbackPage /></div>
       ) : (
         <>
       {message && <div className="mt-6"><Alert type={message.type}>{message.text}</Alert></div>}

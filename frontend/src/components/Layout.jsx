@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { BookOpen, Home, LogOut, Menu, MoreHorizontal, Palette, ScrollText, Settings, Shield, ShoppingBag, Skull, Swords, Users, X } from 'lucide-react';
+import { BookOpen, Home, LogOut, MessageSquareText, Menu, MoreHorizontal, Palette, ScrollText, Settings, Shield, ShoppingBag, Skull, Swords, Users, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../store/authStore';
 import Button from './Button';
@@ -15,6 +15,7 @@ export default function Layout({ children }) {
     { to: '/characters', label: 'Personagens' },
     { to: '/campaigns', label: 'Campanhas' },
     user && { to: '/powers', label: 'Biblioteca' },
+    user && { to: '/feedback', label: 'Feedback' },
     user && { to: '/monsters', label: 'Monstros' },
     user?.role === 'admin' && { to: '/admin', label: 'Admin' }
   ].filter(Boolean);
@@ -35,6 +36,7 @@ export default function Layout({ children }) {
     inCampaignRoom && { to: `${location.pathname}?tab=diary`, label: 'Diário', icon: ScrollText },
     inCampaignRoom && { to: `${location.pathname}?tab=shops`, label: 'Loja', icon: ShoppingBag },
     user && { to: '/powers', label: 'Biblioteca de Magias e Poderes', icon: BookOpen },
+    user && { to: '/feedback', label: 'Feedback', icon: MessageSquareText },
     user && { to: '/dashboard?tab=settings', label: 'Configurações', icon: Settings },
     user && { to: '/dashboard?tab=personalization', label: 'Personalização', icon: Palette },
     user?.role === 'admin' && { to: '/admin', label: 'Admin', icon: Shield }

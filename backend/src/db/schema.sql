@@ -289,6 +289,32 @@ create table if not exists friend_messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists feedbacks (
+  id uuid primary key default uuid_generate_v4(),
+  user_id uuid not null references users(id) on delete cascade,
+  title text not null,
+  type text not null check (type in ('Bug', 'Sugestão', 'Ideia', 'Melhoria visual', 'Problema no celular', 'Problema de conta/login', 'Problema em ficha', 'Problema em campanha', 'Outro')),
+  description text not null,
+  priority text not null default 'Média' check (priority in ('Baixa', 'Média', 'Alta', 'Urgente')),
+  status text not null default 'Enviado' check (status in ('Enviado', 'Em análise', 'Em desenvolvimento', 'Resolvido', 'Recusado')),
+  page_context text,
+  attachment_url text,
+  admin_response text,
+  admin_id uuid references users(id) on delete set null,
+  responded_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table feedbacks add column if not exists page_context text;
+alter table feedbacks add column if not exists attachment_url text;
+alter table feedbacks add column if not exists admin_response text;
+alter table feedbacks add column if not exists admin_id uuid references users(id) on delete set null;
+alter table feedbacks add column if not exists responded_at timestamptz;
+alter table feedbacks add column if not exists updated_at timestamptz not null default now();
+create index if not exists feedbacks_user_created_idx on feedbacks (user_id, created_at desc);
+create index if not exists feedbacks_admin_filters_idx on feedbacks (status, priority, type, created_at desc);
+
 create table if not exists monsters (
   id uuid primary key default uuid_generate_v4(),
   name text not null,

@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { BookOpen, Home, LogOut, Menu, MoreHorizontal, Palette, ScrollText, Settings, Shield, Skull, Swords, Users, X } from 'lucide-react';
+import { BookOpen, Home, LogOut, Menu, MoreHorizontal, Palette, ScrollText, Settings, Shield, ShoppingBag, Skull, Swords, Users, X } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../store/authStore';
 import Button from './Button';
@@ -8,6 +8,7 @@ export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const inCampaignRoom = /^\/campaigns\/[^/]+/.test(location.pathname);
   const links = [
     user && { to: '/dashboard', label: 'Dashboard' },
     { to: '/characters', label: 'Personagens' },
@@ -23,15 +24,22 @@ export default function Layout({ children }) {
     user && { to: '/monsters', label: 'Monstros', icon: Skull }
   ].filter(Boolean);
   const drawerLinks = [
+    user && { to: '/dashboard', label: 'Dashboard', icon: Home },
+    { to: '/characters', label: 'Personagens', icon: ScrollText },
+    { to: '/campaigns', label: 'Campanhas', icon: Swords },
     user && { to: '/dashboard?tab=friends', label: 'Amigos', icon: Users },
-    user && { to: '/powers', label: 'Biblioteca', icon: BookOpen },
+    user && { to: '/monsters', label: 'Monstros', icon: Skull },
+    inCampaignRoom && { to: `${location.pathname}?tab=diary`, label: 'Diário', icon: ScrollText },
+    inCampaignRoom && { to: `${location.pathname}?tab=shops`, label: 'Loja', icon: ShoppingBag },
+    user && { to: '/powers', label: 'Biblioteca de Magias e Poderes', icon: BookOpen },
     user && { to: '/dashboard?tab=settings', label: 'Configurações', icon: Settings },
     user && { to: '/dashboard?tab=personalization', label: 'Personalização', icon: Palette },
     user?.role === 'admin' && { to: '/admin', label: 'Admin', icon: Shield }
   ].filter(Boolean);
 
   function activePath(to) {
-    const path = to.split('?')[0];
+    const [path, search] = to.split('?');
+    if (search) return location.pathname === path && location.search === `?${search}`;
     return path === '/' ? location.pathname === '/' : location.pathname.startsWith(path);
   }
 
@@ -53,22 +61,40 @@ export default function Layout({ children }) {
           </div>
         </div>
         {open && (
-          <div className="fixed inset-x-3 bottom-24 z-40 rounded-md border border-ember/20 bg-abyss/95 px-3 py-3 shadow-2xl shadow-black/60 backdrop-blur md:hidden">
-            <div className="grid gap-2">
+          <div className="fixed inset-0 z-50 md:hidden">
+            <button type="button" aria-label="Fechar menu" className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setOpen(false)} />
+            <section role="dialog" aria-modal="true" aria-label="Menu mobile" className="absolute inset-x-0 bottom-0 max-h-[82vh] overflow-y-auto rounded-t-2xl border-t border-ember/25 bg-abyss/95 px-4 pb-[calc(env(safe-area-inset-bottom)+5.75rem)] pt-4 shadow-2xl shadow-black">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[.24em] text-ember/70">Navegação</p>
+                  <h2 className="font-display text-2xl text-ember">Menu</h2>
+                </div>
+                <button type="button" className="grid h-11 w-11 place-items-center rounded-md border border-ember/25 text-ember" onClick={() => setOpen(false)} aria-label="Fechar menu">
+                  <X size={19} />
+                </button>
+              </div>
+              <div className="grid gap-2">
               {drawerLinks.map((link) => {
                 const Icon = link.icon;
                 return (
-                  <NavLink key={link.to} to={link.to} onClick={() => setOpen(false)} className="rounded-md border border-white/10 bg-black/20 px-3 py-3 text-sm text-mist hover:text-white">
-                    <span className="inline-flex items-center gap-2"><Icon size={17} /> {link.label}</span>
+                  <NavLink
+                    key={link.to}
+                    to={link.to}
+                    onClick={() => setOpen(false)}
+                    className={({ isActive }) => `flex min-h-12 items-center gap-3 rounded-md border px-3 py-3 text-left text-sm font-semibold transition-colors ${isActive && activePath(link.to) ? 'border-ember/50 bg-ember/15 text-white' : 'border-white/10 bg-black/25 text-mist hover:border-ember/25 hover:text-white'}`}
+                  >
+                    <Icon size={18} className="shrink-0" />
+                    <span className="break-words leading-snug">{link.label}</span>
                   </NavLink>
                 );
               })}
               {user ? (
-                <Button variant="ghost" className="w-full justify-center py-3" onClick={() => { setOpen(false); logout(); }}><LogOut size={16} className="inline" /> Sair</Button>
+                <Button variant="ghost" className="min-h-12 w-full justify-center py-3 text-red-100" onClick={() => { setOpen(false); logout(); }}><LogOut size={16} className="inline" /> Sair</Button>
               ) : (
-                <Link to="/login" onClick={() => setOpen(false)}><Button className="w-full py-3"><Shield size={16} className="inline" /> Entrar</Button></Link>
+                <Link to="/login" onClick={() => setOpen(false)}><Button className="min-h-12 w-full py-3"><Shield size={16} className="inline" /> Entrar</Button></Link>
               )}
-            </div>
+              </div>
+            </section>
           </div>
         )}
       </nav>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { Send } from 'lucide-react';
 import Alert from '../components/Alert';
@@ -96,6 +96,7 @@ function ChatPanel({ messages, currentUserId, isMaster, content, setContent, sen
 export default function CampaignRoom() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const [room, setRoom] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -116,6 +117,12 @@ export default function CampaignRoom() {
   const currentMember = room?.members?.find((member) => member.user_id === user?.id || member.id === user?.id);
   const isMaster = room?.role === 'master' || room?.campaign?.master_id === user?.id || user?.role === 'admin';
   const selectedCharacterId = currentMember?.shared_character_id || currentMember?.character_id || '';
+
+  function activateTab(tabId) {
+    const nextTab = tabs.some((tab) => tab.id === tabId) ? tabId : 'chat';
+    setActiveTab(nextTab);
+    setSearchParams(nextTab === 'chat' ? {} : { tab: nextTab });
+  }
 
   const loadRoom = useCallback(async () => {
     const { data } = await api.get(`/campaigns/${id}`);
@@ -163,6 +170,15 @@ export default function CampaignRoom() {
       socket.disconnect();
     };
   }, [id, loadRoom, socket]);
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab');
+    if (requestedTab && tabs.some((tab) => tab.id === requestedTab)) {
+      setActiveTab(requestedTab);
+    } else if (!requestedTab) {
+      setActiveTab('chat');
+    }
+  }, [searchParams]);
 
   async function runAction(action, successMessage) {
     setError('');
@@ -315,7 +331,7 @@ export default function CampaignRoom() {
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => activateTab(tab.id)}
                 className={`min-h-10 shrink-0 rounded-md border px-3 py-2 text-xs font-semibold ${activeTab === tab.id ? 'border-ember/50 bg-ember/15 text-ember' : 'border-white/10 bg-black/25 text-mist'}`}
               >
                 {tab.label}

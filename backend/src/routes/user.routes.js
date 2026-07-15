@@ -22,7 +22,7 @@ function publicUser(row) {
     email: row.email,
     role: row.role,
     profile_image_url: row.profile_image_url || '',
-    theme: row.theme || 'lugubre',
+    theme: row.theme || 'sombrio',
     created_at: row.created_at,
     updated_at: row.updated_at
   };

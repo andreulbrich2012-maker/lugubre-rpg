@@ -36,7 +36,7 @@ export async function requireAuth(req, res, next) {
       email: user.email,
       role: user.role,
       profile_image_url: user.profile_image_url || '',
-      theme: user.theme || 'lugubre'
+      theme: user.theme || 'sombrio'
     };
     return next();
   } catch (error) {

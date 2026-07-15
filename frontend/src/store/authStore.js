@@ -24,7 +24,7 @@ export const useAuth = create((set, get) => ({
       const { data } = await api.get('/auth/me');
       if (localStorage.getItem(AUTH_TOKEN_KEY) !== token) return;
       localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
-      localStorage.setItem('lugubre-theme', data.user.theme || 'lugubre');
+      localStorage.setItem('lugubre-theme', data.user.theme || 'sombrio');
       set({ user: data.user, token, authLoading: false, authInitialized: true });
     } catch {
       if (localStorage.getItem(AUTH_TOKEN_KEY) === token) {
@@ -38,7 +38,7 @@ export const useAuth = create((set, get) => ({
     const { data } = await api.post('/auth/login', { email, password });
     localStorage.setItem(AUTH_TOKEN_KEY, data.token);
     localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
-    localStorage.setItem('lugubre-theme', data.user.theme || 'lugubre');
+    localStorage.setItem('lugubre-theme', data.user.theme || 'sombrio');
     set({ user: data.user, token: data.token, authLoading: false, authInitialized: true });
     return data;
   },
@@ -49,7 +49,7 @@ export const useAuth = create((set, get) => ({
   async refreshMe() {
     const { data } = await api.get('/auth/me');
     localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
-    localStorage.setItem('lugubre-theme', data.user.theme || 'lugubre');
+    localStorage.setItem('lugubre-theme', data.user.theme || 'sombrio');
     set({ user: data.user, authLoading: false, authInitialized: true });
     return data.user;
   },

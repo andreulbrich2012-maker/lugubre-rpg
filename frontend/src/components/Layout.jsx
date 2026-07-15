@@ -96,9 +96,11 @@ export default function Layout({ children }) {
 
       {children}
 
-      <footer className="border-t border-ember/10 px-4 py-8 text-center text-sm text-mist">
-        Lúgubre RPG, fichas, campanhas e sombras bem organizadas.
-      </footer>
+      {location.pathname !== '/' && (
+        <footer className="border-t border-ember/10 px-4 py-8 text-center text-sm text-mist">
+          Lúgubre RPG, fichas, campanhas e sombras bem organizadas.
+        </footer>
+      )}
 
       {menuOpen && (
         <div className="fixed inset-0 z-[1000] lg:hidden" data-mobile-menu-root>

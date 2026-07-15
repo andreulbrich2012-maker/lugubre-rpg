@@ -1,4 +1,4 @@
-﻿create extension if not exists "uuid-ossp";
+create extension if not exists "uuid-ossp";
 
 create table if not exists users (
   id uuid primary key default uuid_generate_v4(),
@@ -7,15 +7,16 @@ create table if not exists users (
   password_hash text not null,
   role text not null default 'user' check (role in ('user', 'player', 'master', 'admin')),
   profile_image_url text,
-  theme text not null default 'lugubre' check (theme in ('sombrio', 'lugubre', 'daltonismo')),
+  theme text not null default 'sombrio' check (theme in ('sombrio', 'lugubre', 'daltonismo')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 alter table users add column if not exists profile_image_url text;
-alter table users add column if not exists theme text not null default 'lugubre';
+alter table users add column if not exists theme text not null default 'sombrio';
 alter table users add column if not exists updated_at timestamptz not null default now();
 alter table users alter column role set default 'user';
+alter table users alter column theme set default 'sombrio';
 alter table users drop constraint if exists users_role_check;
 alter table users add constraint users_role_check check (role in ('user', 'player', 'master', 'admin'));
 
@@ -325,6 +326,29 @@ alter table feedbacks add column if not exists updated_at timestamptz not null d
 create index if not exists feedbacks_user_created_idx on feedbacks (user_id, created_at desc);
 create index if not exists feedbacks_admin_filters_idx on feedbacks (status, priority, type, created_at desc);
 
+create table if not exists developer_posts (
+  id uuid primary key default uuid_generate_v4(),
+  title text not null,
+  short_description text not null,
+  full_description text,
+  image_url text,
+  category text,
+  published_at timestamptz not null default now(),
+  is_visible boolean not null default true,
+  created_by uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table developer_posts add column if not exists full_description text;
+alter table developer_posts add column if not exists image_url text;
+alter table developer_posts add column if not exists category text;
+alter table developer_posts add column if not exists published_at timestamptz not null default now();
+alter table developer_posts add column if not exists is_visible boolean not null default true;
+alter table developer_posts add column if not exists created_by uuid references users(id) on delete set null;
+alter table developer_posts add column if not exists updated_at timestamptz not null default now();
+create index if not exists developer_posts_public_idx on developer_posts (is_visible, published_at desc);
+
 create table if not exists monsters (
   id uuid primary key default uuid_generate_v4(),
   name text not null,
@@ -531,6 +555,26 @@ on conflict ((lower(name)), type) do update set
   recommended_level = excluded.recommended_level,
   image_url = excluded.image_url,
   updated_at = now();
+
+insert into developer_posts (title, short_description, full_description, image_url, category, published_at, is_visible)
+select 'Sistema de Feedback Adicionado',
+       'Jogadores agora podem enviar bugs, ideias e sugestões para a administração.',
+       'O painel de feedback aproxima a comunidade do desenvolvimento: cada relato pode ser acompanhado, respondido e transformado em melhoria real para o Lúgubre RPG.',
+       '/assets/crypt-gate.svg',
+       'Sistema',
+       now() - interval '1 day',
+       true
+where not exists (select 1 from developer_posts where lower(title) = lower('Sistema de Feedback Adicionado'));
+
+insert into developer_posts (title, short_description, full_description, image_url, category, published_at, is_visible)
+select 'Biblioteca de Magias e Poderes',
+       'A biblioteca ganhou elementos, filtros e organização para consulta rápida.',
+       'Magias e poderes passaram a viver em uma área própria, pronta para expandir com novas escolas, elementos e vínculos com fichas.',
+       '/assets/dark-castle.svg',
+       'Novidade',
+       now() - interval '2 days',
+       true
+where not exists (select 1 from developer_posts where lower(title) = lower('Biblioteca de Magias e Poderes'));
 
 insert into users (name, email, password_hash, role)
 values

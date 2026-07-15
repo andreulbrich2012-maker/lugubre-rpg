@@ -11,6 +11,7 @@ import friendRoutes from './routes/friend.routes.js';
 import userRoutes from './routes/user.routes.js';
 import powerRoutes from './routes/power.routes.js';
 import feedbackRoutes from './routes/feedback.routes.js';
+import developerRoutes from './routes/developer.routes.js';
 
 export function createApp() {
   const app = express();
@@ -28,6 +29,7 @@ export function createApp() {
   app.use('/api/users', userRoutes);
   app.use('/api/powers', powerRoutes);
   app.use('/api/feedbacks', feedbackRoutes);
+  app.use('/api', developerRoutes);
   app.use('/api/admin', adminRoutes);
 
   app.use((err, req, res, next) => {

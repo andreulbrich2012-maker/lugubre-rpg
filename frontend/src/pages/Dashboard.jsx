@@ -22,6 +22,19 @@ const tabs = [
   { id: 'personalization', label: 'Personalizacao', icon: Palette }
 ];
 
+const immersivePhrases = [
+  'As sombras aguardavam teu retorno.',
+  'O Grimório permanece aberto.',
+  'Uma nova história será escrita.',
+  'O destino espera.',
+  'As velas ainda queimam.',
+  'A névoa se ergue novamente.',
+  'O silêncio reconhece teus passos.',
+  'A mesa está pronta para mais uma jornada.',
+  'Os ecos da última sessão ainda sussurram.',
+  'O Lúgubre desperta mais uma vez.'
+];
+
 export default function Dashboard() {
   const { user, logout, refreshMe } = useAuth();
   const navigate = useNavigate();
@@ -145,27 +158,33 @@ function DashboardTopbar({ user, onMenu, onSettings, onLogout }) {
 }
 
 function DashboardTab({ summary, user }) {
+  const phrase = useMemo(() => immersivePhrases[Math.floor(Math.random() * immersivePhrases.length)], []);
+
   return (
     <div className="space-y-6">
-      <section className="gothic-panel rounded-md p-4 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <section className="gothic-panel relative overflow-hidden rounded-md p-4 sm:p-6 lg:p-8">
+        <div className="absolute right-0 top-0 h-52 w-52 rounded-full bg-blood/20 blur-3xl" />
+        <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-sm text-mist">Bem-vindo de volta,</p>
-            <h2 className="break-words font-display text-3xl text-ember sm:text-4xl">{user?.name}</h2>
+            <p className="text-xs font-bold uppercase tracking-[0.28em] text-ember/80">{phrase}</p>
+            <h2 className="mt-2 break-words font-display text-3xl text-white sm:text-4xl lg:text-5xl">{user?.name}</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-mist">Continue personagens, campanhas e registros de mesa em um painel feito para voltar rápido ao que importa.</p>
           </div>
           <Shield className="text-ember" size={34} />
         </div>
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <div className="relative mt-6 grid gap-4 sm:grid-cols-2">
           <Metric label="Personagens" value={summary?.characters_count || 0} />
           <Metric label="Campanhas" value={summary?.campaigns_count || 0} />
         </div>
       </section>
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Link to="/characters/new" className="gothic-panel soft-motion rounded-md p-5">
+          <ScrollText className="mb-3 text-ember" size={24} />
           <h3 className="font-display text-2xl text-white">Criar personagem</h3>
           <p className="mt-2 text-sm text-mist">Comece uma nova ficha com raça, classe, origem e inventário.</p>
         </Link>
         <Link to="/campaigns" className="gothic-panel soft-motion rounded-md p-5">
+          <Swords className="mb-3 text-ember" size={24} />
           <h3 className="font-display text-2xl text-white">Campanhas</h3>
           <p className="mt-2 text-sm text-mist">Crie uma mesa ou entre com um código de convite.</p>
         </Link>
@@ -178,6 +197,16 @@ function DashboardTab({ summary, user }) {
           <MessageSquareText className="mb-3 text-ember" size={24} />
           <h3 className="font-display text-2xl text-white">Feedback</h3>
           <p className="mt-2 text-sm text-mist">Envie bugs, ideias e sugestões para melhorar o sistema.</p>
+        </Link>
+        <Link to="/monsters" className="gothic-panel soft-motion rounded-md p-5">
+          <Skull className="mb-3 text-ember" size={24} />
+          <h3 className="font-display text-2xl text-white">Monstros</h3>
+          <p className="mt-2 text-sm text-mist">Consulte criaturas, ataques e classificações elementais.</p>
+        </Link>
+        <Link to="/dashboard?tab=personalization" className="gothic-panel soft-motion rounded-md p-5">
+          <Palette className="mb-3 text-ember" size={24} />
+          <h3 className="font-display text-2xl text-white">Personalização</h3>
+          <p className="mt-2 text-sm text-mist">Ajuste tema, contraste e identidade da sua conta.</p>
         </Link>
       </section>
     </div>
@@ -568,8 +597,8 @@ function SettingsTab() {
 }
 
 const themeOptions = [
-  { id: 'sombrio', name: 'Tema Sombrio', text: 'Preto, cinza escuro e roxo fechado.', swatches: ['#050509', '#171523', '#5c3b8f'] },
-  { id: 'lugubre', name: 'Tema Lugubre', text: 'Vermelho escuro, roxo, preto e branco suave.', swatches: ['#07070a', '#8f1d2c', '#d6a65f'] },
+  { id: 'sombrio', name: 'Tema Principal Roxo', text: 'Preto profundo, roxo arcano e dourado discreto.', swatches: ['#05040a', '#6f43d6', '#c7a35b'] },
+  { id: 'lugubre', name: 'Tema Lúgubre Clássico', text: 'Vermelho escuro, dourado antigo e preto ritual.', swatches: ['#07070a', '#8f1d2c', '#d6a65f'] },
   { id: 'daltonismo', name: 'Tema Daltonismo', text: 'Alto contraste com azul, amarelo e branco.', swatches: ['#061826', '#1f9bd1', '#ffd166'] }
 ];
 

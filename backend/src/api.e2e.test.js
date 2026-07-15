@@ -341,6 +341,80 @@ describe('fluxo principal da API', () => {
       })
       .expect(201);
 
+    await request(app)
+      .get('/api/admin/developer-posts')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(403);
+
+    await request(app)
+      .post('/api/admin/developer-posts')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        title: `Diario bloqueado ${stamp}`,
+        shortDescription: 'Usuario comum nao pode criar publicacao.'
+      })
+      .expect(403);
+
+    const developerPost = await request(app)
+      .post('/api/admin/developer-posts')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        title: `Diario do Desenvolvedor ${stamp}`,
+        shortDescription: 'Publicacao criada pelo teste automatizado.',
+        fullDescription: 'Conteudo completo da publicacao de teste.',
+        imageUrl: '/assets/dark-castle.svg',
+        category: 'Atualizacao',
+        publishedAt: '2026-07-14',
+        isVisible: true
+      })
+      .expect(201);
+
+    let publicDeveloperPosts = await request(app)
+      .get('/api/developer-posts')
+      .expect(200);
+
+    expect(publicDeveloperPosts.body.some((item) => item.id === developerPost.body.id)).toBe(true);
+
+    await request(app)
+      .put(`/api/admin/developer-posts/${developerPost.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        title: `Diario oculto ${stamp}`,
+        shortDescription: 'Publicacao ocultada pelo teste.',
+        fullDescription: 'Conteudo oculto.',
+        imageUrl: '/assets/crypt-gate.svg',
+        category: 'Correcao',
+        publishedAt: '2026-07-15',
+        isVisible: false
+      })
+      .expect(200);
+
+    publicDeveloperPosts = await request(app)
+      .get('/api/developer-posts')
+      .expect(200);
+
+    expect(publicDeveloperPosts.body.some((item) => item.id === developerPost.body.id)).toBe(false);
+
+    await request(app)
+      .put(`/api/admin/developer-posts/${developerPost.body.id}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        title: `Diario editado ${stamp}`,
+        shortDescription: 'Publicacao editada e visivel pelo teste.',
+        fullDescription: 'Conteudo editado.',
+        imageUrl: '/assets/haunted-ruins.svg',
+        category: 'Novidade',
+        publishedAt: '2026-07-16',
+        isVisible: true
+      })
+      .expect(200);
+
+    publicDeveloperPosts = await request(app)
+      .get('/api/developer-posts')
+      .expect(200);
+
+    expect(publicDeveloperPosts.body.find((item) => item.id === developerPost.body.id)?.title).toBe(`Diario editado ${stamp}`);
+
     const expectedRaceAttributes = {
       Humano: { forca: 2, agilidade: 2, presenca: 2, intelecto: 2, vigor: 2 },
       Elfo: { forca: 1, agilidade: 2, presenca: 2, intelecto: 3, vigor: 2 },
@@ -832,6 +906,12 @@ describe('fluxo principal da API', () => {
     await expectAdminDelete(`/api/admin/skills/${skill.body.id}`, adminToken);
     await expectAdminDelete(`/api/admin/powers/${libraryPower.body.id}`, adminToken);
     await expectAdminDelete(`/api/admin/feedbacks/${feedback.body.feedback.id}`, adminToken);
+    await expectAdminDelete(`/api/admin/developer-posts/${developerPost.body.id}`, adminToken);
+
+    const developerPostsAfterDelete = await request(app)
+      .get('/api/developer-posts')
+      .expect(200);
+    expect(developerPostsAfterDelete.body.some((item) => item.id === developerPost.body.id)).toBe(false);
 
     const catalogAfterDelete = await Promise.all([
       request(app).get('/api/catalog/races').expect(200),

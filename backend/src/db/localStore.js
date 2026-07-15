@@ -17,7 +17,7 @@ function publicUser(user) {
     email: user.email,
     role: user.role,
     profile_image_url: user.profile_image_url || '',
-    theme: user.theme || 'lugubre',
+    theme: user.theme || 'sombrio',
     created_at: user.created_at,
     updated_at: user.updated_at
   };
@@ -37,6 +37,34 @@ const defaultData = {
   friend_messages: [],
   powers: [],
   feedbacks: [],
+  developer_posts: [
+    {
+      id: 'developer-post-feedback',
+      title: 'Sistema de Feedback Adicionado',
+      short_description: 'Jogadores agora podem enviar bugs, ideias e sugestões para a administração.',
+      full_description: 'O painel de feedback aproxima a comunidade do desenvolvimento: cada relato pode ser acompanhado, respondido e transformado em melhoria real para o Lúgubre RPG.',
+      image_url: '/assets/crypt-gate.svg',
+      category: 'Sistema',
+      published_at: new Date(Date.now() - 86_400_000).toISOString(),
+      is_visible: true,
+      created_by: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    },
+    {
+      id: 'developer-post-library',
+      title: 'Biblioteca de Magias e Poderes',
+      short_description: 'A biblioteca ganhou elementos, filtros e organização para consulta rápida.',
+      full_description: 'Magias e poderes passaram a viver em uma área própria, pronta para expandir com novas escolas, elementos e vínculos com fichas.',
+      image_url: '/assets/dark-castle.svg',
+      category: 'Novidade',
+      published_at: new Date(Date.now() - 172_800_000).toISOString(),
+      is_visible: true,
+      created_by: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+  ],
   monsters: [
     {
       id: 'monster-guardian-ashes',
@@ -242,7 +270,7 @@ async function createSeedUser(seed) {
     password_hash: await bcrypt.hash(seed.password, 10),
     role: seed.role,
     profile_image_url: '',
-    theme: 'lugubre',
+    theme: 'sombrio',
     created_at: new Date().toISOString()
   };
 }
@@ -258,7 +286,7 @@ async function ensureSeedUsers(data) {
         email: seed.email,
         role: seed.role,
         profile_image_url: data.users[index].profile_image_url || '',
-        theme: data.users[index].theme || 'lugubre'
+        theme: data.users[index].theme || 'sombrio'
       };
       if (shouldRefreshSeeds) {
         data.users[index].password_hash = await bcrypt.hash(seed.password, 10);
@@ -291,7 +319,7 @@ async function ensureStore() {
         delete user.password;
       }
       user.profile_image_url = user.profile_image_url || '';
-      user.theme = user.theme || 'lugubre';
+      user.theme = user.theme || 'sombrio';
       user.updated_at = user.updated_at || user.created_at || new Date().toISOString();
     }
     for (const character of data.characters) {
@@ -422,7 +450,7 @@ export async function createLocalUser({ name, email, password, role = 'user' }) 
     error.status = 409;
     throw error;
   }
-  const user = { id: crypto.randomUUID(), name: name.trim(), email: normalizedEmail, password_hash: await bcrypt.hash(password, 10), role, profile_image_url: '', theme: 'lugubre', created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  const user = { id: crypto.randomUUID(), name: name.trim(), email: normalizedEmail, password_hash: await bcrypt.hash(password, 10), role, profile_image_url: '', theme: 'sombrio', created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
   data.users.push(user);
   await writeStore(data);
   return user;
@@ -678,6 +706,66 @@ export async function deleteLocalPower(id) {
   data.powers[index].updated_at = data.powers[index].deleted_at;
   await writeStore(data);
   return true;
+}
+
+function normalizeLocalDeveloperPost(post = {}, createdBy = null) {
+  const now = new Date().toISOString();
+  return {
+    id: post.id || crypto.randomUUID(),
+    title: post.title || 'Publicação',
+    short_description: post.short_description || post.shortDescription || '',
+    full_description: post.full_description || post.fullDescription || '',
+    image_url: post.image_url || post.imageUrl || '',
+    category: post.category || 'Atualização',
+    published_at: post.published_at || post.publishedAt || now,
+    is_visible: post.is_visible ?? post.isVisible ?? true,
+    created_by: post.created_by ?? createdBy,
+    created_at: post.created_at || now,
+    updated_at: post.updated_at || now
+  };
+}
+
+export async function listLocalDeveloperPosts({ includeHidden = false } = {}) {
+  const data = await ensureStore();
+  data.developer_posts = data.developer_posts || [];
+  return data.developer_posts
+    .map((post) => normalizeLocalDeveloperPost(post))
+    .filter((post) => includeHidden || post.is_visible)
+    .sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+}
+
+export async function createLocalDeveloperPost(post, createdBy = null) {
+  const data = await ensureStore();
+  data.developer_posts = data.developer_posts || [];
+  const row = normalizeLocalDeveloperPost(post, createdBy);
+  data.developer_posts.push(row);
+  await writeStore(data);
+  return row;
+}
+
+export async function updateLocalDeveloperPost(id, post) {
+  const data = await ensureStore();
+  data.developer_posts = data.developer_posts || [];
+  const index = data.developer_posts.findIndex((row) => row.id === id);
+  if (index === -1) return null;
+  data.developer_posts[index] = normalizeLocalDeveloperPost({
+    ...data.developer_posts[index],
+    ...post,
+    id,
+    created_at: data.developer_posts[index].created_at,
+    updated_at: new Date().toISOString()
+  }, data.developer_posts[index].created_by);
+  await writeStore(data);
+  return data.developer_posts[index];
+}
+
+export async function deleteLocalDeveloperPost(id) {
+  const data = await ensureStore();
+  data.developer_posts = data.developer_posts || [];
+  const before = data.developer_posts.length;
+  data.developer_posts = data.developer_posts.filter((post) => post.id !== id);
+  await writeStore(data);
+  return data.developer_posts.length !== before;
 }
 
 function decorateLocalFeedback(data, feedback) {

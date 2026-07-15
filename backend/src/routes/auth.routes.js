@@ -21,7 +21,7 @@ function publicUser(user) {
     email: user.email,
     role: user.role,
     profile_image_url: user.profile_image_url || '',
-    theme: user.theme || 'lugubre'
+    theme: user.theme || 'sombrio'
   };
 }
 

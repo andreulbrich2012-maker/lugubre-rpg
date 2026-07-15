@@ -3,17 +3,21 @@ import { z } from 'zod';
 import { tryQuery } from '../db/pool.js';
 import {
   createLocalCatalogItem,
+  createLocalDeveloperPost,
   createLocalMonster,
   createLocalMonsterAttack,
   createLocalPower,
   deleteLocalCatalogItem,
+  deleteLocalDeveloperPost,
   deleteLocalFeedback,
   deleteLocalMonster,
   deleteLocalMonsterAttack,
   deleteLocalPower,
   getLocalFeedback,
+  listLocalDeveloperPosts,
   listLocalFeedbacks,
   updateLocalCatalogItem,
+  updateLocalDeveloperPost,
   updateLocalFeedback,
   updateLocalMonster,
   updateLocalMonsterAttack,
@@ -104,6 +108,15 @@ const feedbackStatusSchema = z.object({
 });
 const feedbackResponseSchema = z.object({
   adminResponse: z.string().trim().max(8000).optional().default('')
+});
+const developerPostSchema = z.object({
+  title: z.string().min(3).max(180),
+  shortDescription: z.string().min(3).max(320),
+  fullDescription: z.string().max(6000).optional().default(''),
+  imageUrl: z.string().max(1_500_000).optional().default(''),
+  category: z.string().max(60).optional().default('Atualização'),
+  publishedAt: z.coerce.date().optional(),
+  isVisible: z.coerce.boolean().default(true)
 });
 
 function toJson(value) {
@@ -204,6 +217,19 @@ function powerPayload(body) {
     recommended_class: parsed.recommendedClass || '',
     recommended_level: parsed.recommendedLevel,
     image_url: parsed.imageUrl || ''
+  };
+}
+
+function developerPostPayload(body) {
+  const parsed = developerPostSchema.parse(body);
+  return {
+    title: parsed.title.trim(),
+    short_description: parsed.shortDescription.trim(),
+    full_description: parsed.fullDescription || '',
+    image_url: parsed.imageUrl || '',
+    category: parsed.category || 'Atualização',
+    published_at: parsed.publishedAt ? parsed.publishedAt.toISOString() : new Date().toISOString(),
+    is_visible: parsed.isVisible
   };
 }
 
@@ -323,6 +349,52 @@ router.delete('/feedbacks/:id', async (req, res) => {
     params: [req.params.id],
     notFoundMessage: 'Feedback nao encontrado ou ja excluido.',
     localDelete: () => deleteLocalFeedback(req.params.id)
+  });
+  res.status(deleted.status).json(deleted.body);
+});
+
+router.get('/developer-posts', async (_, res) => {
+  const result = await tryQuery(
+    `select p.*, u.name as created_by_name
+     from developer_posts p
+     left join users u on u.id = p.created_by
+     order by p.published_at desc, p.created_at desc`
+  );
+  res.json(result?.rows || await listLocalDeveloperPosts({ includeHidden: true }));
+});
+
+router.post('/developer-posts', async (req, res) => {
+  const payload = developerPostPayload(req.body);
+  const result = await tryQuery(
+    `insert into developer_posts (title, short_description, full_description, image_url, category, published_at, is_visible, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8)
+     returning *`,
+    [payload.title, payload.short_description, payload.full_description, payload.image_url, payload.category, payload.published_at, payload.is_visible, req.user.id]
+  );
+  res.status(201).json(result?.rows?.[0] || await createLocalDeveloperPost(payload, req.user.id));
+});
+
+router.put('/developer-posts/:id', async (req, res) => {
+  const payload = developerPostPayload(req.body);
+  const result = await tryQuery(
+    `update developer_posts
+     set title=$1, short_description=$2, full_description=$3, image_url=$4, category=$5,
+         published_at=$6, is_visible=$7, updated_at=now()
+     where id=$8
+     returning *`,
+    [payload.title, payload.short_description, payload.full_description, payload.image_url, payload.category, payload.published_at, payload.is_visible, req.params.id]
+  );
+  const post = result?.rows?.[0] || await updateLocalDeveloperPost(req.params.id, payload);
+  if (!post) return res.status(404).json({ message: 'Publicacao nao encontrada.' });
+  res.json(post);
+});
+
+router.delete('/developer-posts/:id', async (req, res) => {
+  const deleted = await deleteRecord({
+    sql: 'delete from developer_posts where id=$1',
+    params: [req.params.id],
+    notFoundMessage: 'Publicacao nao encontrada ou ja excluida.',
+    localDelete: () => deleteLocalDeveloperPost(req.params.id)
   });
   res.status(deleted.status).json(deleted.body);
 });

@@ -21,7 +21,7 @@ export default function App() {
   const { user, initAuth } = useAuth();
 
   useEffect(() => {
-    const theme = user?.theme || localStorage.getItem('lugubre-theme') || 'lugubre';
+    const theme = user?.theme || localStorage.getItem('lugubre-theme') || 'sombrio';
     document.documentElement.dataset.theme = theme;
   }, [user?.theme]);
 

@@ -337,13 +337,15 @@ router.post('/races', async (req, res) => {
 router.put('/races/:id', async (req, res) => {
   const body = raceSchema.parse(req.body);
   const payload = { name: body.name, image: body.image || '', attribute_modifiers: body.attributeModifiers };
-  const result = await tryQuery('update races set name=$1, image=$2, attribute_modifiers=$3 where id=$4 returning *', [payload.name, payload.image, toJson(payload.attribute_modifiers), req.params.id]);
-  res.json(result?.rows?.[0] || await updateLocalCatalogItem('races', req.params.id, payload));
+  const result = await tryQuery('update races set name=$1, image=$2, attribute_modifiers=$3 where id=$4 and deleted_at is null returning *', [payload.name, payload.image, toJson(payload.attribute_modifiers), req.params.id]);
+  const race = result?.rows?.[0] || await updateLocalCatalogItem('races', req.params.id, payload);
+  if (!race) return res.status(404).json({ message: 'Raca nao encontrada.' });
+  res.json(race);
 });
 
 router.delete('/races/:id', async (req, res) => {
   const deleted = await deleteRecord({
-    sql: 'delete from races where id=$1',
+    sql: 'update races set deleted_at=now() where id=$1 and deleted_at is null',
     params: [req.params.id],
     notFoundMessage: 'Raca nao encontrada ou ja excluida.',
     localDelete: () => deleteLocalCatalogItem('races', req.params.id)
@@ -361,13 +363,15 @@ router.post('/classes', async (req, res) => {
 router.put('/classes/:id', async (req, res) => {
   const body = classSchema.parse(req.body);
   const payload = { name: body.name, description: body.description, image: body.image || '', progression: body.progression };
-  const result = await tryQuery('update classes set name=$1, description=$2, image=$3, progression=$4 where id=$5 returning *', [payload.name, payload.description, payload.image, toJson(payload.progression), req.params.id]);
-  res.json(result?.rows?.[0] || await updateLocalCatalogItem('classes', req.params.id, payload));
+  const result = await tryQuery('update classes set name=$1, description=$2, image=$3, progression=$4 where id=$5 and deleted_at is null returning *', [payload.name, payload.description, payload.image, toJson(payload.progression), req.params.id]);
+  const klass = result?.rows?.[0] || await updateLocalCatalogItem('classes', req.params.id, payload);
+  if (!klass) return res.status(404).json({ message: 'Classe nao encontrada.' });
+  res.json(klass);
 });
 
 router.delete('/classes/:id', async (req, res) => {
   const deleted = await deleteRecord({
-    sql: 'delete from classes where id=$1',
+    sql: 'update classes set deleted_at=now() where id=$1 and deleted_at is null',
     params: [req.params.id],
     notFoundMessage: 'Classe nao encontrada ou ja excluida.',
     localDelete: () => deleteLocalCatalogItem('classes', req.params.id)
@@ -385,13 +389,15 @@ router.post('/origins', async (req, res) => {
 router.put('/origins/:id', async (req, res) => {
   const body = originSchema.parse(req.body);
   const payload = { name: body.name, description: body.description, skill_modifiers: body.skillModifiers };
-  const result = await tryQuery('update origins set name=$1, description=$2, skill_modifiers=$3 where id=$4 returning *', [payload.name, payload.description, toJson(payload.skill_modifiers), req.params.id]);
-  res.json(result?.rows?.[0] || await updateLocalCatalogItem('origins', req.params.id, payload));
+  const result = await tryQuery('update origins set name=$1, description=$2, skill_modifiers=$3 where id=$4 and deleted_at is null returning *', [payload.name, payload.description, toJson(payload.skill_modifiers), req.params.id]);
+  const origin = result?.rows?.[0] || await updateLocalCatalogItem('origins', req.params.id, payload);
+  if (!origin) return res.status(404).json({ message: 'Origem nao encontrada.' });
+  res.json(origin);
 });
 
 router.delete('/origins/:id', async (req, res) => {
   const deleted = await deleteRecord({
-    sql: 'delete from origins where id=$1',
+    sql: 'update origins set deleted_at=now() where id=$1 and deleted_at is null',
     params: [req.params.id],
     notFoundMessage: 'Origem nao encontrada ou ja excluida.',
     localDelete: () => deleteLocalCatalogItem('origins', req.params.id)
@@ -407,13 +413,15 @@ router.post('/skills', async (req, res) => {
 
 router.put('/skills/:id', async (req, res) => {
   const body = skillSchema.parse(req.body);
-  const result = await tryQuery('update skills set name=$1, "key"=$2, attribute=$3 where id=$4 returning id, "key", name, attribute', [body.name, body.key, body.attribute, req.params.id]);
-  res.json(result?.rows?.[0] || await updateLocalCatalogItem('skills', req.params.id, body));
+  const result = await tryQuery('update skills set name=$1, "key"=$2, attribute=$3 where id=$4 and deleted_at is null returning id, "key", name, attribute', [body.name, body.key, body.attribute, req.params.id]);
+  const skill = result?.rows?.[0] || await updateLocalCatalogItem('skills', req.params.id, body);
+  if (!skill) return res.status(404).json({ message: 'Pericia nao encontrada.' });
+  res.json(skill);
 });
 
 router.delete('/skills/:id', async (req, res) => {
   const deleted = await deleteRecord({
-    sql: 'delete from skills where id=$1',
+    sql: 'update skills set deleted_at=now() where id=$1 and deleted_at is null',
     params: [req.params.id],
     notFoundMessage: 'Pericia nao encontrada ou ja excluida.',
     localDelete: () => deleteLocalCatalogItem('skills', req.params.id)
@@ -449,7 +457,7 @@ router.put('/monsters/:id', async (req, res) => {
   const result = await tryQuery(
     `update monsters set name=$1, image_url=$2, token_url=$3, category=$4, difficulty=$5,
      base_health=$6, min_health=$7, max_health=$8, armor=$9, items=$10, description=$11, updated_at=now()
-     where id=$12 returning *`,
+     where id=$12 and deleted_at is null returning *`,
     [payload.name, payload.image_url, payload.token_url, payload.category, payload.difficulty, payload.base_health, payload.min_health, payload.max_health, payload.armor, toJson(payload.items), payload.description, req.params.id]
   );
   let monster = result?.rows?.[0] || await updateLocalMonster(req.params.id, payload);
@@ -475,7 +483,7 @@ router.put('/monsters/:id', async (req, res) => {
 
 router.delete('/monsters/:id', async (req, res) => {
   const deleted = await deleteRecord({
-    sql: 'delete from monsters where id=$1',
+    sql: 'update monsters set deleted_at=now(), updated_at=now() where id=$1 and deleted_at is null',
     params: [req.params.id],
     notFoundMessage: 'Monstro nao encontrado ou ja excluido.',
     localDelete: () => deleteLocalMonster(req.params.id)
@@ -532,7 +540,7 @@ router.put('/powers/:id', async (req, res) => {
     `update power_library
      set name=$1, type=$2, element=$3, description=$4, mana_cost=$5, damage_formula=$6,
          range=$7, duration=$8, requirement=$9, recommended_class=$10, recommended_level=$11, image_url=$12, updated_at=now()
-     where id=$13
+     where id=$13 and deleted_at is null
      returning *`,
     [payload.name, payload.type, payload.element, payload.description, payload.mana_cost, payload.damage_formula, payload.range, payload.duration, payload.requirement, payload.recommended_class, payload.recommended_level, payload.image_url, req.params.id]
   );
@@ -543,7 +551,7 @@ router.put('/powers/:id', async (req, res) => {
 
 router.delete('/powers/:id', async (req, res) => {
   const deleted = await deleteRecord({
-    sql: 'delete from power_library where id=$1',
+    sql: 'update power_library set deleted_at=now(), updated_at=now() where id=$1 and deleted_at is null',
     params: [req.params.id],
     notFoundMessage: 'Poder ou magia nao encontrado ou ja excluido.',
     localDelete: () => deleteLocalPower(req.params.id)

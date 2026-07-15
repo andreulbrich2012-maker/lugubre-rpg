@@ -36,6 +36,12 @@ const editableVitals = {
   mana: { current: 'mana', max: 'manaMax', currentColumn: 'mana', maxColumn: 'mana_max' }
 };
 
+const referenceConfig = {
+  race: { title: 'Trocar raça', endpoint: '/catalog/races', payload: 'raceId', empty: 'Nenhuma raça ativa encontrada.' },
+  class: { title: 'Trocar classe', endpoint: '/catalog/classes', payload: 'classId', empty: 'Nenhuma classe ativa encontrada.' },
+  origin: { title: 'Trocar origem', endpoint: '/catalog/origins', payload: 'originId', empty: 'Nenhuma origem ativa encontrada.' }
+};
+
 function clampCurrentValue(value, max) {
   const safeMax = Number(max ?? 0);
   const safeValue = Math.max(0, Number(value || 0));
@@ -107,6 +113,9 @@ export default function CharacterSheet() {
   const [vitalSaveStatus, setVitalSaveStatus] = useState({});
   const [itemModal, setItemModal] = useState(null);
   const [powerModal, setPowerModal] = useState(null);
+  const [referenceModal, setReferenceModal] = useState(null);
+  const [referenceOptions, setReferenceOptions] = useState([]);
+  const [referenceStatus, setReferenceStatus] = useState('');
   const draftRef = useRef(null);
   const sheetRef = useRef(null);
   const persistQueueRef = useRef(Promise.resolve());
@@ -273,6 +282,36 @@ export default function CharacterSheet() {
     await persistQueued(nextDraft);
   }
 
+  async function openReferenceSwap(warning) {
+    const config = referenceConfig[warning.type];
+    if (!config) return;
+    setReferenceStatus('Carregando opções...');
+    setReferenceModal(warning);
+    try {
+      const { data } = await api.get(config.endpoint);
+      setReferenceOptions(data || []);
+      setReferenceStatus('');
+    } catch {
+      setReferenceOptions([]);
+      setReferenceStatus('Não foi possível carregar as opções.');
+    }
+  }
+
+  async function saveReferenceSwap(optionId) {
+    const config = referenceConfig[referenceModal?.type];
+    if (!config || !optionId) return;
+    setReferenceStatus('Salvando troca...');
+    try {
+      const { data } = await api.patch(`/characters/${id}/references`, { [config.payload]: optionId });
+      syncSheet(data);
+      setReferenceModal(null);
+      setReferenceOptions([]);
+      setReferenceStatus('');
+    } catch (error) {
+      setReferenceStatus(error?.response?.data?.message || 'Não foi possível salvar a troca.');
+    }
+  }
+
   async function updateQuickModifier(value) {
     const diceSettings = { ...(draft.diceSettings || {}), quickRollModifier: Number(value || 0) };
     const nextDraft = { ...draft, diceSettings };
@@ -296,6 +335,7 @@ export default function CharacterSheet() {
   const totalDefense = (editing ? draft.defense : sheet.defense) + inventory.reduce((sum, item) => sum + Number(item.defenseBonus || 0), 0);
   const skillsCatalog = sheet.skills_catalog || [];
   const origin = sheet.origin_name || sheet.origin || 'Sem origem';
+  const referenceWarnings = sheet.reference_warnings || [];
   const mobileSections = [
     ['#sheet-status', 'Status'],
     ['#sheet-attributes', 'Atributos'],
@@ -387,6 +427,8 @@ export default function CharacterSheet() {
             </div>
           </Panel>
 
+          <ReferenceWarnings warnings={referenceWarnings} onSwap={openReferenceSwap} />
+
           <PowersPanel
             attacks={attacks}
             spells={spells}
@@ -422,6 +464,15 @@ export default function CharacterSheet() {
           skillsCatalog={skillsCatalog}
           onClose={() => setPowerModal(null)}
           onSave={(payload, type) => savePower(payload, type, powerModal.power?.id)}
+        />
+      )}
+      {referenceModal && (
+        <ReferenceSwapModal
+          warning={referenceModal}
+          options={referenceOptions}
+          status={referenceStatus}
+          onClose={() => { setReferenceModal(null); setReferenceOptions([]); setReferenceStatus(''); }}
+          onSave={saveReferenceSwap}
         />
       )}
     </main>
@@ -794,6 +845,56 @@ function PowerChip({ label, value }) {
       <p className="text-[10px] font-bold uppercase tracking-[.14em] text-mist">{label}</p>
       <p className="mt-0.5 break-words text-sm font-semibold text-white">{value || '-'}</p>
     </div>
+  );
+}
+
+function ReferenceWarnings({ warnings, onSwap }) {
+  if (!warnings?.length) return null;
+  return (
+    <div className="grid gap-3">
+      {warnings.map((warning) => (
+        <article key={warning.type} className="rounded-md border border-amber-400/30 bg-amber-950/15 p-4">
+          <p className="text-sm font-semibold text-amber-100">{warning.message}</p>
+          <p className="mt-1 text-xs uppercase tracking-[.16em] text-mist">Atual: {warning.current_name || 'Registro removido'}</p>
+          <Button type="button" className="mt-3 min-h-11 w-full sm:w-auto" onClick={() => onSwap(warning)}>
+            Trocar agora
+          </Button>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function ReferenceSwapModal({ warning, options, status, onClose, onSave }) {
+  const [selected, setSelected] = useState('');
+  const config = referenceConfig[warning.type] || {};
+
+  useEffect(() => {
+    setSelected(options[0]?.id || '');
+  }, [options]);
+
+  return (
+    <ModalFrame title={config.title || 'Trocar referencia'} onClose={onClose}>
+      <div className="space-y-4">
+        <p className="text-sm leading-relaxed text-mist">
+          Escolha uma opção ativa para substituir {warning.current_name || 'o registro removido'}.
+        </p>
+        <label className="block text-sm text-mist">
+          Nova opção
+          <select className="mt-1 min-h-11 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={selected} onChange={(event) => setSelected(event.target.value)} disabled={!options.length}>
+            {options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+          </select>
+        </label>
+        {!options.length && <p className="rounded border border-ember/20 bg-black/30 p-3 text-sm text-mist">{status || config.empty || 'Nenhuma opção ativa encontrada.'}</p>}
+        {status && options.length > 0 && <p className="text-sm text-mist">{status}</p>}
+        <div className="grid gap-2 pt-2 sm:flex sm:justify-end">
+          <Button type="button" variant="ghost" className="min-h-11 w-full sm:w-auto" onClick={onClose}>Cancelar</Button>
+          <Button type="button" className="min-h-11 w-full sm:w-auto" disabled={!selected || status === 'Salvando troca...'} onClick={() => onSave(selected)}>
+            {status === 'Salvando troca...' ? 'Salvando...' : 'Salvar troca'}
+          </Button>
+        </div>
+      </div>
+    </ModalFrame>
   );
 }
 

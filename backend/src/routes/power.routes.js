@@ -8,7 +8,7 @@ router.use(requireAuth);
 
 function filters(req) {
   const params = [];
-  const where = [];
+  const where = ['deleted_at is null'];
   const search = String(req.query.search || '').trim();
   const type = String(req.query.type || '').trim();
   const element = String(req.query.element || '').trim();
@@ -33,7 +33,7 @@ function filters(req) {
 
   return {
     params,
-    sql: where.length ? `where ${where.join(' and ')}` : ''
+    sql: `where ${where.join(' and ')}`
   };
 }
 
@@ -64,7 +64,7 @@ router.get('/', async (req, res) => {
 });
 
 router.get('/:id', async (req, res) => {
-  const result = await tryQuery('select * from power_library where id = $1', [req.params.id]);
+  const result = await tryQuery('select * from power_library where id = $1 and deleted_at is null', [req.params.id]);
   const power = result?.rows?.[0] || await getLocalPower(req.params.id);
   if (!power) return res.status(404).json({ message: 'Poder ou magia nao encontrado.' });
   res.json(power);

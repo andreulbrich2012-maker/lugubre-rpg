@@ -490,9 +490,10 @@ export async function updateLocalUserPassword(id, currentPassword, newPassword) 
   return publicUser(data.users[index]);
 }
 
-export async function getLocalCatalog(type) {
+export async function getLocalCatalog(type, options = {}) {
   const data = await ensureStore();
-  return data[type] || [];
+  const rows = data[type] || [];
+  return options.includeDeleted ? rows : rows.filter((item) => !item.deleted_at);
 }
 
 export async function createLocalCatalogItem(type, item) {
@@ -505,7 +506,7 @@ export async function createLocalCatalogItem(type, item) {
 
 export async function updateLocalCatalogItem(type, id, item) {
   const data = await ensureStore();
-  const index = data[type].findIndex((row) => row.id === id);
+  const index = data[type].findIndex((row) => row.id === id && !row.deleted_at);
   if (index === -1) return null;
   data[type][index] = { ...data[type][index], ...item, id };
   await writeStore(data);
@@ -514,23 +515,25 @@ export async function updateLocalCatalogItem(type, id, item) {
 
 export async function deleteLocalCatalogItem(type, id) {
   const data = await ensureStore();
-  const before = data[type].length;
-  data[type] = data[type].filter((item) => item.id !== id);
+  const index = data[type].findIndex((item) => item.id === id && !item.deleted_at);
+  if (index === -1) return false;
+  data[type][index] = { ...data[type][index], deleted_at: new Date().toISOString() };
   await writeStore(data);
-  return data[type].length !== before;
+  return true;
 }
 
 export async function listLocalMonsters(category = '') {
   const data = await ensureStore();
   const normalized = String(category || '').toLowerCase();
   return data.monsters
+    .filter((monster) => !monster.deleted_at)
     .filter((monster) => !normalized || monster.category.toLowerCase() === normalized)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function getLocalMonster(id) {
   const data = await ensureStore();
-  return data.monsters.find((monster) => monster.id === id) || null;
+  return data.monsters.find((monster) => monster.id === id && !monster.deleted_at) || null;
 }
 
 export async function createLocalMonster(monster) {
@@ -544,7 +547,7 @@ export async function createLocalMonster(monster) {
 
 export async function updateLocalMonster(id, monster) {
   const data = await ensureStore();
-  const index = data.monsters.findIndex((row) => row.id === id);
+  const index = data.monsters.findIndex((row) => row.id === id && !row.deleted_at);
   if (index === -1) return null;
   const existingAttacks = data.monsters[index].attacks || [];
   data.monsters[index] = normalizeLocalMonster({
@@ -561,10 +564,12 @@ export async function updateLocalMonster(id, monster) {
 
 export async function deleteLocalMonster(id) {
   const data = await ensureStore();
-  const before = data.monsters.length;
-  data.monsters = data.monsters.filter((monster) => monster.id !== id);
+  const index = data.monsters.findIndex((monster) => monster.id === id && !monster.deleted_at);
+  if (index === -1) return false;
+  data.monsters[index].deleted_at = new Date().toISOString();
+  data.monsters[index].updated_at = data.monsters[index].deleted_at;
   await writeStore(data);
-  return data.monsters.length !== before;
+  return true;
 }
 
 export async function createLocalMonsterAttack(monsterId, attack) {
@@ -623,7 +628,7 @@ export async function deleteLocalMonsterAttack(attackId) {
 
 export async function listLocalPowers() {
   const data = await ensureStore();
-  return [...(data.powers || [])].sort((a, b) => (
+  return [...(data.powers || [])].filter((power) => !power.deleted_at).sort((a, b) => (
     `${a.type || ''}${a.element || ''}${a.recommended_level || 0}${a.name || ''}`
       .localeCompare(`${b.type || ''}${b.element || ''}${b.recommended_level || 0}${b.name || ''}`)
   ));
@@ -631,7 +636,7 @@ export async function listLocalPowers() {
 
 export async function getLocalPower(id) {
   const data = await ensureStore();
-  return (data.powers || []).find((power) => power.id === id) || null;
+  return (data.powers || []).find((power) => power.id === id && !power.deleted_at) || null;
 }
 
 export async function createLocalPower(power) {
@@ -652,7 +657,7 @@ export async function createLocalPower(power) {
 export async function updateLocalPower(id, power) {
   const data = await ensureStore();
   data.powers = data.powers || [];
-  const index = data.powers.findIndex((row) => row.id === id);
+  const index = data.powers.findIndex((row) => row.id === id && !row.deleted_at);
   if (index === -1) return null;
   data.powers[index] = {
     ...data.powers[index],
@@ -667,10 +672,12 @@ export async function updateLocalPower(id, power) {
 export async function deleteLocalPower(id) {
   const data = await ensureStore();
   data.powers = data.powers || [];
-  const before = data.powers.length;
-  data.powers = data.powers.filter((power) => power.id !== id);
+  const index = data.powers.findIndex((power) => power.id === id && !power.deleted_at);
+  if (index === -1) return false;
+  data.powers[index].deleted_at = new Date().toISOString();
+  data.powers[index].updated_at = data.powers[index].deleted_at;
   await writeStore(data);
-  return data.powers.length !== before;
+  return true;
 }
 
 function decorateLocalFeedback(data, feedback) {

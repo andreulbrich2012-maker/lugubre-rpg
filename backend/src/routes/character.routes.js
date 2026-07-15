@@ -77,7 +77,7 @@ const characterSchema = z.object({
 });
 
 async function skillKeys() {
-  const result = await tryQuery('select "key" from skills order by name');
+  const result = await tryQuery('select "key" from skills where deleted_at is null order by name');
   return result?.rows?.map((skill) => skill.key) || (await getLocalCatalog('skills')).map((skill) => skill.key);
 }
 
@@ -162,6 +162,29 @@ function powerField(value) {
   return null;
 }
 
+const referenceSchema = z.object({
+  raceId: z.string().min(1).nullable().optional(),
+  classId: z.string().min(1).nullable().optional(),
+  originId: z.string().min(1).nullable().optional()
+});
+
+function hasField(object, field) {
+  return Object.prototype.hasOwnProperty.call(object, field);
+}
+
+async function getActiveReference(type, id) {
+  if (!id) return null;
+  const tables = {
+    race: { table: 'races', local: 'races', columns: 'id, name, attribute_modifiers' },
+    class: { table: 'classes', local: 'classes', columns: 'id, name' },
+    origin: { table: 'origins', local: 'origins', columns: 'id, name, skill_modifiers' }
+  };
+  const config = tables[type];
+  const result = await tryQuery(`select ${config.columns} from ${config.table} where id = $1 and deleted_at is null`, [id]);
+  if (result) return result.rows[0] || null;
+  return (await getLocalCatalog(config.local)).find((item) => item.id === id) || null;
+}
+
 function characterSnapshot(row) {
   return {
     character_name: row.character_name,
@@ -217,14 +240,14 @@ async function normalizeCharacter(body, currentSkills = null) {
   const keys = await skillKeys();
   let modifiers = {};
   if (data.raceId) {
-    const race = await tryQuery('select attribute_modifiers from races where id = $1', [data.raceId]);
+    const race = await tryQuery('select attribute_modifiers from races where id = $1 and deleted_at is null', [data.raceId]);
     if (race?.rows?.[0]) modifiers = parseJsonField(race.rows[0].attribute_modifiers, {});
     else modifiers = (await getLocalCatalog('races')).find((item) => item.id === data.raceId)?.attribute_modifiers || {};
   }
   const attributes = applyRaceModifiers(baseAttributes(), modifiers);
   let origin = null;
   if (data.originId) {
-    const result = await tryQuery('select skill_modifiers from origins where id = $1', [data.originId]);
+    const result = await tryQuery('select skill_modifiers from origins where id = $1 and deleted_at is null', [data.originId]);
     origin = result?.rows?.[0] || (await getLocalCatalog('origins')).find((item) => item.id === data.originId);
   }
   const originSkills = parseJsonField(origin?.skill_modifiers, {});
@@ -249,12 +272,12 @@ async function enrich(row) {
     tryQuery('select * from races order by name'),
     tryQuery('select * from classes order by name'),
     tryQuery('select * from origins order by name'),
-    tryQuery('select id, "key", name, attribute from skills order by name')
+    tryQuery('select id, "key", name, attribute from skills where deleted_at is null order by name')
   ]);
   const [races, classes, origins, skillsCatalog] = await Promise.all([
-    racesResult?.rows || getLocalCatalog('races'),
-    classesResult?.rows || getLocalCatalog('classes'),
-    originsResult?.rows || getLocalCatalog('origins'),
+    racesResult?.rows || getLocalCatalog('races', { includeDeleted: true }),
+    classesResult?.rows || getLocalCatalog('classes', { includeDeleted: true }),
+    originsResult?.rows || getLocalCatalog('origins', { includeDeleted: true }),
     skillsResult?.rows || getLocalCatalog('skills')
   ]);
   const attributes = parseJsonField(row.attributes, baseAttributes());
@@ -269,6 +292,33 @@ async function enrich(row) {
     'select id, label, saved_at from character_saves where character_id = $1 order by saved_at desc limit 3',
     [row.id]
   );
+  const raceRef = races.find((item) => item.id === row.race_id);
+  const classRef = classes.find((item) => item.id === row.class_id);
+  const originRef = origins.find((item) => item.id === row.origin_id);
+  const referenceWarnings = [
+    row.race_id && raceRef?.deleted_at ? {
+      type: 'race',
+      field: 'raceId',
+      label: 'raça',
+      current_name: raceRef.name || row.race_name || 'Raça removida',
+      message: 'Sua raça atual foi removida do sistema. Troque a raça clicando aqui.'
+    } : null,
+    row.class_id && classRef?.deleted_at ? {
+      type: 'class',
+      field: 'classId',
+      label: 'classe',
+      current_name: classRef.name || row.class_name || 'Classe removida',
+      message: 'Sua classe atual foi removida do sistema. Troque a classe clicando aqui.'
+    } : null,
+    row.origin_id && originRef?.deleted_at ? {
+      type: 'origin',
+      field: 'originId',
+      label: 'origem',
+      current_name: originRef.name || row.origin_name || row.origin || 'Origem removida',
+      message: 'Sua origem atual foi removida do sistema. Troque a origem clicando aqui.'
+    } : null
+  ].filter(Boolean);
+
   return {
     ...row,
     attributes,
@@ -283,9 +333,10 @@ async function enrich(row) {
     quick_roll_modifier: diceSettings.quickRollModifier,
     save_history: savesResult?.rows || row.save_history || [],
     skills_catalog: skillsCatalog,
-    race_name: row.race_name || races.find((item) => item.id === row.race_id)?.name,
-    class_name: row.class_name || classes.find((item) => item.id === row.class_id)?.name,
-    origin_name: row.origin_name || origins.find((item) => item.id === row.origin_id)?.name || row.origin,
+    reference_warnings: referenceWarnings,
+    race_name: row.race_name || raceRef?.name,
+    class_name: row.class_name || classRef?.name,
+    origin_name: row.origin_name || originRef?.name || row.origin,
     dodge: calculateDodge(attributes),
     total_defense: calculateDefense(row.defense, inventory)
   };
@@ -409,7 +460,7 @@ router.post('/:id/powers', async (req, res) => {
   const body = z.object({ type: z.string().default('attacks') }).passthrough().parse(req.body);
   let source = body;
   if (body.powerId) {
-    const library = await tryQuery('select * from power_library where id = $1', [body.powerId]);
+    const library = await tryQuery('select * from power_library where id = $1 and deleted_at is null', [body.powerId]);
     if (!library?.rowCount) return res.status(404).json({ message: 'Poder ou magia da biblioteca não encontrado.' });
     const power = library.rows[0];
     source = {
@@ -482,6 +533,46 @@ router.put('/:id', async (req, res) => {
   if (!row) return res.status(404).json({ message: 'Ficha não encontrada.' });
   await recordCharacterSave(row, 'Edicao da base');
   res.json(await enrich(row));
+});
+
+router.patch('/:id/references', async (req, res) => {
+  const dbRow = await tryQuery('select * from characters where id = $1 and owner_id = $2', [req.params.id, req.user.id]);
+  const row = dbRow?.rows?.[0] || await getLocalCharacter(req.params.id, req.user.id);
+  if (!row) return res.status(404).json({ message: 'Ficha nao encontrada.' });
+
+  const body = referenceSchema.parse(req.body);
+  const race = hasField(body, 'raceId') ? await getActiveReference('race', body.raceId) : null;
+  const klass = hasField(body, 'classId') ? await getActiveReference('class', body.classId) : null;
+  const origin = hasField(body, 'originId') ? await getActiveReference('origin', body.originId) : null;
+
+  if (body.raceId && !race) return res.status(400).json({ message: 'Raca invalida ou removida.' });
+  if (body.classId && !klass) return res.status(400).json({ message: 'Classe invalida ou removida.' });
+  if (body.originId && !origin) return res.status(400).json({ message: 'Origem invalida ou removida.' });
+
+  const attributes = hasField(body, 'raceId')
+    ? applyRaceModifiers(baseAttributes(), parseJsonField(race?.attribute_modifiers, {}))
+    : parseJsonField(row.attributes, baseAttributes());
+  const nextRaceId = hasField(body, 'raceId') ? body.raceId || null : row.race_id;
+  const nextClassId = hasField(body, 'classId') ? body.classId || null : row.class_id;
+  const nextOriginId = hasField(body, 'originId') ? body.originId || null : row.origin_id;
+  const nextOriginName = hasField(body, 'originId') ? origin?.name || '' : row.origin;
+
+  const result = await tryQuery(
+    `update characters
+     set race_id=$1, class_id=$2, origin_id=$3, origin=$4, attributes=$5, updated_at=now()
+     where id=$6 and owner_id=$7
+     returning *`,
+    [nextRaceId, nextClassId, nextOriginId, nextOriginName, toJson(attributes), req.params.id, req.user.id]
+  );
+  const updated = result?.rows?.[0] || await updateLocalCharacter(req.params.id, req.user.id, {
+    raceId: nextRaceId,
+    classId: nextClassId,
+    originId: nextOriginId,
+    origin: nextOriginName,
+    attributes
+  });
+  await recordCharacterSave(updated, 'Troca de referencia');
+  res.json(await enrich(updated));
 });
 
 router.patch('/:id/play', async (req, res) => {

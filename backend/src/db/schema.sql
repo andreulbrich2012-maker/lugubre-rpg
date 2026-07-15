@@ -24,8 +24,10 @@ create table if not exists races (
   name text not null,
   image text,
   attribute_modifiers jsonb not null default '{}',
+  deleted_at timestamptz,
   created_at timestamptz not null default now()
 );
+alter table races add column if not exists deleted_at timestamptz;
 
 create table if not exists classes (
   id uuid primary key default uuid_generate_v4(),
@@ -33,26 +35,32 @@ create table if not exists classes (
   description text,
   image text,
   progression jsonb not null default '[]',
+  deleted_at timestamptz,
   created_at timestamptz not null default now()
 );
 
 alter table classes add column if not exists description text;
+alter table classes add column if not exists deleted_at timestamptz;
 
 create table if not exists origins (
   id uuid primary key default uuid_generate_v4(),
   name text not null,
   description text,
   skill_modifiers jsonb not null default '{}',
+  deleted_at timestamptz,
   created_at timestamptz not null default now()
 );
+alter table origins add column if not exists deleted_at timestamptz;
 
 create table if not exists skills (
   id uuid primary key default uuid_generate_v4(),
   "key" text not null unique,
   name text not null,
   attribute text not null default 'presenca',
+  deleted_at timestamptz,
   created_at timestamptz not null default now()
 );
+alter table skills add column if not exists deleted_at timestamptz;
 
 create table if not exists characters (
   id uuid primary key default uuid_generate_v4(),
@@ -246,11 +254,13 @@ create table if not exists power_library (
   recommended_class text,
   recommended_level int not null default 1 check (recommended_level between 1 and 20),
   image_url text,
+  deleted_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 alter table power_library add column if not exists image_url text;
+alter table power_library add column if not exists deleted_at timestamptz;
 alter table power_library add column if not exists updated_at timestamptz not null default now();
 alter table power_library drop constraint if exists power_library_type_check;
 alter table power_library add constraint power_library_type_check check (type in ('magia', 'poder'));
@@ -328,6 +338,7 @@ create table if not exists monsters (
   armor int not null default 10 check (armor >= 0),
   items jsonb not null default '[]',
   description text,
+  deleted_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -342,6 +353,7 @@ alter table monsters add column if not exists max_health int not null default 12
 alter table monsters add column if not exists armor int not null default 10;
 alter table monsters add column if not exists items jsonb not null default '[]';
 alter table monsters add column if not exists description text;
+alter table monsters add column if not exists deleted_at timestamptz;
 alter table monsters add column if not exists updated_at timestamptz not null default now();
 alter table monsters alter column category set default 'Caos';
 update monsters

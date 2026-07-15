@@ -30,8 +30,12 @@ function normalizeMonster(row) {
 
 async function monsterRows(category = '') {
   const params = [];
-  const where = category ? 'where lower(m.category) = lower($1)' : '';
-  if (category) params.push(category);
+  const filters = ['m.deleted_at is null'];
+  if (category) {
+    params.push(category);
+    filters.push(`lower(m.category) = lower($${params.length})`);
+  }
+  const where = `where ${filters.join(' and ')}`;
   const result = await tryQuery(
     `select m.*,
        coalesce(
@@ -79,7 +83,7 @@ async function findMonster(id) {
        ) as attacks
      from monsters m
      left join monster_attacks a on a.monster_id = m.id
-     where m.id = $1
+     where m.id = $1 and m.deleted_at is null
      group by m.id`,
     [id]
   );

@@ -488,6 +488,37 @@ describe('fluxo principal da API', () => {
     expect(savedCharacter.body.mana).toBe(5);
     expect(savedCharacter.body.inventory[0]).toMatchObject({ quantity: 2, weight: 1, name: 'Poção de Vida' });
     expect(savedCharacter.body.skills.luta).toBe(10);
+
+    await expectAdminDelete(`/api/admin/races/${editedRace.body.id}`, adminToken);
+    await expectAdminDelete(`/api/admin/classes/${klass.body.id}`, adminToken);
+    await expectAdminDelete(`/api/admin/origins/${origin.body.id}`, adminToken);
+
+    const hiddenCatalog = await Promise.all([
+      request(app).get('/api/catalog/races').expect(200),
+      request(app).get('/api/catalog/classes').expect(200),
+      request(app).get('/api/catalog/origins').expect(200)
+    ]);
+    expect(hiddenCatalog[0].body.some((item) => item.id === editedRace.body.id)).toBe(false);
+    expect(hiddenCatalog[1].body.some((item) => item.id === klass.body.id)).toBe(false);
+    expect(hiddenCatalog[2].body.some((item) => item.id === origin.body.id)).toBe(false);
+
+    const warnedCharacter = await request(app)
+      .get(`/api/characters/${character.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(warnedCharacter.body.reference_warnings.map((item) => item.type)).toEqual(expect.arrayContaining(['race', 'class', 'origin']));
+
+    const swappedCharacter = await request(app)
+      .patch(`/api/characters/${character.body.id}/references`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ raceId: humanRaceId, classId, originId: defaultOriginId })
+      .expect(200);
+
+    expect(swappedCharacter.body.reference_warnings).toHaveLength(0);
+    expect(swappedCharacter.body.race_id).toBe(humanRaceId);
+    expect(swappedCharacter.body.class_id).toBe(classId);
+    expect(swappedCharacter.body.origin_id).toBe(defaultOriginId);
     expect(savedCharacter.body.skill_bonuses.luta).toBe(3);
     expect(savedCharacter.body.attacks[0]).toMatchObject({ name: 'Arco Curto', damage: '1d6+1', criticalValue: 19, criticalMultiplier: 3, range: '18m', skill: 'Pontaria' });
     expect(savedCharacter.body.spells[0]).toMatchObject({ name: 'Bola de Fogo', damage: '2d8+3', element: 'Caos', manaCost: 4 });
@@ -798,9 +829,6 @@ describe('fluxo principal da API', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(204);
 
-    await expectAdminDelete(`/api/admin/races/${editedRace.body.id}`, adminToken);
-    await expectAdminDelete(`/api/admin/classes/${klass.body.id}`, adminToken);
-    await expectAdminDelete(`/api/admin/origins/${origin.body.id}`, adminToken);
     await expectAdminDelete(`/api/admin/skills/${skill.body.id}`, adminToken);
     await expectAdminDelete(`/api/admin/powers/${libraryPower.body.id}`, adminToken);
     await expectAdminDelete(`/api/admin/feedbacks/${feedback.body.feedback.id}`, adminToken);

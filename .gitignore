@@ -9,3 +9,4 @@ backend/.env
 .vercel
 .env*
 data/
+Fotos/

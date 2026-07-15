@@ -162,8 +162,16 @@ function DashboardTab({ summary, user }) {
 
   return (
     <div className="space-y-6">
-      <section className="gothic-panel relative overflow-hidden rounded-md p-4 sm:p-6 lg:p-8">
-        <div className="absolute right-0 top-0 h-52 w-52 rounded-full bg-blood/20 blur-3xl" />
+      <section className="gothic-panel relative min-h-[300px] overflow-hidden rounded-md p-4 sm:min-h-[340px] sm:p-6 lg:min-h-[380px] lg:p-8">
+        <img
+          src="/images/lugubre/lugubre-dashboard-banner.jpg"
+          alt=""
+          aria-hidden="true"
+          decoding="async"
+          className="absolute inset-0 h-full w-full scale-[1.03] object-cover object-[center_42%] opacity-55"
+        />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,4,10,.98)_0%,rgba(8,6,18,.88)_48%,rgba(5,4,10,.42)_100%)]" />
+        <div className="absolute inset-0 shadow-[inset_0_0_130px_42px_rgba(5,4,10,.65)]" />
         <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.28em] text-ember/80">{phrase}</p>
@@ -172,7 +180,7 @@ function DashboardTab({ summary, user }) {
           </div>
           <Shield className="text-ember" size={34} />
         </div>
-        <div className="relative mt-6 grid gap-4 sm:grid-cols-2">
+        <div className="relative mt-8 grid gap-4 sm:mt-10 sm:grid-cols-2 lg:max-w-2xl">
           <Metric label="Personagens" value={summary?.characters_count || 0} />
           <Metric label="Campanhas" value={summary?.campaigns_count || 0} />
         </div>
@@ -215,7 +223,7 @@ function DashboardTab({ summary, user }) {
 
 function Metric({ label, value }) {
   return (
-    <div className="rounded-md border border-ember/15 bg-black/25 p-4">
+    <div className="rounded-md border border-ember/20 bg-black/50 p-4 backdrop-blur-sm">
       <p className="text-sm text-mist">{label}</p>
       <p className="mt-1 font-display text-4xl text-white">{value}</p>
     </div>

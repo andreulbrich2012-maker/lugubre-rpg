@@ -15,6 +15,16 @@ import {
 import Button from '../components/Button';
 import { api } from '../lib/api';
 
+const lugubreImages = {
+  hero: '/images/lugubre/lugubre-hero.jpg',
+  portal: '/images/lugubre/lugubre-portal.jpg',
+  mountains: '/images/lugubre/lugubre-mountains.jpg',
+  throne: '/images/lugubre/lugubre-throne.jpg',
+  forest: '/images/lugubre/lugubre-moonlit-forest.jpg'
+};
+
+const diaryFallbackImages = [lugubreImages.forest, lugubreImages.mountains];
+
 const features = [
   [ScrollText, 'Criador de Personagens', 'Monte fichas com raças, classes, origens, atributos, perícias, inventário, poderes e evolução em um único lugar.'],
   [Swords, 'Campanhas Online', 'Crie mesas, convide jogadores, compartilhe fichas e mantenha cada sessão organizada.'],
@@ -37,7 +47,7 @@ const fallbackPosts = [
     id: 'fallback-feedback',
     title: 'Sistema de Feedback Adicionado',
     short_description: 'Jogadores agora podem enviar sugestões, relatar bugs e acompanhar respostas da administração.',
-    image_url: '/assets/crypt-gate.svg',
+    image_url: lugubreImages.forest,
     category: 'Sistema',
     published_at: new Date().toISOString()
   },
@@ -45,7 +55,7 @@ const fallbackPosts = [
     id: 'fallback-library',
     title: 'Biblioteca de Magias e Poderes',
     short_description: 'A biblioteca ganhou filtros, elementos e integração com as fichas.',
-    image_url: '/assets/dark-castle.svg',
+    image_url: lugubreImages.mountains,
     category: 'Novidade',
     published_at: new Date(Date.now() - 86_400_000).toISOString()
   }
@@ -80,8 +90,16 @@ export default function Home() {
 function HeroSection() {
   return (
     <section className="relative min-h-[78vh] overflow-hidden px-3 py-16 sm:px-4 sm:py-24 lg:min-h-[720px]">
-      <div className="absolute inset-0 bg-cover bg-center scale-105 opacity-80" style={{ backgroundImage: "url('/assets/dark-castle.svg')" }} />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_68%_28%,rgba(134,92,246,.34),transparent_25%),radial-gradient(circle_at_18%_20%,rgba(199,163,91,.16),transparent_22%),linear-gradient(90deg,#05040a_0%,rgba(8,6,18,.86)_48%,rgba(5,4,10,.44)_100%)]" />
+      <img
+        src={lugubreImages.hero}
+        alt=""
+        aria-hidden="true"
+        fetchPriority="high"
+        decoding="async"
+        className="absolute inset-0 h-full w-full scale-[1.04] object-cover object-[60%_center] opacity-90 sm:object-center"
+      />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_28%,rgba(134,92,246,.24),transparent_28%),radial-gradient(circle_at_18%_20%,rgba(199,163,91,.12),transparent_24%),linear-gradient(90deg,#05040a_0%,rgba(8,6,18,.90)_46%,rgba(5,4,10,.48)_100%)]" />
+      <div className="absolute inset-0 shadow-[inset_0_0_180px_70px_rgba(5,4,10,.58)]" />
       <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-[#05040a] via-[#05040a]/80 to-transparent" />
       <div className="relative mx-auto flex min-h-[58vh] max-w-7xl items-center">
         <div className="max-w-3xl">
@@ -106,16 +124,29 @@ function HeroSection() {
 function AboutSection() {
   return (
     <section id="sistema" className="mx-auto max-w-7xl px-3 py-14 sm:px-4 sm:py-20">
-      <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
-        <div>
+      <div className="grid gap-8 lg:grid-cols-[0.88fr_1.12fr] lg:items-center">
+        <figure className="relative aspect-[4/3] overflow-hidden rounded-md border border-ember/20 bg-black/40 shadow-[0_24px_80px_rgba(0,0,0,.48)]">
+          <img
+            src={lugubreImages.portal}
+            alt="Portal arcano violeta em ruínas antigas"
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#05040a]/70 via-transparent to-blood/10" />
+          <figcaption className="absolute bottom-4 left-4 right-4 text-xs font-bold uppercase tracking-[.22em] text-ember">
+            Um portal para histórias que permanecem
+          </figcaption>
+        </figure>
+        <div className="lg:pl-4">
           <p className="text-xs font-bold uppercase tracking-[.28em] text-ember">O que é</p>
           <h2 className="mt-3 font-display text-4xl text-white sm:text-5xl">Uma mesa sombria, organizada como software premium.</h2>
+          <p className="mt-5 text-base leading-relaxed text-mist sm:text-lg">
+            Lúgubre RPG é uma plataforma de fantasia sombria feita para criar personagens, organizar campanhas,
+            registrar jornadas e transformar cada mesa em uma narrativa viva, sem perder tempo procurando regra,
+            ficha ou mensagem no meio da sessão.
+          </p>
         </div>
-        <p className="text-base leading-relaxed text-mist sm:text-lg">
-          Lúgubre RPG é uma plataforma de fantasia sombria feita para criar personagens, organizar campanhas,
-          registrar jornadas e transformar cada mesa em uma narrativa viva, sem perder tempo procurando regra,
-          ficha ou mensagem no meio da sessão.
-        </p>
       </div>
       <div className="mt-10 grid gap-4 md:grid-cols-3">
         {highlights.map(([title, text]) => (
@@ -168,20 +199,22 @@ function DeveloperDiarySection({ posts }) {
           </p>
         </div>
         <div className="mt-7 grid gap-4 lg:grid-cols-3">
-          {posts.slice(0, 6).map((post) => <DeveloperPostCard key={post.id} post={post} />)}
+          {posts.slice(0, 6).map((post, index) => <DeveloperPostCard key={post.id} post={post} fallbackIndex={index} />)}
         </div>
       </div>
     </section>
   );
 }
 
-function DeveloperPostCard({ post }) {
+function DeveloperPostCard({ post, fallbackIndex }) {
   const [broken, setBroken] = useState(false);
-  const image = !broken && post.image_url ? post.image_url : '/assets/haunted-ruins.svg';
+  const fallbackImage = diaryFallbackImages[fallbackIndex % diaryFallbackImages.length];
+  const legacyPlaceholder = post.image_url?.startsWith('/assets/');
+  const image = !broken && post.image_url && !legacyPlaceholder ? post.image_url : fallbackImage;
   return (
     <article className="soft-motion overflow-hidden rounded-md border border-white/10 bg-black/25">
       <div className="relative aspect-[16/9] overflow-hidden bg-black/40">
-        <img src={image} alt={`Imagem da atualização ${post.title}`} className="h-full w-full object-cover opacity-85 transition-transform duration-500 hover:scale-105" onError={() => setBroken(true)} />
+        <img src={image} alt={`Arte de fantasia sombria para a atualização ${post.title}`} loading="lazy" decoding="async" className="h-full w-full object-cover opacity-85 transition-transform duration-500 hover:scale-105" onError={() => setBroken(true)} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
         <span className="absolute left-3 top-3 rounded-full border border-ember/30 bg-black/55 px-3 py-1 text-xs font-bold uppercase tracking-[.16em] text-ember">
           {post.category || 'Atualização'}
@@ -199,8 +232,10 @@ function DeveloperPostCard({ post }) {
 function FinalCallSection() {
   return (
     <section className="mx-auto max-w-7xl px-3 py-14 sm:px-4 sm:py-20">
-      <div className="relative overflow-hidden rounded-md border border-ember/20 bg-[linear-gradient(135deg,rgba(111,67,214,.22),rgba(5,4,10,.95))] p-6 shadow-glow sm:p-10">
-        <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-blood/20 blur-3xl" />
+      <div className="relative overflow-hidden rounded-md border border-ember/20 bg-black p-6 shadow-glow sm:p-10">
+        <img src={lugubreImages.throne} alt="" aria-hidden="true" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover object-center opacity-45" />
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,4,10,.98)_0%,rgba(5,4,10,.90)_48%,rgba(20,9,38,.54)_100%)]" />
+        <div className="absolute inset-0 shadow-[inset_0_0_110px_35px_rgba(5,4,10,.62)]" />
         <div className="relative max-w-3xl">
           <Crown className="text-ember" size={34} />
           <h2 className="mt-4 font-display text-4xl text-white">O grimório está aberto.</h2>

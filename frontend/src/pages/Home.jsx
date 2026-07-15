@@ -16,7 +16,7 @@ import Button from '../components/Button';
 import { api } from '../lib/api';
 
 const lugubreImages = {
-  hero: '/images/lugubre/lugubre-hero.jpg',
+  hero: '/images/lugubre/lugubre-hero.png',
   portal: '/images/lugubre/lugubre-portal.jpg',
   mountains: '/images/lugubre/lugubre-mountains.jpg',
   throne: '/images/lugubre/lugubre-throne.jpg',
@@ -96,10 +96,10 @@ function HeroSection() {
         aria-hidden="true"
         fetchPriority="high"
         decoding="async"
-        className="absolute inset-0 h-full w-full scale-[1.04] object-cover object-[60%_center] opacity-90 sm:object-center"
+        className="absolute inset-0 h-full w-full scale-[1.04] object-cover object-[60%_center] opacity-95 sm:object-center"
       />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_28%,rgba(134,92,246,.24),transparent_28%),radial-gradient(circle_at_18%_20%,rgba(199,163,91,.12),transparent_24%),linear-gradient(90deg,#05040a_0%,rgba(8,6,18,.90)_46%,rgba(5,4,10,.48)_100%)]" />
-      <div className="absolute inset-0 shadow-[inset_0_0_180px_70px_rgba(5,4,10,.58)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_28%,rgba(134,92,246,.18),transparent_30%),radial-gradient(circle_at_18%_20%,rgba(199,163,91,.10),transparent_24%),linear-gradient(90deg,#05040a_0%,rgba(8,6,18,.82)_46%,rgba(5,4,10,.24)_100%)]" />
+      <div className="absolute inset-0 shadow-[inset_0_0_150px_46px_rgba(5,4,10,.38)]" />
       <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-[#05040a] via-[#05040a]/80 to-transparent" />
       <div className="relative mx-auto flex min-h-[58vh] max-w-7xl items-center">
         <div className="max-w-3xl">

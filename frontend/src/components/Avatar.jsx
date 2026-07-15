@@ -10,6 +10,7 @@ export default function Avatar({ user, size = 'md' }) {
     return (
       <img
         src={user.profile_image_url}
+        alt={`Foto de perfil de ${user?.name || 'usuário'}`}
         className={`${sizes[size]} rounded-full border border-ember/40 object-cover shadow-glow`}
       />
     );

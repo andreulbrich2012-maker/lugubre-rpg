@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { BookOpen, Camera, Eye, EyeOff, LayoutDashboard, Menu, MessageCircle, MessageSquareText, Palette, ScrollText, Settings, Shield, Skull, Swords, Trash2, Users, X } from 'lucide-react';
+import { BookOpen, Camera, ChevronRight, CircleUserRound, Eye, EyeOff, Flame, LayoutDashboard, Menu, MessageCircle, MessageSquareText, Palette, ScrollText, Settings, Shield, Skull, Sparkles, Swords, Trash2, Users, X } from 'lucide-react';
 import Alert from '../components/Alert';
 import Avatar from '../components/Avatar';
 import Button from '../components/Button';
@@ -17,6 +17,7 @@ const tabs = [
   { id: 'campaigns', label: 'Campanhas', icon: Swords },
   { id: 'friends', label: 'Amigos', icon: Users },
   { id: 'monsters', label: 'Monstros', icon: Skull },
+  { id: 'library', label: 'Biblioteca', icon: BookOpen, href: '/powers' },
   { id: 'feedback', label: 'Feedback', icon: MessageSquareText },
   { id: 'settings', label: 'Configuracoes', icon: Settings },
   { id: 'personalization', label: 'Personalizacao', icon: Palette }
@@ -85,38 +86,43 @@ export default function Dashboard() {
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
-    if (requestedTab && tabs.some((tab) => tab.id === requestedTab)) {
+    if (requestedTab && tabs.some((tab) => tab.id === requestedTab && !tab.href)) {
       setActive(requestedTab);
     }
   }, [searchParams]);
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-6 px-3 pb-24 pt-5 sm:px-4 sm:py-8 lg:grid-cols-[260px_1fr]">
+    <main className="mx-auto grid max-w-[1600px] gap-4 px-3 pb-24 pt-4 sm:px-4 sm:py-5 lg:grid-cols-[270px_minmax(0,1fr)]">
       {sidebarOpen && <button className="fixed inset-0 z-30 bg-black/70 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-      <aside className={`gothic-panel fixed left-3 right-3 top-20 z-40 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-md p-4 lg:sticky lg:left-auto lg:right-auto lg:top-24 lg:z-auto lg:block lg:h-[calc(100vh-140px)] ${sidebarOpen ? 'block' : 'hidden'}`}>
+      <aside className={`gothic-panel fixed left-3 right-3 top-20 z-40 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-md p-3 lg:sticky lg:left-auto lg:right-auto lg:top-20 lg:z-auto lg:flex lg:h-[calc(100vh-6.5rem)] lg:flex-col ${sidebarOpen ? 'block' : 'hidden'}`}>
         <div className="flex items-center gap-3 border-b border-ember/10 pb-4">
           <Avatar user={user} size="md" />
           <div className="min-w-0">
-            <p className="text-xs uppercase tracking-[0.28em] text-ember/70">Conta</p>
-            <h1 className="truncate font-display text-2xl text-ember">{user?.name}</h1>
+            <p className="text-[11px] uppercase tracking-[0.24em] text-mist/70">Conta</p>
+            <h1 className="truncate font-display text-xl text-white">{user?.name}</h1>
             <p className="truncate text-xs text-mist">{user?.email}</p>
           </div>
         </div>
-        <nav className="mt-4 space-y-2">
+        <nav className="mt-4 space-y-1.5">
           {tabs.map((tab) => {
             const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => { activateTab(tab.id); setSidebarOpen(false); }}
-                className={`flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors ${active === tab.id ? 'border-ember/50 bg-ember/15 text-white' : 'border-transparent text-mist hover:border-ember/20 hover:text-white'}`}
-              >
-                <Icon size={17} />
-                {tab.label}
-              </button>
-            );
+            const className = `flex min-h-11 w-full items-center gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors ${active === tab.id ? 'border-[#8b5cf6]/40 bg-[#7c3aed]/20 text-[#b99af3]' : 'border-transparent text-mist hover:border-[#8b5cf6]/20 hover:bg-white/[.03] hover:text-white'}`;
+            if (tab.href) {
+              return <Link key={tab.id} to={tab.href} onClick={() => setSidebarOpen(false)} className={className}><Icon size={18} />{tab.label}</Link>;
+            }
+            return <button key={tab.id} onClick={() => { activateTab(tab.id); setSidebarOpen(false); }} className={className}><Icon size={18} />{tab.label}</button>;
           })}
         </nav>
+        <div className="mt-6 rounded-md border border-[#8b5cf6]/20 bg-black/30 p-3 lg:mt-auto">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-md border border-[#8b5cf6]/35 bg-[#7c3aed]/15 text-[#9b72e8]"><Sparkles size={20} /></div>
+            <div>
+              <p className="font-display text-lg text-white">Lúgubre RPG</p>
+              <p className="text-xs text-mist">v0.5.0 Beta</p>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-mist/80">O destino espera.</p>
+        </div>
       </aside>
 
       <section className="min-h-[640px] min-w-0">
@@ -127,7 +133,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            {active === 'dashboard' && <DashboardTab summary={summary} user={user} />}
+            {active === 'dashboard' && <DashboardTab summary={summary} user={user} characters={characters} campaigns={campaigns} onSettings={() => activateTab('settings')} />}
             {active === 'characters' && <CharactersTab characters={characters} onRemove={removeCharacter} />}
             {active === 'campaigns' && <CampaignsTab campaigns={campaigns} onReload={load} />}
             {active === 'friends' && <FriendsTab />}
@@ -144,90 +150,165 @@ export default function Dashboard() {
 
 function DashboardTopbar({ user, onMenu, onSettings, onLogout }) {
   return (
-    <div className="mb-5 flex items-center justify-between gap-4 rounded-md border border-ember/10 bg-black/20 p-3 sm:border-0 sm:bg-transparent sm:p-0">
+    <div className="mb-4 flex items-center justify-between gap-4 rounded-md border border-[#8b5cf6]/15 bg-black/25 p-3 lg:hidden">
       <div className="min-w-0">
-        <p className="text-xs uppercase tracking-[0.28em] text-ember/70">Painel</p>
-        <h2 className="truncate font-display text-2xl text-white sm:text-3xl">Conta e grimorio</h2>
+        <p className="text-[11px] uppercase tracking-[0.24em] text-[#9b72e8]">Painel</p>
+        <h2 className="truncate font-display text-2xl text-white">Dashboard</h2>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <Button variant="ghost" className="px-3 lg:hidden" onClick={onMenu}><Menu size={18} /></Button>
+        <Button variant="ghost" className="px-3" onClick={onMenu} title="Abrir navegação"><Menu size={18} /></Button>
         <UserMenu user={user} onSettings={onSettings} onLogout={onLogout} />
       </div>
     </div>
   );
 }
 
-function DashboardTab({ summary, user }) {
+function DashboardTab({ summary, user, characters, campaigns, onSettings }) {
   const phrase = useMemo(() => immersivePhrases[Math.floor(Math.random() * immersivePhrases.length)], []);
+  const characterCount = Number(summary?.characters_count || 0);
+  const campaignCount = Number(summary?.campaigns_count || 0);
+  const total = characterCount + campaignCount;
+  const campaignAngle = total ? Math.round((campaignCount / total) * 360) : 0;
+  const characterAngle = total ? Math.round((characterCount / total) * 360) : 0;
+  const chartBackground = total
+    ? `conic-gradient(#8b5cf6 0deg ${campaignAngle}deg, #4c2a84 ${campaignAngle}deg ${campaignAngle + characterAngle}deg, #211831 ${campaignAngle + characterAngle}deg 360deg)`
+    : 'conic-gradient(#211831 0deg 360deg)';
+
+  const actions = [
+    { to: '/characters/new', icon: CircleUserRound, title: 'Criar personagem', description: 'Comece uma nova ficha com raça, classe, origem e inventário.', action: 'Criar agora' },
+    { to: '/campaigns', icon: Swords, title: 'Campanhas', description: 'Crie uma mesa ou entre com um código de convite.', action: 'Ver campanhas' },
+    { to: '/powers', icon: BookOpen, title: 'Biblioteca', description: 'Busque magias, poderes, objetos e adicione direto na ficha.', action: 'Explorar' },
+    { to: '/feedback', icon: MessageSquareText, title: 'Feedback', description: 'Envie bugs, ideias e sugestões para melhorar o sistema.', action: 'Enviar feedback' }
+  ];
+
+  const activity = [
+    {
+      icon: Swords,
+      title: campaigns?.[0] ? 'Campanha disponível' : 'Campanhas prontas',
+      detail: campaigns?.[0]?.name || 'Crie sua primeira mesa',
+      time: campaigns?.[0] ? 'Recente' : 'Agora'
+    },
+    {
+      icon: CircleUserRound,
+      title: characters?.[0] ? 'Personagem criado' : 'Ficha aguardando',
+      detail: characters?.[0]?.character_name || 'Comece um novo personagem',
+      time: characters?.[0] ? 'Recente' : 'Agora'
+    },
+    { icon: BookOpen, title: 'Biblioteca integrada', detail: 'Magias e poderes disponíveis', time: 'Online' }
+  ];
 
   return (
-    <div className="space-y-6">
-      <section className="gothic-panel relative min-h-[300px] overflow-hidden rounded-md p-4 sm:min-h-[340px] sm:p-6 lg:min-h-[380px] lg:p-8">
-        <img
-          src="/images/lugubre/lugubre-dashboard-banner.jpg"
-          alt=""
-          aria-hidden="true"
-          decoding="async"
-          className="absolute inset-0 h-full w-full scale-[1.03] object-cover object-[center_42%] opacity-55"
-        />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,4,10,.98)_0%,rgba(8,6,18,.88)_48%,rgba(5,4,10,.42)_100%)]" />
-        <div className="absolute inset-0 shadow-[inset_0_0_130px_42px_rgba(5,4,10,.65)]" />
-        <div className="relative flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-ember/80">{phrase}</p>
-            <h2 className="mt-2 break-words font-display text-3xl text-white sm:text-4xl lg:text-5xl">{user?.name}</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-mist">Continue personagens, campanhas e registros de mesa em um painel feito para voltar rápido ao que importa.</p>
+    <div className="space-y-4">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_312px]">
+        <div className="gothic-panel relative min-h-[150px] overflow-hidden rounded-md">
+          <img src="/images/lugubre/lugubre-dashboard-banner.jpg" alt="" aria-hidden="true" decoding="async" className="absolute inset-0 h-full w-full scale-[1.04] object-cover object-[center_48%] opacity-70" />
+          <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,4,10,.48),rgba(8,6,18,.58)_50%,rgba(5,4,10,.94)_100%)]" />
+          <div className="absolute inset-0 shadow-[inset_0_0_95px_28px_rgba(5,4,10,.68)]" />
+          <div className="relative flex min-h-[150px] items-end justify-end p-5 sm:items-center sm:p-6">
+            <div className="max-w-xs text-right">
+              <p className="font-display text-lg leading-relaxed text-white">“Nas sombras, cada escolha escreve uma nova lenda.”</p>
+              <div className="mt-3 flex items-center justify-end gap-2 text-[#9b72e8]">
+                <span className="h-px w-12 bg-[#8b5cf6]/40" /><Sparkles size={15} /><span className="h-px w-12 bg-[#8b5cf6]/40" />
+              </div>
+            </div>
           </div>
-          <Shield className="text-ember" size={34} />
         </div>
-        <div className="relative mt-8 grid gap-4 sm:mt-10 sm:grid-cols-2 lg:max-w-2xl">
-          <Metric label="Personagens" value={summary?.characters_count || 0} />
-          <Metric label="Campanhas" value={summary?.campaigns_count || 0} />
+        <div className="gothic-panel flex min-h-[150px] items-center gap-3 rounded-md p-4">
+          <Avatar user={user} size="lg" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-display text-xl text-white">{user?.name}</p>
+            <span className="mt-2 inline-flex rounded border border-[#8b5cf6]/25 bg-[#7c3aed]/20 px-2 py-1 text-[11px] font-semibold text-[#b99af3]">{user?.role === 'admin' ? 'Mestre' : 'Jogador'}</span>
+          </div>
+          <button type="button" onClick={onSettings} aria-label="Abrir configurações" className="grid h-10 w-10 place-items-center rounded-md text-mist transition-colors hover:bg-[#7c3aed]/15 hover:text-[#b99af3]"><Settings size={19} /></button>
         </div>
       </section>
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <Link to="/characters/new" className="gothic-panel soft-motion rounded-md p-5">
-          <ScrollText className="mb-3 text-ember" size={24} />
-          <h3 className="font-display text-2xl text-white">Criar personagem</h3>
-          <p className="mt-2 text-sm text-mist">Comece uma nova ficha com raça, classe, origem e inventário.</p>
-        </Link>
-        <Link to="/campaigns" className="gothic-panel soft-motion rounded-md p-5">
-          <Swords className="mb-3 text-ember" size={24} />
-          <h3 className="font-display text-2xl text-white">Campanhas</h3>
-          <p className="mt-2 text-sm text-mist">Crie uma mesa ou entre com um código de convite.</p>
-        </Link>
-        <Link to="/powers" className="gothic-panel soft-motion rounded-md p-5">
-          <BookOpen className="mb-3 text-ember" size={24} />
-          <h3 className="font-display text-2xl text-white">Biblioteca</h3>
-          <p className="mt-2 text-sm text-mist">Busque magias e poderes e adicione direto na ficha.</p>
-        </Link>
-        <Link to="/feedback" className="gothic-panel soft-motion rounded-md p-5">
-          <MessageSquareText className="mb-3 text-ember" size={24} />
-          <h3 className="font-display text-2xl text-white">Feedback</h3>
-          <p className="mt-2 text-sm text-mist">Envie bugs, ideias e sugestões para melhorar o sistema.</p>
-        </Link>
-        <Link to="/monsters" className="gothic-panel soft-motion rounded-md p-5">
-          <Skull className="mb-3 text-ember" size={24} />
-          <h3 className="font-display text-2xl text-white">Monstros</h3>
-          <p className="mt-2 text-sm text-mist">Consulte criaturas, ataques e classificações elementais.</p>
-        </Link>
-        <Link to="/dashboard?tab=personalization" className="gothic-panel soft-motion rounded-md p-5">
-          <Palette className="mb-3 text-ember" size={24} />
-          <h3 className="font-display text-2xl text-white">Personalização</h3>
-          <p className="mt-2 text-sm text-mist">Ajuste tema, contraste e identidade da sua conta.</p>
-        </Link>
+
+      <section className="gothic-panel rounded-md p-5 sm:p-7">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm text-mist">Bem-vindo de volta,</p>
+            <h2 className="mt-1 break-words font-display text-3xl text-[#9b72e8] sm:text-4xl">{user?.name}</h2>
+            <p className="mt-2 text-xs uppercase tracking-[.18em] text-mist/55">{phrase}</p>
+          </div>
+          <Shield className="shrink-0 text-[#8b5cf6]" size={32} />
+        </div>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <Metric icon={CircleUserRound} label="Personagens criados" value={characterCount} />
+          <Metric icon={Swords} label="Campanhas ativas" value={campaignCount} />
+        </div>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {actions.map((action) => <DashboardAction key={action.to} {...action} />)}
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1fr_1fr_1.15fr]">
+        <article className="gothic-panel rounded-md p-5">
+          <h3 className="font-display text-xl text-[#b99af3]">Atividade recente</h3>
+          <div className="mt-4 space-y-4">
+            {activity.map(({ icon: Icon, title, detail, time }) => (
+              <div key={title} className="grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3">
+                <Icon size={21} className="text-[#8b5cf6]" />
+                <div className="min-w-0"><p className="truncate text-sm text-white">{title}</p><p className="truncate text-xs text-mist">{detail}</p></div>
+                <span className="text-[11px] text-mist/60">{time}</span>
+              </div>
+            ))}
+          </div>
+        </article>
+
+        <article className="gothic-panel rounded-md p-5">
+          <h3 className="font-display text-xl text-[#b99af3]">Estatísticas rápidas</h3>
+          <div className="mt-5 flex flex-col items-center gap-5 sm:flex-row sm:justify-center">
+            <div className="grid h-32 w-32 shrink-0 place-items-center rounded-full" style={{ background: chartBackground }}>
+              <div className="grid h-[78px] w-[78px] place-items-center rounded-full border border-white/5 bg-[#08070d] text-center">
+                <div><p className="font-display text-2xl text-white">{total}</p><p className="text-[10px] text-mist">Total</p></div>
+              </div>
+            </div>
+            <div className="w-full max-w-44 space-y-3 text-sm">
+              <StatLegend color="#8b5cf6" label="Campanhas" value={campaignCount} />
+              <StatLegend color="#4c2a84" label="Personagens" value={characterCount} />
+              <StatLegend color="#211831" label="Outros" value={0} />
+            </div>
+          </div>
+        </article>
+
+        <article className="gothic-panel flex min-h-60 flex-col rounded-md p-5">
+          <h3 className="font-display text-xl text-[#b99af3]">Dica do mestre</h3>
+          <div className="flex flex-1 items-center gap-5 py-5">
+            <Flame className="shrink-0 text-[#8b5cf6]" size={42} />
+            <p className="text-sm leading-relaxed text-mist">Use a <span className="text-[#b99af3]">Biblioteca</span> para adicionar magias e poderes diretamente na ficha do personagem.</p>
+          </div>
+        </article>
       </section>
     </div>
   );
 }
 
-function Metric({ label, value }) {
+function Metric({ icon: Icon, label, value }) {
   return (
-    <div className="rounded-md border border-ember/20 bg-black/50 p-4 backdrop-blur-sm">
-      <p className="text-sm text-mist">{label}</p>
-      <p className="mt-1 font-display text-4xl text-white">{value}</p>
+    <div className="flex min-h-24 items-center gap-4 rounded-md border border-[#8b5cf6]/15 bg-black/30 p-4">
+      <Icon className="shrink-0 text-[#8b5cf6]" size={30} />
+      <div><p className="text-[11px] uppercase tracking-[.12em] text-mist/70">{label}</p><p className="mt-1 font-display text-3xl text-white">{value}</p></div>
     </div>
   );
+}
+
+function DashboardAction({ to, icon: Icon, title, description, action }) {
+  return (
+    <article className="gothic-panel soft-motion flex min-h-56 flex-col rounded-md p-5">
+      <div className="flex items-start gap-4">
+        <Icon className="shrink-0 text-[#8b5cf6]" size={34} />
+        <div><h3 className="font-display text-2xl text-white">{title}</h3><p className="mt-2 text-sm leading-relaxed text-mist">{description}</p></div>
+      </div>
+      <Link to={to} className="mt-auto flex min-h-10 items-center justify-between rounded-md border border-white/10 bg-white/[.025] px-3 text-sm text-mist transition-colors hover:border-[#8b5cf6]/35 hover:bg-[#7c3aed]/10 hover:text-white">
+        {action}<ChevronRight size={16} />
+      </Link>
+    </article>
+  );
+}
+
+function StatLegend({ color, label, value }) {
+  return <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} /><span className="flex-1 text-mist">{label}</span><span className="text-white">{value}</span></div>;
 }
 
 function CharactersTab({ characters, onRemove }) {

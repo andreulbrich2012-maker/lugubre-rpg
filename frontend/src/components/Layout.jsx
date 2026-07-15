@@ -9,6 +9,7 @@ export default function Layout({ children }) {
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const inCampaignRoom = /^\/campaigns\/[^/]+/.test(location.pathname);
+  const onDashboard = location.pathname === '/dashboard';
 
   const links = [
     user && { to: '/dashboard', label: 'Dashboard' },
@@ -71,8 +72,8 @@ export default function Layout({ children }) {
   return (
     <div className="min-h-screen overflow-x-hidden pb-20 lg:pb-0" style={{ background: 'var(--bg-radial)' }}>
       <nav className="sticky top-0 z-20 border-b border-ember/10 bg-abyss/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-3 py-3 sm:px-4">
-          <Link to="/" className="font-display text-2xl text-ember">Lúgubre RPG</Link>
+        <div className={`mx-auto flex items-center justify-between gap-3 px-3 py-3 sm:px-4 ${onDashboard ? 'max-w-[1600px]' : 'max-w-7xl'}`}>
+          <Link to="/" className={`font-display text-2xl ${onDashboard ? 'text-[#9b72e8]' : 'text-ember'}`}>Lúgubre RPG</Link>
           <button
             type="button"
             className="grid h-10 w-10 place-items-center rounded-md border border-ember/25 text-ember lg:hidden"
@@ -96,7 +97,7 @@ export default function Layout({ children }) {
 
       {children}
 
-      {location.pathname !== '/' && (
+      {location.pathname !== '/' && !onDashboard && (
         <footer className="border-t border-ember/10 px-4 py-8 text-center text-sm text-mist">
           Lúgubre RPG, fichas, campanhas e sombras bem organizadas.
         </footer>

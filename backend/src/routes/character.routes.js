@@ -142,9 +142,9 @@ function normalizeWallet(wallet) {
 }
 
 function clampCurrent(value, max) {
-  const safeMax = Number(max ?? 0);
+  const safeMax = Math.max(0, Number(max ?? 0));
   const safeValue = Math.max(0, Number(value || 0));
-  return safeMax > 0 ? Math.min(safeValue, safeMax) : safeValue;
+  return Math.min(safeValue, safeMax);
 }
 
 function normalizeDiceSettings(settings) {
@@ -579,11 +579,11 @@ router.patch('/:id/play', async (req, res) => {
   const dbRow = await tryQuery('select * from characters where id = $1 and owner_id = $2', [req.params.id, req.user.id]);
   const row = dbRow?.rows?.[0] || await getLocalCharacter(req.params.id, req.user.id);
   if (!row) return res.status(404).json({ message: 'Ficha não encontrada.' });
-  const body = z.object({
+  const parsed = z.object({
     lifeCurrent: z.coerce.number().optional(),
-    lifeMax: z.coerce.number().min(0).optional(),
+    lifeMax: z.coerce.number().min(1).optional(),
     sanityCurrent: z.coerce.number().optional(),
-    sanityMax: z.coerce.number().min(0).optional(),
+    sanityMax: z.coerce.number().min(1).optional(),
     mana: z.coerce.number().optional(),
     manaMax: z.coerce.number().min(0).optional(),
     defense: z.coerce.number().min(0).optional(),
@@ -594,7 +594,9 @@ router.patch('/:id/play', async (req, res) => {
     spells: z.array(powerSchema).optional(),
     wallet: walletSchema.optional(),
     diceSettings: diceSettingsSchema.optional()
-  }).parse(req.body);
+  }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Valores de jogo inválidos.', issues: parsed.error.issues });
+  const body = parsed.data;
   const keys = await skillKeys();
   const payload = {
     ...row,

@@ -629,6 +629,10 @@ describe('fluxo principal da API', () => {
     expect(reloaded.body.life_current).toBe(0);
     expect(reloaded.body.life_max).toBe(70);
 
+    reloaded = await patchPlay({ lifeCurrent: 20, lifeMax: 19 });
+    expect(reloaded.body.life_current).toBe(19);
+    expect(reloaded.body.life_max).toBe(19);
+
     reloaded = await patchPlay({ sanityCurrent: 20 });
     expect(reloaded.body.sanity_current).toBe(20);
     expect(reloaded.body.sanity_max).toBe(52);
@@ -644,6 +648,10 @@ describe('fluxo principal da API', () => {
     reloaded = await patchPlay({ sanityCurrent: -1 });
     expect(reloaded.body.sanity_current).toBe(0);
     expect(reloaded.body.sanity_max).toBe(60);
+
+    reloaded = await patchPlay({ sanityCurrent: 20, sanityMax: 19 });
+    expect(reloaded.body.sanity_current).toBe(19);
+    expect(reloaded.body.sanity_max).toBe(19);
 
     reloaded = await patchPlay({ mana: 12 });
     expect(reloaded.body.mana).toBe(10);
@@ -664,6 +672,16 @@ describe('fluxo principal da API', () => {
     reloaded = await patchPlay({ mana: -1 });
     expect(reloaded.body.mana).toBe(0);
     expect(reloaded.body.mana_max).toBe(40);
+
+    reloaded = await patchPlay({ mana: 20, manaMax: 19 });
+    expect(reloaded.body.mana).toBe(19);
+    expect(reloaded.body.mana_max).toBe(19);
+
+    await request(app)
+      .patch(`/api/characters/${character.body.id}/play`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ lifeMax: 0 })
+      .expect(400);
 
     const walletSteps = [
       [{ bronze: 6, silver: 2, platinum: 1, gold: 1 }, 626],

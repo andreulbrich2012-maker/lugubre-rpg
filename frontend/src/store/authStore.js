@@ -68,15 +68,15 @@ export const useAuth = create((set, get) => ({
   },
   async logout() {
     const token = get().token || localStorage.getItem(AUTH_TOKEN_KEY);
-    localStorage.removeItem(AUTH_TOKEN_KEY);
-    localStorage.removeItem(AUTH_USER_KEY);
-    set({ user: null, token: null, authLoading: false, authInitialized: true });
     if (token) {
       try {
         await api.post('/auth/logout', null, { headers: { Authorization: `Bearer ${token}` } });
-      } catch {
-        // Always clear the local session when the API cannot be reached.
+      } catch (error) {
+        if (error?.response?.status !== 401) throw error;
       }
     }
+    localStorage.removeItem(AUTH_TOKEN_KEY);
+    localStorage.removeItem(AUTH_USER_KEY);
+    set({ user: null, token: null, authLoading: false, authInitialized: true });
   }
 }));

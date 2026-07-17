@@ -20,11 +20,13 @@ api.interceptors.request.use((config) => {
 function shouldClearSession(error) {
   if (error?.response?.status !== 401) return false;
 
+  const url = error.config?.url || '';
+  if (url.includes('/auth/logout')) return false;
+
   const requestToken = error.config?.__lugubreToken;
   const currentToken = localStorage.getItem(AUTH_TOKEN_KEY);
   if (requestToken && currentToken && requestToken !== currentToken) return false;
 
-  const url = error.config?.url || '';
   const message = error.response?.data?.message || '';
   return (
     url.includes('/auth/me') ||

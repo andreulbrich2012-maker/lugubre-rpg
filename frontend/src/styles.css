@@ -116,3 +116,68 @@ img, video, canvas, svg {
     transform: translateY(0);
   }
 }
+
+@keyframes menuOverlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes menuOverlayOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes mobileSheetIn {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes mobileSheetOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(100%); }
+}
+
+@keyframes dashboardDrawerIn {
+  from { opacity: 0; transform: translateY(-18px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes dashboardDrawerOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-12px) scale(.99); }
+}
+
+@keyframes accountMenuIn {
+  from { opacity: 0; transform: translateY(-8px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes accountMenuOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-6px) scale(.98); }
+}
+
+.menu-overlay-opening { animation: menuOverlayIn 900ms cubic-bezier(.16, 1, .3, 1) both; }
+.menu-overlay-closing { animation: menuOverlayOut 400ms ease-in both; }
+.mobile-sheet-opening { animation: mobileSheetIn 900ms cubic-bezier(.16, 1, .3, 1) both; }
+.mobile-sheet-closing { animation: mobileSheetOut 400ms cubic-bezier(.4, 0, 1, 1) both; }
+.dashboard-drawer-opening { animation: dashboardDrawerIn 900ms cubic-bezier(.16, 1, .3, 1) both; transform-origin: top center; }
+.dashboard-drawer-closing { animation: dashboardDrawerOut 400ms ease-in both; transform-origin: top center; }
+.account-menu-opening { animation: accountMenuIn 900ms cubic-bezier(.16, 1, .3, 1) both; transform-origin: top right; }
+.account-menu-closing { animation: accountMenuOut 400ms ease-in both; transform-origin: top right; }
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-overlay-opening,
+  .menu-overlay-closing,
+  .mobile-sheet-opening,
+  .mobile-sheet-closing,
+  .dashboard-drawer-opening,
+  .dashboard-drawer-closing,
+  .account-menu-opening,
+  .account-menu-closing {
+    animation-duration: 80ms;
+  }
+
+  .mobile-sheet-opening { animation-name: menuOverlayIn; }
+  .mobile-sheet-closing { animation-name: menuOverlayOut; }
+}

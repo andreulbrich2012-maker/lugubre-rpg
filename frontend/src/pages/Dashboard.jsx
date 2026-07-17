@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { BookOpen, Camera, ChevronRight, CircleUserRound, Eye, EyeOff, Flame, LayoutDashboard, Menu, MessageCircle, MessageSquareText, Palette, ScrollText, Settings, Shield, Skull, Sparkles, Swords, Trash2, Users, X } from 'lucide-react';
+import { BookOpen, Camera, ChevronRight, CircleUserRound, Eye, EyeOff, Flame, LayoutDashboard, LogOut, Menu, MessageCircle, MessageSquareText, Palette, ScrollText, Settings, Shield, Skull, Sparkles, Swords, Trash2, Users, X } from 'lucide-react';
 import Alert from '../components/Alert';
 import Avatar from '../components/Avatar';
 import Button from '../components/Button';
 import LoadingButton from '../components/LoadingButton';
 import UserMenu from '../components/UserMenu';
+import LogoutDialog from '../components/LogoutDialog';
 import { api } from '../lib/api';
+import { useMenuTransition } from '../hooks/useMenuTransition';
 import { MonstersTab } from './Monsters';
 import { useAuth } from '../store/authStore';
 import FeedbackPanel from '../components/feedback/FeedbackPanel';
@@ -37,7 +39,7 @@ const immersivePhrases = [
 ];
 
 export default function Dashboard() {
-  const { user, logout, refreshMe } = useAuth();
+  const { user, refreshMe } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [active, setActive] = useState('dashboard');
@@ -46,7 +48,10 @@ export default function Dashboard() {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const sidebarMenu = useMenuTransition();
+  const sidebarTriggerRef = useRef(null);
+  const firstSidebarItemRef = useRef(null);
+  const sidebarWasMountedRef = useRef(false);
 
   async function load() {
     setLoading(true);
@@ -73,11 +78,6 @@ export default function Dashboard() {
     setCharacters((current) => current.filter((character) => character.id !== id));
   }
 
-  function signOut() {
-    logout();
-    navigate('/login');
-  }
-
   function activateTab(tabId) {
     setActive(tabId);
     if (tabId === 'dashboard') {
@@ -85,6 +85,12 @@ export default function Dashboard() {
     } else {
       setSearchParams({ tab: tabId });
     }
+  }
+
+  function selectSidebarTab(tab) {
+    const action = () => tab.href ? navigate(tab.href) : activateTab(tab.id);
+    if (sidebarMenu.mounted) sidebarMenu.close(action);
+    else action();
   }
 
   useEffect(() => {
@@ -99,10 +105,35 @@ export default function Dashboard() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    if (!sidebarMenu.mounted) return undefined;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        sidebarMenu.close();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [sidebarMenu.close, sidebarMenu.mounted]);
+
+  useEffect(() => {
+    if (sidebarMenu.mounted) sidebarWasMountedRef.current = true;
+    if (sidebarMenu.interactive) firstSidebarItemRef.current?.focus();
+    if (!sidebarMenu.mounted && sidebarWasMountedRef.current) {
+      sidebarWasMountedRef.current = false;
+      sidebarTriggerRef.current?.focus?.();
+    }
+  }, [sidebarMenu.interactive, sidebarMenu.mounted]);
+
   return (
     <main className="mx-auto grid max-w-[1600px] gap-4 px-3 pb-24 pt-4 sm:px-4 sm:py-5 lg:grid-cols-[270px_minmax(0,1fr)]">
-      {sidebarOpen && <button className="fixed inset-0 z-30 bg-black/70 lg:hidden" onClick={() => setSidebarOpen(false)} />}
-      <aside className={`gothic-panel fixed left-3 right-3 top-20 z-40 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-md p-3 lg:sticky lg:left-auto lg:right-auto lg:top-20 lg:z-auto lg:flex lg:h-[calc(100vh-6.5rem)] lg:flex-col ${sidebarOpen ? 'block' : 'hidden'}`}>
+      {sidebarMenu.mounted && <button aria-label="Fechar navegação do painel" className={`fixed inset-0 z-30 bg-black/70 lg:hidden menu-overlay-${sidebarMenu.phase}`} onClick={() => sidebarMenu.close()} />}
+      <aside id="dashboard-navigation" aria-label="Navegação do painel" data-dashboard-menu-phase={sidebarMenu.phase} inert={sidebarMenu.mounted && !sidebarMenu.interactive ? '' : undefined} className={`gothic-panel fixed left-3 right-3 top-20 z-40 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-md p-3 lg:sticky lg:left-auto lg:right-auto lg:top-20 lg:z-auto lg:flex lg:h-[calc(100vh-6.5rem)] lg:flex-col ${sidebarMenu.mounted ? `block dashboard-drawer-${sidebarMenu.phase} ${sidebarMenu.interactive ? 'pointer-events-auto' : 'pointer-events-none'}` : 'hidden'}`}>
         <div className="flex items-center gap-3 border-b border-ember/10 pb-4">
           <Avatar user={user} size="md" />
           <div className="min-w-0">
@@ -112,13 +143,13 @@ export default function Dashboard() {
           </div>
         </div>
         <nav className="mt-4 space-y-1.5">
-          {tabs.map((tab) => {
+          {tabs.map((tab, index) => {
             const Icon = tab.icon;
             const className = `flex min-h-11 w-full items-center gap-3 rounded-md border px-3 py-2 text-left text-sm transition-colors ${active === tab.id ? 'border-[#8b5cf6]/40 bg-[#7c3aed]/20 text-[#b99af3]' : 'border-transparent text-mist hover:border-[#8b5cf6]/20 hover:bg-white/[.03] hover:text-white'}`;
             if (tab.href) {
-              return <Link key={tab.id} to={tab.href} onClick={() => setSidebarOpen(false)} className={className}><Icon size={18} />{tab.label}</Link>;
+              return <Link ref={index === 0 ? firstSidebarItemRef : undefined} key={tab.id} to={tab.href} onClick={(event) => { event.preventDefault(); selectSidebarTab(tab); }} tabIndex={sidebarMenu.mounted && !sidebarMenu.interactive ? -1 : 0} className={className}><Icon size={18} />{tab.label}</Link>;
             }
-            return <button key={tab.id} onClick={() => { activateTab(tab.id); setSidebarOpen(false); }} className={className}><Icon size={18} />{tab.label}</button>;
+            return <button ref={index === 0 ? firstSidebarItemRef : undefined} key={tab.id} onClick={() => selectSidebarTab(tab)} disabled={sidebarMenu.mounted && !sidebarMenu.interactive} className={className}><Icon size={18} />{tab.label}</button>;
           })}
         </nav>
         <div className="mt-6 rounded-md border border-[#8b5cf6]/20 bg-black/30 p-3 lg:mt-auto">
@@ -134,7 +165,7 @@ export default function Dashboard() {
       </aside>
 
       <section className="min-h-[640px] min-w-0">
-        <DashboardTopbar user={user} onMenu={() => setSidebarOpen(true)} onSettings={() => activateTab('settings')} onLogout={signOut} />
+        <DashboardTopbar user={user} menuButtonRef={sidebarTriggerRef} menuExpanded={sidebarMenu.mounted} onMenu={sidebarMenu.open} onSettings={() => activateTab('settings')} />
         {loadError && <div className="mb-4"><Alert type="error">{loadError} <button type="button" className="ml-2 underline" onClick={load}>Tentar novamente</button></Alert></div>}
         {loading ? (
           <div className="gothic-panel grid min-h-80 place-items-center rounded-md">
@@ -157,7 +188,7 @@ export default function Dashboard() {
   );
 }
 
-function DashboardTopbar({ user, onMenu, onSettings, onLogout }) {
+function DashboardTopbar({ user, menuButtonRef, menuExpanded, onMenu, onSettings }) {
   return (
     <div className="mb-4 flex items-center justify-between gap-4 rounded-md border border-[#8b5cf6]/15 bg-black/25 p-3 lg:hidden">
       <div className="min-w-0">
@@ -165,8 +196,8 @@ function DashboardTopbar({ user, onMenu, onSettings, onLogout }) {
         <h2 className="truncate font-display text-2xl text-white">Dashboard</h2>
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <Button variant="ghost" className="px-3" onClick={onMenu} title="Abrir navegação"><Menu size={18} /></Button>
-        <UserMenu user={user} onSettings={onSettings} onLogout={onLogout} />
+        <Button ref={menuButtonRef} variant="ghost" className="px-3" onClick={onMenu} title="Abrir navegação" aria-label="Abrir navegação do painel" aria-expanded={menuExpanded} aria-controls="dashboard-navigation"><Menu size={18} /></Button>
+        <UserMenu user={user} onSettings={onSettings} />
       </div>
     </div>
   );
@@ -541,7 +572,8 @@ function FriendsTab() {
 }
 
 function SettingsTab() {
-  const { user, updateProfile, setUser } = useAuth();
+  const { user, updateProfile, setUser, logout } = useAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState({ name: user?.name || '', email: user?.email || '' });
   const [preview, setPreview] = useState(user?.profile_image_url || '');
   const [profileMessage, setProfileMessage] = useState(null);
@@ -550,6 +582,7 @@ function SettingsTab() {
   const [showPassword, setShowPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState(null);
   const [passwordLoading, setPasswordLoading] = useState(false);
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
 
   function readImage(file) {
     if (!file) return;
@@ -643,6 +676,11 @@ function SettingsTab() {
     }
   }
 
+  async function confirmLogout() {
+    await logout();
+    navigate('/login', { replace: true });
+  }
+
   return (
     <div className="space-y-6">
       <section className="gothic-panel rounded-md p-4 sm:p-6">
@@ -690,6 +728,21 @@ function SettingsTab() {
           <LoadingButton loading={passwordLoading} loadingText="Alterando..." className="w-full sm:w-auto">Alterar senha</LoadingButton>
         </form>
       </section>
+
+      <section className="gothic-panel rounded-md border-red-950/70 p-4 sm:p-6">
+        <Header title="Sessão" />
+        <div className="mt-5 flex flex-col gap-4 rounded-md border border-red-500/20 bg-red-950/15 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h3 className="font-display text-xl text-white">Encerrar sessão</h3>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-mist">Encerre sua sessão neste dispositivo. Você precisará entrar novamente para acessar sua conta.</p>
+          </div>
+          <Button type="button" variant="ghost" className="w-full shrink-0 border-red-500/45 text-red-200 hover:bg-red-950/40 sm:w-auto" onClick={() => setLogoutDialogOpen(true)}>
+            <LogOut size={17} /> Sair da conta
+          </Button>
+        </div>
+      </section>
+
+      <LogoutDialog open={logoutDialogOpen} onClose={() => setLogoutDialogOpen(false)} onConfirm={confirmLogout} />
     </div>
   );
 }

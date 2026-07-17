@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { tryQuery } from '../db/pool.js';
+import { hasDatabaseConnection, pool, tryQuery } from '../db/pool.js';
 import {
   createLocalCharacter,
   deleteLocalCharacter,
@@ -51,18 +51,18 @@ const diceSettingsSchema = z.object({
 });
 
 const characterSchema = z.object({
-  playerName: z.string().min(1),
-  characterName: z.string().min(1),
-  photo: z.string().optional().nullable(),
-  raceId: z.string().optional().nullable(),
-  classId: z.string().optional().nullable(),
-  originId: z.string().optional().nullable(),
-  origin: z.string().optional().default(''),
+  playerName: z.string().trim().min(1),
+  characterName: z.string().trim().min(1),
+  photo: z.string().max(3_000_000).optional().nullable(),
+  raceId: z.string().min(1).optional().nullable(),
+  classId: z.string().min(1).optional().nullable(),
+  originId: z.string().min(1).optional().nullable(),
+  origin: z.string().trim().optional().default(''),
   level: z.coerce.number().min(1).max(20).default(1),
   lifeCurrent: z.coerce.number().min(0).default(63),
-  lifeMax: z.coerce.number().min(0).default(63),
+  lifeMax: z.coerce.number().min(1).default(63),
   sanityCurrent: z.coerce.number().min(0).default(52),
-  sanityMax: z.coerce.number().min(0).default(52),
+  sanityMax: z.coerce.number().min(1).default(52),
   mana: z.coerce.number().min(0).default(0),
   manaMax: z.coerce.number().min(0).optional(),
   defense: z.coerce.number().min(0).default(10),
@@ -185,6 +185,12 @@ async function getActiveReference(type, id) {
   return (await getLocalCatalog(config.local)).find((item) => item.id === id) || null;
 }
 
+function requestError(message, status = 400) {
+  const error = new Error(message);
+  error.status = status;
+  return error;
+}
+
 function characterSnapshot(row) {
   return {
     character_name: row.character_name,
@@ -235,26 +241,32 @@ async function recordCharacterSave(row, label = 'Salvamento') {
   return row.save_history || [];
 }
 
-async function normalizeCharacter(body, currentSkills = null) {
+async function normalizeCharacter(body, currentSkills = null, { requireReferences = false } = {}) {
   const data = characterSchema.parse(body);
   const keys = await skillKeys();
-  let modifiers = {};
-  if (data.raceId) {
-    const race = await tryQuery('select attribute_modifiers from races where id = $1 and deleted_at is null', [data.raceId]);
-    if (race?.rows?.[0]) modifiers = parseJsonField(race.rows[0].attribute_modifiers, {});
-    else modifiers = (await getLocalCatalog('races')).find((item) => item.id === data.raceId)?.attribute_modifiers || {};
-  }
+  if (requireReferences && !data.raceId) throw requestError('Escolha uma raça ativa.');
+  if (requireReferences && !data.classId) throw requestError('Escolha uma classe ativa.');
+  if (requireReferences && !data.originId && !data.origin) throw requestError('Escolha uma origem ativa.');
+
+  const [race, klass, origin] = await Promise.all([
+    data.raceId ? getActiveReference('race', data.raceId) : null,
+    data.classId ? getActiveReference('class', data.classId) : null,
+    data.originId ? getActiveReference('origin', data.originId) : null
+  ]);
+  if (data.raceId && !race) throw requestError('A raça selecionada não está mais disponível. Escolha outra opção.');
+  if (data.classId && !klass) throw requestError('A classe selecionada não está mais disponível. Escolha outra opção.');
+  if (data.originId && !origin) throw requestError('A origem selecionada não está mais disponível. Escolha outra opção.');
+
+  const modifiers = parseJsonField(race?.attribute_modifiers, {});
   const attributes = applyRaceModifiers(baseAttributes(), modifiers);
-  let origin = null;
-  if (data.originId) {
-    const result = await tryQuery('select skill_modifiers from origins where id = $1 and deleted_at is null', [data.originId]);
-    origin = result?.rows?.[0] || (await getLocalCatalog('origins')).find((item) => item.id === data.originId);
-  }
   const originSkills = parseJsonField(origin?.skill_modifiers, {});
   const base = baseSkills(keys);
   const createdSkills = Object.fromEntries(Object.keys(base).map((key) => [key, Number(base[key] || 0) + Number(originSkills[key] || 0)]));
   return {
     ...data,
+    lifeCurrent: clampCurrent(data.lifeCurrent, data.lifeMax),
+    sanityCurrent: clampCurrent(data.sanityCurrent, data.sanityMax),
+    mana: clampCurrent(data.mana, data.manaMax ?? data.mana),
     manaMax: data.manaMax ?? data.mana,
     attributes,
     skills: normalizeSkillTraining(currentSkills || data.skills || createdSkills, keys),
@@ -376,18 +388,42 @@ router.get('/', async (req, res) => {
   res.json(await Promise.all(rows.map(enrich)));
 });
 
-router.post('/', async (req, res) => {
-  const data = await normalizeCharacter({ ...req.body, skills: undefined });
-  const result = await tryQuery(
-    `insert into characters
-     (owner_id, player_name, character_name, photo, race_id, class_id, origin_id, origin, level, life_current, life_max, sanity_current, sanity_max, mana, mana_max, defense, attributes, skills, skill_bonuses, inventory, attacks, spells, wallet, dice_settings)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
-     returning *`,
-    [req.user.id, data.playerName, data.characterName, data.photo, data.raceId || null, data.classId || null, data.originId || null, data.origin, data.level, data.lifeCurrent, data.lifeMax, data.sanityCurrent, data.sanityMax, data.mana, data.manaMax, data.defense, toJson(data.attributes), toJson(data.skills), toJson(data.skillBonuses), toJson(data.inventory), toJson(data.attacks), toJson(data.spells), toJson(data.wallet), toJson(data.diceSettings)]
-  );
-  const row = result?.rows?.[0] || await createLocalCharacter(req.user.id, data);
-  await recordCharacterSave(row, 'Criacao da ficha');
-  res.status(201).json(await enrich(row));
+router.post('/', async (req, res, next) => {
+  try {
+    const data = await normalizeCharacter({ ...req.body, skills: undefined }, null, { requireReferences: true });
+    let row;
+
+    if (hasDatabaseConnection()) {
+      const client = await pool.connect();
+      try {
+        await client.query('begin');
+        const result = await client.query(
+          `insert into characters
+           (owner_id, player_name, character_name, photo, race_id, class_id, origin_id, origin, level, life_current, life_max, sanity_current, sanity_max, mana, mana_max, defense, attributes, skills, skill_bonuses, inventory, attacks, spells, wallet, dice_settings)
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+           returning *`,
+          [req.user.id, data.playerName, data.characterName, data.photo || null, data.raceId, data.classId, data.originId || null, data.origin, data.level, data.lifeCurrent, data.lifeMax, data.sanityCurrent, data.sanityMax, data.mana, data.manaMax, data.defense, toJson(data.attributes), toJson(data.skills), toJson(data.skillBonuses), toJson(data.inventory), toJson(data.attacks), toJson(data.spells), toJson(data.wallet), toJson(data.diceSettings)]
+        );
+        row = result.rows[0];
+        await client.query(
+          'insert into character_saves (character_id, label, snapshot) values ($1, $2, $3)',
+          [row.id, 'Criacao da ficha', toJson(characterSnapshot(row))]
+        );
+        await client.query('commit');
+      } catch (error) {
+        await client.query('rollback');
+        throw error;
+      } finally {
+        client.release();
+      }
+    } else {
+      row = await createLocalCharacter(req.user.id, data);
+    }
+
+    res.status(201).json(await enrich(row));
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.get('/:id/inventory', async (req, res) => {

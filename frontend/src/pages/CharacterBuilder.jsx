@@ -4,11 +4,19 @@ import { useNavigate, useParams } from 'react-router-dom';
 import Button from '../components/Button';
 import EntityImage from '../components/EntityImage';
 import { api } from '../lib/api';
+import { buildCharacterPayload, characterSaveError, validateCharacterDraft } from '../lib/characterBuilder';
 
 const attributeKeys = ['forca', 'agilidade', 'presenca', 'intelecto', 'vigor'];
 const attributeLabels = { forca: 'Força', agilidade: 'Agilidade', intelecto: 'Intelecto', vigor: 'Vigor', presenca: 'Presença' };
 const baseAttributes = Object.fromEntries(attributeKeys.map((key) => [key, 2]));
 const steps = ['Jogador', 'Personagem', 'Foto', 'Raça', 'Classe', 'Origem', 'Atributos', 'Inventário', 'Resumo'];
+const stepValidationMessages = {
+  0: 'Informe o nome do jogador.',
+  1: 'Informe o nome do personagem.',
+  3: 'Escolha uma raça.',
+  4: 'Escolha uma classe.',
+  5: 'Escolha uma origem.'
+};
 const initial = {
   playerName: '',
   characterName: '',
@@ -37,6 +45,8 @@ export default function CharacterBuilder() {
   const [form, setForm] = useState(initial);
   const [catalog, setCatalog] = useState({ races: [], classes: [], origins: [] });
   const [error, setError] = useState('');
+  const [catalogLoading, setCatalogLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const { id } = useParams();
   const navigate = useNavigate();
 
@@ -47,9 +57,15 @@ export default function CharacterBuilder() {
   }, [selectedRace]);
 
   useEffect(() => {
+    let active = true;
+    setCatalogLoading(true);
     Promise.all([api.get('/catalog/races'), api.get('/catalog/classes'), api.get('/catalog/origins')])
-      .then(([races, classes, origins]) => setCatalog({ races: races.data, classes: classes.data, origins: origins.data }));
-    if (id) api.get(`/characters/${id}`).then(({ data }) => setForm({
+      .then(([races, classes, origins]) => {
+        if (active) setCatalog({ races: races.data, classes: classes.data, origins: origins.data });
+      })
+      .catch(() => active && setError('Não foi possível carregar raças, classes e origens.'))
+      .finally(() => active && setCatalogLoading(false));
+    if (id) api.get(`/characters/${id}`).then(({ data }) => active && setForm({
       playerName: data.player_name,
       characterName: data.character_name,
       photo: data.photo || '',
@@ -70,7 +86,8 @@ export default function CharacterBuilder() {
       inventory: data.inventory || [],
       attacks: data.attacks || [],
       spells: data.spells || []
-    }));
+    })).catch((requestError) => active && setError(characterSaveError(requestError)));
+    return () => { active = false; };
   }, [id]);
 
   const canAdvance = [
@@ -87,7 +104,7 @@ export default function CharacterBuilder() {
 
   function next() {
     if (!canAdvance) {
-      setError('Preencha esta etapa antes de avançar.');
+      setError(stepValidationMessages[step] || 'Preencha esta etapa antes de avançar.');
       return;
     }
     setError('');
@@ -95,9 +112,44 @@ export default function CharacterBuilder() {
   }
 
   async function save() {
-    const payload = id ? form : { ...form, skills: undefined };
-    const response = id ? await api.put(`/characters/${id}`, payload) : await api.post('/characters', payload);
-    navigate(`/characters/${response.data.id}`);
+    if (saving) return;
+    let validation = validateCharacterDraft(form, catalog);
+    if (validation) {
+      setStep(validation.step);
+      setError(validation.message);
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      const [races, classes, origins] = await Promise.all([
+        api.get('/catalog/races'),
+        api.get('/catalog/classes'),
+        api.get('/catalog/origins')
+      ]);
+      const currentCatalog = { races: races.data, classes: classes.data, origins: origins.data };
+      setCatalog(currentCatalog);
+      validation = validateCharacterDraft(form, currentCatalog);
+      if (validation) {
+        setStep(validation.step);
+        setError(validation.message);
+        return;
+      }
+
+      const payload = buildCharacterPayload(form, { includeSkills: Boolean(id) });
+      const response = id ? await api.put(`/characters/${id}`, payload) : await api.post('/characters', payload);
+      if (!response.data?.id) throw new Error('A API não retornou o personagem criado.');
+      navigate(`/characters/${response.data.id}`, { replace: true, state: { notice: 'Ficha salva no banco de dados.' } });
+    } catch (requestError) {
+      const message = characterSaveError(requestError);
+      setError(message);
+      if (message.includes('raça') || message.includes('raca')) setStep(3);
+      if (message.includes('classe')) setStep(4);
+      if (message.includes('origem')) setStep(5);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -126,14 +178,15 @@ export default function CharacterBuilder() {
           <section className="gothic-panel min-h-[360px] rounded-md p-4 sm:p-6 md:min-h-[520px] md:p-10">
             {step === 0 && <BigInput label="Nome do jogador" value={form.playerName} onChange={(playerName) => setForm({ ...form, playerName })} />}
             {step === 1 && <BigInput label="Nome do personagem" value={form.characterName} onChange={(characterName) => setForm({ ...form, characterName })} />}
-            {step === 2 && <PhotoStep form={form} setForm={setForm} />}
+            {step === 2 && <PhotoStep form={form} setForm={setForm} setError={setError} />}
             {step === 3 && <PickList title="Escolha a raça" label="Raça" items={catalog.races} value={form.raceId} onChange={(raceId) => setForm({ ...form, raceId })} />}
             {step === 4 && <PickList title="Escolha a classe" label="Classe" items={catalog.classes} value={form.classId} onChange={(classId) => setForm({ ...form, classId })} />}
             {step === 5 && <OriginStep catalog={catalog} form={form} setForm={setForm} />}
             {step === 6 && <AttributePreview attributes={finalAttributes} selectedRace={selectedRace} />}
             {step === 7 && <Inventory form={form} setForm={setForm} />}
             {step === 8 && <Summary form={form} attributes={finalAttributes} catalog={catalog} />}
-            {error && <p className="mt-6 text-sm text-red-300">{error}</p>}
+            {catalogLoading && <p className="mt-6 text-sm text-mist" role="status">Carregando opções...</p>}
+            {error && <p className="mt-6 rounded-md border border-red-400/30 bg-red-950/30 p-3 text-sm text-red-200" role="alert">{error}</p>}
           </section>
 
           <details className="gothic-panel rounded-md p-4 lg:hidden">
@@ -149,13 +202,13 @@ export default function CharacterBuilder() {
         </div>
 
         <div className="fixed inset-x-0 bottom-20 z-20 grid gap-2 border-t border-ember/10 bg-abyss/95 p-3 backdrop-blur sm:static sm:flex sm:flex-row sm:justify-between sm:border-0 sm:bg-transparent sm:p-0 sm:pb-4">
-          <Button variant="ghost" className="w-full sm:w-auto" disabled={step === 0} onClick={() => setStep((current) => Math.max(current - 1, 0))}>
+          <Button type="button" variant="ghost" className="w-full sm:w-auto" disabled={step === 0 || saving} onClick={() => setStep((current) => Math.max(current - 1, 0))}>
             <ArrowLeft size={18} className="inline" /> Voltar
           </Button>
           {step < steps.length - 1 ? (
-            <Button onClick={next}>Avançar <ArrowRight size={18} className="inline" /></Button>
+            <Button type="button" disabled={catalogLoading || saving} onClick={next}>Avançar <ArrowRight size={18} className="inline" /></Button>
           ) : (
-            <Button onClick={save}><Save size={18} className="inline" /> Salvar ficha</Button>
+            <Button type="button" disabled={saving || catalogLoading} onClick={save}><Save size={18} className="inline" /> {saving ? 'Salvando...' : 'Salvar ficha'}</Button>
           )}
         </div>
       </section>
@@ -167,19 +220,30 @@ function BigInput({ label, value, onChange }) {
   return <label className="block"><span className="text-sm uppercase tracking-[.22em] text-ember">{label}</span><input autoFocus className="mt-5 w-full border-0 border-b border-ember/30 bg-transparent px-0 py-4 text-2xl font-semibold outline-none focus:border-ember sm:text-4xl" value={value} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
-function PhotoStep({ form, setForm }) {
+function PhotoStep({ form, setForm, setError }) {
   function loadFile(event) {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('Escolha um arquivo de imagem válido.');
+      event.target.value = '';
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      setError('A imagem é grande demais. Escolha um arquivo de até 2 MB.');
+      event.target.value = '';
+      return;
+    }
+    setError('');
     const reader = new FileReader();
     reader.onload = () => setForm({ ...form, photo: String(reader.result) });
     reader.readAsDataURL(file);
   }
-  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">Foto do personagem</p><label className="mt-8 flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-ember/35 bg-black/20 text-mist soft-motion sm:min-h-72">{form.photo ? <img src={form.photo} className="h-56 w-full rounded-md object-cover sm:h-72" /> : <><Upload className="text-ember" /><span className="mt-3">Selecionar arquivo</span></>}<input type="file" accept="image/*" className="hidden" onChange={loadFile} /></label></div>;
+  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">Foto do personagem</p><label className="mt-8 flex min-h-56 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-ember/35 bg-black/20 text-mist soft-motion sm:min-h-72">{form.photo ? <img src={form.photo} alt="Foto selecionada do personagem" className="h-56 w-full rounded-md object-cover sm:h-72" /> : <><Upload className="text-ember" /><span className="mt-3">Selecionar arquivo</span></>}<input type="file" accept="image/*" className="hidden" onChange={loadFile} /></label></div>;
 }
 
 function PickList({ title, label, items, value, onChange }) {
-  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">{title}</p><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{items.map((item) => <button key={item.id} onClick={() => onChange(item.id)} className={`gothic-panel rounded-md p-4 text-left soft-motion ${value === item.id ? 'border-ember bg-ember/10' : ''}`}><EntityImage src={item.image} label={label} name={item.name} className="mb-4 h-32 sm:h-24" /><strong>{item.name}</strong>{item.description && <p className="mt-2 text-sm text-mist">{item.description}</p>}</button>)}</div></div>;
+  return <div><p className="text-sm uppercase tracking-[.22em] text-ember">{title}</p><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{items.map((item) => <button type="button" key={item.id} onClick={() => onChange(item.id)} className={`gothic-panel rounded-md p-4 text-left soft-motion ${value === item.id ? 'border-ember bg-ember/10' : ''}`}><EntityImage src={item.image} label={label} name={item.name} className="mb-4 h-32 sm:h-24" /><strong>{item.name}</strong>{item.description && <p className="mt-2 text-sm text-mist">{item.description}</p>}</button>)}</div></div>;
 }
 
 function OriginStep({ catalog, form, setForm }) {

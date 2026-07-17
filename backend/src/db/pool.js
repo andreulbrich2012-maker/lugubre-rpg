@@ -1,13 +1,15 @@
 import pg from 'pg';
-import dotenv from 'dotenv';
-
-dotenv.config();
+import '../config/env.js';
 
 export const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL
 });
 
 export const query = (text, params) => pool.query(text, params);
+
+export function hasDatabaseConnection() {
+  return Boolean(process.env.DATABASE_URL);
+}
 
 export async function tryQuery(text, params) {
   if (!process.env.DATABASE_URL) return null;

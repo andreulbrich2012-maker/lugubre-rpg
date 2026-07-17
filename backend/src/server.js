@@ -1,10 +1,8 @@
 import http from 'http';
-import dotenv from 'dotenv';
 import { Server } from 'socket.io';
+import './config/env.js';
 import { createApp } from './app.js';
 import { requireSocketAuth, registerChatHandlers } from './socket.js';
-
-dotenv.config();
 
 const app = createApp();
 const server = http.createServer(app);

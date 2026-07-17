@@ -145,6 +145,51 @@ describe('fluxo principal da API', () => {
     expect(sessionAfterError.body.user.email).toBe(email);
   });
 
+  it('rejeita ficha invalida sem derrubar a API ou criar registro parcial', async () => {
+    const token = await loginAdmin();
+    const [races, classes, origins] = await Promise.all([
+      request(app).get('/api/catalog/races').expect(200),
+      request(app).get('/api/catalog/classes').expect(200),
+      request(app).get('/api/catalog/origins').expect(200)
+    ]);
+    const valid = {
+      playerName: 'Teste de validacao',
+      characterName: 'Nao deve ser criada',
+      raceId: races.body[0].id,
+      classId: classes.body[0].id,
+      originId: origins.body[0].id,
+      lifeCurrent: 63,
+      lifeMax: 63,
+      sanityCurrent: 52,
+      sanityMax: 52,
+      mana: 10,
+      manaMax: 10,
+      defense: 10,
+      inventory: []
+    };
+
+    await request(app)
+      .post('/api/characters')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...valid, characterName: '' })
+      .expect(400);
+
+    const removedReference = await request(app)
+      .post('/api/characters')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ ...valid, raceId: crypto.randomUUID() })
+      .expect(400);
+    expect(removedReference.body.message).toContain('não está mais disponível');
+
+    await request(app)
+      .post('/api/characters')
+      .set('Authorization', 'Bearer token-invalido')
+      .send(valid)
+      .expect(401);
+
+    await request(app).get('/health').expect(200);
+  });
+
   it('cobre auth, admin, ficha, bônus, inventário, campanha e mensagens', async () => {
     const adminToken = await loginAdmin();
     const stamp = Date.now();

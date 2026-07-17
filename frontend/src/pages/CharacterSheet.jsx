@@ -1,6 +1,6 @@
 import { Dice5, Edit, Minus, Plus, Save, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import Button from '../components/Button';
 import CharacterSheetMobile from '../components/character-sheet/CharacterSheetMobile';
 import CharacterSheetLoading from '../components/character-sheet/CharacterSheetLoading';
@@ -92,6 +92,7 @@ function rollDiceFormula(formula) {
 
 export default function CharacterSheet() {
   const { id } = useParams();
+  const location = useLocation();
   const [sheet, setSheet] = useState(null);
   const [draft, setDraft] = useState(null);
   const [editing, setEditing] = useState(false);
@@ -106,6 +107,7 @@ export default function CharacterSheet() {
   const [referenceModal, setReferenceModal] = useState(null);
   const [referenceOptions, setReferenceOptions] = useState([]);
   const [referenceStatus, setReferenceStatus] = useState('');
+  const [creationNotice, setCreationNotice] = useState(location.state?.notice || '');
   const draftRef = useRef(null);
   const sheetRef = useRef(null);
   const persistQueueRef = useRef(Promise.resolve());
@@ -124,6 +126,12 @@ export default function CharacterSheet() {
   }
 
   useEffect(() => { load(); }, [id]);
+
+  useEffect(() => {
+    if (!creationNotice) return undefined;
+    const timer = setTimeout(() => setCreationNotice(''), 3500);
+    return () => clearTimeout(timer);
+  }, [creationNotice]);
 
   useEffect(() => () => {
     clearTimeout(vitalSaveTimerRef.current);
@@ -367,6 +375,7 @@ export default function CharacterSheet() {
   const referenceWarnings = sheet.reference_warnings || [];
   return (
     <main className="min-h-[calc(100vh-64px)] overflow-x-hidden bg-[#050506] pb-24 lg:px-4 lg:py-5">
+      {creationNotice && <div className="fixed left-1/2 top-20 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-md border border-emerald-400/30 bg-emerald-950/95 px-4 py-3 text-center text-sm text-emerald-100 shadow-xl" role="status">{creationNotice}</div>}
       <CharacterSheetMobile
         sheet={sheet}
         draft={draft}

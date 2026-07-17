@@ -16,7 +16,7 @@ import developerRoutes from './routes/developer.routes.js';
 export function createApp() {
   const app = express();
   app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
-  app.use(express.json({ limit: '2mb' }));
+  app.use(express.json({ limit: '4mb' }));
 
   app.get('/health', (_, res) => res.json({ ok: true, name: 'Lúgubre RPG API' }));
   app.use('/api/auth', authRoutes);
@@ -33,7 +33,6 @@ export function createApp() {
   app.use('/api/admin', adminRoutes);
 
   app.use((err, req, res, next) => {
-    console.error(err);
     if (err?.issues) {
       return res.status(400).json({
         message: 'Verifique os campos enviados.',
@@ -46,6 +45,10 @@ export function createApp() {
     if (err?.code === '23505') {
       return res.status(409).json({ message: 'Já existe um item cadastrado com estes dados.' });
     }
+    if (Number.isInteger(err?.status) && err.status >= 400 && err.status < 600) {
+      return res.status(err.status).json({ message: err.message || 'Nao foi possivel concluir a operacao.' });
+    }
+    console.error(err);
     res.status(500).json({ message: 'Erro interno.' });
   });
 

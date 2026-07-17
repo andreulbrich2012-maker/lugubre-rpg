@@ -1,8 +1,17 @@
 import pg from 'pg';
 import '../config/env.js';
 
+export function normalizeDatabaseUrl(connectionString) {
+  if (!connectionString) return connectionString;
+
+  return connectionString.replace(
+    /([?&])sslmode=(?:prefer|require|verify-ca)(?=(&|$))/i,
+    '$1sslmode=verify-full'
+  );
+}
+
 export const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL
+  connectionString: normalizeDatabaseUrl(process.env.DATABASE_URL)
 });
 
 export const query = (text, params) => pool.query(text, params);

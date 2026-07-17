@@ -444,7 +444,10 @@ values
   ('Kenku', '', '{"agilidade":1,"vigor":-1}'),
   ('Orc', '', '{"forca":1,"intelecto":-1}'),
   ('Aasimar', '', '{"vigor":-1,"presenca":1}')
-on conflict ((lower(name))) do update set image = excluded.image, attribute_modifiers = excluded.attribute_modifiers;
+on conflict ((lower(name))) do update set
+  image = excluded.image,
+  attribute_modifiers = excluded.attribute_modifiers,
+  deleted_at = null;
 
 update characters c
 set attributes = '{"forca":3,"agilidade":1,"presenca":2,"intelecto":2,"vigor":2}'::jsonb,

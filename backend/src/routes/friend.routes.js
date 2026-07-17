@@ -38,16 +38,26 @@ router.get('/search', async (req, res) => {
 });
 
 router.post('/add', async (req, res) => {
-  const body = z.object({ email: z.string().email() }).parse(req.body);
+  const body = z.object({ email: z.string().trim().toLowerCase().email() }).parse(req.body);
   const user = await tryQuery('select id, name, email, role from users where email = $1', [body.email.toLowerCase()]);
   if (user?.rows?.[0]) {
     if (user.rows[0].id === req.user.id) return res.status(400).json({ message: 'Voce nao pode adicionar a si mesmo.' });
+    const existing = await query(
+      `select * from friends
+       where (user_id=$1 and friend_id=$2) or (user_id=$2 and friend_id=$1)`,
+      [req.user.id, user.rows[0].id]
+    );
+    if (existing.rowCount) {
+      const result = await query("update friends set status='accepted' where id=$1 returning *", [existing.rows[0].id]);
+      return res.status(200).json({ ...result.rows[0], friend: user.rows[0] });
+    }
+    const [userId, friendId] = [req.user.id, user.rows[0].id].sort();
     const result = await query(
       `insert into friends (user_id, friend_id, status)
        values ($1, $2, 'accepted')
        on conflict (user_id, friend_id) do update set status = 'accepted'
        returning *`,
-      [req.user.id, user.rows[0].id]
+      [userId, friendId]
     );
     return res.status(201).json({ ...result.rows[0], friend: user.rows[0] });
   }
@@ -57,17 +67,18 @@ router.post('/add', async (req, res) => {
 });
 
 router.get('/messages/:friendId', async (req, res) => {
+  const friendId = z.string().uuid().parse(req.params.friendId);
   const result = await tryQuery(
     `select * from friend_messages
      where (sender_id = $1 and receiver_id = $2) or (sender_id = $2 and receiver_id = $1)
      order by created_at asc limit 200`,
-    [req.user.id, req.params.friendId]
+    [req.user.id, friendId]
   );
-  res.json(result?.rows || await listLocalFriendMessages(req.user.id, req.params.friendId));
+  res.json(result?.rows || await listLocalFriendMessages(req.user.id, friendId));
 });
 
 router.post('/messages', async (req, res) => {
-  const body = z.object({ friendId: z.string().min(1), message: z.string().min(1) }).parse(req.body);
+  const body = z.object({ friendId: z.string().uuid(), message: z.string().trim().min(1).max(4000) }).parse(req.body);
   const friendship = await tryQuery(
     `select id from friends
      where status = 'accepted'
@@ -77,11 +88,11 @@ router.post('/messages', async (req, res) => {
   if (friendship?.rowCount) {
     const result = await query(
       'insert into friend_messages (sender_id, receiver_id, message) values ($1, $2, $3) returning *',
-      [req.user.id, body.friendId, body.message.trim()]
+      [req.user.id, body.friendId, body.message]
     );
     return res.status(201).json(result.rows[0]);
   }
-  const message = await createLocalFriendMessage(req.user.id, body.friendId, body.message.trim());
+  const message = await createLocalFriendMessage(req.user.id, body.friendId, body.message);
   if (!message) return res.status(403).json({ message: 'Adicione este usuario antes de conversar.' });
   res.status(201).json(message);
 });

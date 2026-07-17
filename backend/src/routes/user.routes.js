@@ -8,12 +8,14 @@ import {
   updateLocalUserTheme
 } from '../db/localStore.js';
 import { requireAuth } from '../middleware/auth.js';
+import { imageReferenceSchema } from '../utils/images.js';
 
 const router = Router();
 router.use(requireAuth);
 
 const publicColumns = 'id, name, email, role, profile_image_url, theme, created_at, updated_at';
 const themes = ['sombrio', 'lugubre', 'daltonismo'];
+const normalizedEmail = z.preprocess((value) => String(value || '').trim().toLowerCase(), z.string().email());
 
 function publicUser(row) {
   return {
@@ -32,8 +34,8 @@ router.put('/profile', async (req, res) => {
   try {
     const body = z.object({
       name: z.string().min(2).optional(),
-      email: z.string().email().optional(),
-      profileImageUrl: z.string().max(1_500_000).optional().nullable()
+      email: normalizedEmail.optional(),
+      profileImageUrl: imageReferenceSchema().optional().nullable()
     }).parse(req.body);
 
     const result = await tryQuery(
@@ -55,7 +57,7 @@ router.put('/password', async (req, res) => {
   try {
     const body = z.object({
       currentPassword: z.string().min(6),
-      newPassword: z.string().min(6)
+      newPassword: z.string().min(8)
     }).parse(req.body);
 
     const result = await tryQuery('select password_hash from users where id = $1', [req.user.id]);
@@ -91,7 +93,7 @@ router.put('/theme', async (req, res) => {
 router.post('/profile-image', async (req, res) => {
   try {
     const body = z.object({
-      image: z.string().startsWith('data:image/').max(1_500_000)
+      image: imageReferenceSchema(1_500_000, false)
     }).parse(req.body);
     const result = await tryQuery(
       `update users set profile_image_url = $1, updated_at = now()

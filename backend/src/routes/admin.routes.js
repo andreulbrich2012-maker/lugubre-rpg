@@ -25,6 +25,7 @@ import {
 } from '../db/localStore.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { parseDiceFormula } from '../utils/rules.js';
+import { imageReferenceSchema } from '../utils/images.js';
 import { feedbackPriorities, feedbackStatuses, feedbackTypes } from './feedback.routes.js';
 
 const router = Router();
@@ -43,14 +44,14 @@ const monsterCategories = ['Caos', 'Gaia', 'Ponto', 'Érebo', 'Nix', 'Tártaro',
 
 const raceSchema = z.object({
   name: z.string().min(2),
-  image: z.string().optional().nullable(),
+  image: imageReferenceSchema().optional().nullable(),
   attributeModifiers: z.record(z.coerce.number()).default({})
 });
 
 const classSchema = z.object({
   name: z.string().min(2),
   description: z.string().optional().default(''),
-  image: z.string().optional().nullable(),
+  image: imageReferenceSchema().optional().nullable(),
   progression: z.array(z.object({
     level: z.coerce.number().min(1).max(20),
     mana: z.coerce.number().min(0),
@@ -78,9 +79,9 @@ const monsterAttackSchema = z.object({
 
 const monsterSchema = z.object({
   name: z.string().min(2),
-  imageUrl: z.string().optional().default(''),
-  tokenUrl: z.string().optional().default(''),
-  category: z.string().min(2).default('Caos'),
+  imageUrl: imageReferenceSchema().optional().default(''),
+  tokenUrl: imageReferenceSchema().optional().default(''),
+  category: z.enum(monsterCategories).default('Caos'),
   difficulty: z.string().min(2).default('Média'),
   baseHealth: z.coerce.number().min(0).default(8),
   armor: z.coerce.number().min(0).default(10),
@@ -92,7 +93,7 @@ const powerElements = ['Érebo', 'Nix', 'Tártaro', 'Ananque', 'Éter', 'Gaia', 
 const powerLibrarySchema = z.object({
   name: z.string().min(2).max(140),
   type: z.enum(['magia', 'poder']).default('magia'),
-  element: z.string().optional().nullable(),
+  element: z.enum(powerElements).optional().nullable(),
   description: z.string().optional().default(''),
   manaCost: z.coerce.number().min(0).default(0),
   damageFormula: z.string().optional().default(''),
@@ -101,7 +102,7 @@ const powerLibrarySchema = z.object({
   requirement: z.string().optional().default(''),
   recommendedClass: z.string().optional().default(''),
   recommendedLevel: z.coerce.number().min(1).max(20).default(1),
-  imageUrl: z.string().optional().default('')
+  imageUrl: imageReferenceSchema().optional().default('')
 });
 const feedbackStatusSchema = z.object({
   status: z.enum(feedbackStatuses)
@@ -113,7 +114,7 @@ const developerPostSchema = z.object({
   title: z.string().min(3).max(180),
   shortDescription: z.string().min(3).max(320),
   fullDescription: z.string().max(6000).optional().default(''),
-  imageUrl: z.string().max(1_500_000).optional().default(''),
+  imageUrl: imageReferenceSchema().optional().default(''),
   category: z.string().max(60).optional().default('Atualização'),
   publishedAt: z.coerce.date().optional(),
   isVisible: z.coerce.boolean().default(true)

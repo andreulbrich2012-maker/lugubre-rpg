@@ -18,6 +18,7 @@ function publicUser(user) {
     role: user.role,
     profile_image_url: user.profile_image_url || '',
     theme: user.theme || 'sombrio',
+    token_version: Number(user.token_version || 0),
     created_at: user.created_at,
     updated_at: user.updated_at
   };
@@ -121,36 +122,14 @@ const defaultData = {
   ]
 };
 
+const developmentSeedPassword = process.env.NODE_ENV === 'test' ? 'adm123' : process.env.SEED_ADMIN_PASSWORD;
+const developmentDemoPassword = process.env.NODE_ENV === 'test' ? 'demo123' : process.env.SEED_DEMO_PASSWORD;
 const seedUsers = [
-  {
-    name: 'Andre Admin',
-    email: 'andreulbrich2012@gmail.com',
-    password: 'adm123',
-    role: 'admin'
-  },
-  {
-    name: 'Administrador',
-    email: 'adm@lugubre.local',
-    password: 'adm123',
-    role: 'admin'
-  },
-  {
-    name: 'Joao Admin',
-    email: 'joaogames9909@gmail.com',
-    password: 'adm123',
-    role: 'admin'
-  },
-  {
-    name: 'Jogador Demo',
-    email: 'demo@lugubre.local',
-    password: 'demo123',
-    role: 'user'
-  }
-];
-
-export function getSeedPassword(email) {
-  return seedUsers.find((seed) => seed.email === email.trim().toLowerCase())?.password || null;
-}
+  developmentSeedPassword && { name: 'Andre Admin', email: 'andreulbrich2012@gmail.com', password: developmentSeedPassword, role: 'admin' },
+  developmentSeedPassword && { name: 'Administrador', email: 'adm@lugubre.local', password: developmentSeedPassword, role: 'admin' },
+  developmentSeedPassword && { name: 'Joao Admin', email: 'joaogames9909@gmail.com', password: developmentSeedPassword, role: 'admin' },
+  developmentDemoPassword && { name: 'Jogador Demo', email: 'demo@lugubre.local', password: developmentDemoPassword, role: 'user' }
+].filter(Boolean);
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
@@ -276,7 +255,6 @@ async function createSeedUser(seed) {
 }
 
 async function ensureSeedUsers(data) {
-  const shouldRefreshSeeds = data.seed_version !== seedVersion;
   for (const seed of seedUsers) {
     const index = data.users.findIndex((user) => normalizeEmail(user.email) === seed.email);
     if (index >= 0) {
@@ -288,9 +266,6 @@ async function ensureSeedUsers(data) {
         profile_image_url: data.users[index].profile_image_url || '',
         theme: data.users[index].theme || 'sombrio'
       };
-      if (shouldRefreshSeeds) {
-        data.users[index].password_hash = await bcrypt.hash(seed.password, 10);
-      }
     } else {
       data.users.push(await createSeedUser(seed));
     }
@@ -450,7 +425,7 @@ export async function createLocalUser({ name, email, password, role = 'user' }) 
     error.status = 409;
     throw error;
   }
-  const user = { id: crypto.randomUUID(), name: name.trim(), email: normalizedEmail, password_hash: await bcrypt.hash(password, 10), role, profile_image_url: '', theme: 'sombrio', created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+  const user = { id: crypto.randomUUID(), name: name.trim(), email: normalizedEmail, password_hash: await bcrypt.hash(password, 10), role, profile_image_url: '', theme: 'sombrio', token_version: 0, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
   data.users.push(user);
   await writeStore(data);
   return user;
@@ -516,6 +491,19 @@ export async function updateLocalUserPassword(id, currentPassword, newPassword) 
   };
   await writeStore(data);
   return publicUser(data.users[index]);
+}
+
+export async function revokeLocalUserTokens(id) {
+  const data = await ensureStore();
+  const index = data.users.findIndex((user) => user.id === id);
+  if (index === -1) return false;
+  data.users[index] = {
+    ...data.users[index],
+    token_version: Number(data.users[index].token_version || 0) + 1,
+    updated_at: new Date().toISOString()
+  };
+  await writeStore(data);
+  return true;
 }
 
 export async function getLocalCatalog(type, options = {}) {
@@ -921,8 +909,10 @@ export async function updateLocalCharacter(id, ownerId, character) {
 
 export async function deleteLocalCharacter(id, ownerId) {
   const data = await ensureStore();
+  const previousLength = data.characters.length;
   data.characters = data.characters.filter((row) => row.id !== id || row.owner_id !== ownerId);
   await writeStore(data);
+  return data.characters.length < previousLength;
 }
 
 export async function listLocalCampaigns(userId) {

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { tryQuery } from '../db/pool.js';
 import { createLocalFeedback, listLocalFeedbacks } from '../db/localStore.js';
 import { requireAuth } from '../middleware/auth.js';
+import { imageReferenceSchema } from '../utils/images.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -28,7 +29,7 @@ const feedbackSchema = z.object({
   description: z.string().trim().min(10).max(8000),
   priority: z.enum(feedbackPriorities).default('Média'),
   pageContext: z.string().trim().max(240).optional().default(''),
-  attachmentUrl: z.string().trim().max(1_500_000).optional().default('')
+  attachmentUrl: imageReferenceSchema().optional().default('')
 });
 
 function badRequest(res, error) {

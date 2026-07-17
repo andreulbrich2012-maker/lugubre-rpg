@@ -5,6 +5,7 @@ create table if not exists users (
   name text not null,
   email text not null unique,
   password_hash text not null,
+  token_version integer not null default 0,
   role text not null default 'user' check (role in ('user', 'player', 'master', 'admin')),
   profile_image_url text,
   theme text not null default 'sombrio' check (theme in ('sombrio', 'lugubre', 'daltonismo')),
@@ -15,10 +16,12 @@ create table if not exists users (
 alter table users add column if not exists profile_image_url text;
 alter table users add column if not exists theme text not null default 'sombrio';
 alter table users add column if not exists updated_at timestamptz not null default now();
+alter table users add column if not exists token_version integer not null default 0;
 alter table users alter column role set default 'user';
 alter table users alter column theme set default 'sombrio';
 alter table users drop constraint if exists users_role_check;
 alter table users add constraint users_role_check check (role in ('user', 'player', 'master', 'admin'));
+create unique index if not exists users_email_normalized_idx on users (lower(trim(email)));
 
 create table if not exists races (
   id uuid primary key default uuid_generate_v4(),
@@ -93,6 +96,7 @@ create table if not exists characters (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+create index if not exists characters_owner_updated_idx on characters (owner_id, updated_at desc);
 
 alter table characters add column if not exists life_current int not null default 63;
 alter table characters add column if not exists life_max int not null default 63;
@@ -140,6 +144,7 @@ create table if not exists campaign_members (
   updated_at timestamptz not null default now(),
   primary key (campaign_id, user_id)
 );
+create index if not exists campaign_members_user_idx on campaign_members (user_id, campaign_id);
 
 alter table campaign_members add column if not exists id uuid not null default uuid_generate_v4();
 alter table campaign_members add column if not exists shared_character_id uuid references characters(id) on delete set null;
@@ -291,6 +296,8 @@ create table if not exists friends (
   unique (user_id, friend_id),
   check (user_id <> friend_id)
 );
+create index if not exists friends_user_idx on friends (user_id, created_at desc);
+create index if not exists friends_friend_idx on friends (friend_id, created_at desc);
 
 create table if not exists friend_messages (
   id uuid primary key default uuid_generate_v4(),
@@ -299,6 +306,7 @@ create table if not exists friend_messages (
   message text not null,
   created_at timestamptz not null default now()
 );
+create index if not exists friend_messages_sender_receiver_idx on friend_messages (sender_id, receiver_id, created_at desc);
 
 create table if not exists feedbacks (
   id uuid primary key default uuid_generate_v4(),

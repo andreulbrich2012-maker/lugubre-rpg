@@ -64,11 +64,15 @@ export function parseDiceFormula(formula) {
     error.status = 400;
     throw error;
   }
-  return {
-    quantity: Math.min(20, Math.max(1, Number(match[1]))),
-    sides: Math.min(100, Math.max(2, Number(match[2]))),
-    bonus: Number(match[3] || 0)
-  };
+  const quantity = Number(match[1]);
+  const sides = Number(match[2]);
+  const bonus = Number(match[3] || 0);
+  if (quantity < 1 || quantity > 20 || sides < 2 || sides > 100 || Math.abs(bonus) > 10_000) {
+    const error = new Error('Formula fora dos limites permitidos (20 dados, d100 e modificador de 10000).');
+    error.status = 400;
+    throw error;
+  }
+  return { quantity, sides, bonus };
 }
 
 export function rollDiceFormula(formula) {

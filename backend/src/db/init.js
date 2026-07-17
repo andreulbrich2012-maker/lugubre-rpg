@@ -79,6 +79,7 @@ if (!process.env.DATABASE_URL) {
 
 const statements = splitStatements(sql);
 const { pool } = await import('./pool.js');
+let configuredSeedCount = 0;
 
 try {
   for (const [index, statement] of statements.entries()) {
@@ -98,9 +99,10 @@ try {
     .filter(Boolean);
   const adminEmails = [...new Set([...builtInAdminEmails, ...envAdminEmails])];
   const seedUsers = [
-    ...adminEmails.map((email) => ({ name: 'Administrador Lugubre', email, password: 'adm123', role: 'admin' })),
-    { name: 'Demo Jogador', email: 'demo@lugubre.local', password: 'demo123', role: 'user' }
-  ];
+    ...adminEmails.map((email) => process.env.SEED_ADMIN_PASSWORD && ({ name: 'Administrador Lugubre', email, password: process.env.SEED_ADMIN_PASSWORD, role: 'admin' })),
+    process.env.SEED_DEMO_PASSWORD && { name: 'Demo Jogador', email: 'demo@lugubre.local', password: process.env.SEED_DEMO_PASSWORD, role: 'user' }
+  ].filter(Boolean);
+  configuredSeedCount = seedUsers.length;
 
   for (const user of seedUsers) {
     const passwordHash = await bcrypt.hash(user.password, 10);
@@ -109,7 +111,6 @@ try {
        values ($1, $2, $3, $4)
        on conflict (email) do update set
          name = excluded.name,
-         password_hash = excluded.password_hash,
          role = excluded.role,
          updated_at = now()`,
       [user.name, user.email, passwordHash, user.role]
@@ -119,4 +120,4 @@ try {
   await pool.end();
 }
 
-console.log(`Banco inicializado com sucesso. ${statements.length} comandos SQL executados e seeds aplicados.`);
+console.log(`Banco inicializado com sucesso. ${statements.length} comandos SQL executados e ${configuredSeedCount} seeds configurados.`);

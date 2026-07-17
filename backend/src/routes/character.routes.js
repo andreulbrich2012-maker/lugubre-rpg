@@ -11,6 +11,7 @@ import {
 } from '../db/localStore.js';
 import { requireAuth } from '../middleware/auth.js';
 import { applyRaceModifiers, baseAttributes, baseSkills, calculateDefense, calculateDodge, rollDiceFormula } from '../utils/rules.js';
+import { imageReferenceSchema } from '../utils/images.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -34,7 +35,7 @@ const powerSchema = z.object({
   range: z.string().optional().default('-'),
   skill: z.string().optional().default('Luta'),
   element: z.string().optional().default('Érebo'),
-  image: z.string().optional().default(''),
+  image: imageReferenceSchema().optional().default(''),
   manaCost: z.coerce.number().min(0).default(0),
   description: z.string().optional().default('')
 });
@@ -53,7 +54,7 @@ const diceSettingsSchema = z.object({
 const characterSchema = z.object({
   playerName: z.string().trim().min(1),
   characterName: z.string().trim().min(1),
-  photo: z.string().max(3_000_000).optional().nullable(),
+  photo: imageReferenceSchema(3_000_000).optional().nullable(),
   raceId: z.string().min(1).optional().nullable(),
   classId: z.string().min(1).optional().nullable(),
   originId: z.string().min(1).optional().nullable(),
@@ -669,7 +670,8 @@ router.patch('/:id/play', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   const result = await tryQuery('delete from characters where id = $1 and owner_id = $2', [req.params.id, req.user.id]);
-  if (!result) await deleteLocalCharacter(req.params.id, req.user.id);
+  const deleted = result ? result.rowCount > 0 : await deleteLocalCharacter(req.params.id, req.user.id);
+  if (!deleted) return res.status(404).json({ message: 'Ficha não encontrada.' });
   res.status(204).end();
 });
 

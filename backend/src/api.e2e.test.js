@@ -42,6 +42,23 @@ async function expectAdminDelete(path, token) {
 }
 
 describe('fluxo principal da API', () => {
+  it('responde health, headers de seguranca e erros JSON', async () => {
+    const health = await request(app).get('/api/health').expect(200);
+    expect(health.body.ok).toBe(true);
+    expect(health.headers['x-content-type-options']).toBe('nosniff');
+    expect(health.headers['x-frame-options']).toBe('SAMEORIGIN');
+    expect(health.headers['referrer-policy']).toBeTruthy();
+
+    const missing = await request(app).get('/api/rota-inexistente').expect(404);
+    expect(missing.type).toContain('json');
+    expect(missing.body.message).toBe('Rota da API nao encontrada.');
+
+    await request(app)
+      .get('/api/health')
+      .set('Origin', 'https://origem-maliciosa.example')
+      .expect(403);
+  });
+
   it('autentica os perfis seed admin e demo', async () => {
     const admin = await request(app)
       .post('/api/auth/login')
@@ -89,11 +106,11 @@ describe('fluxo principal da API', () => {
     await request(app)
       .post('/api/auth/login')
       .send({ email: 'conta-inexistente@lugubre.local', password: 'adm123' })
-      .expect(404);
+      .expect(401);
 
     await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Duplicado', email: '  ANDREULBRICH2012@GMAIL.COM  ', password: 'adm123' })
+      .send({ name: 'Duplicado', email: '  ANDREULBRICH2012@GMAIL.COM  ', password: 'Teste123!' })
       .expect(409);
   });
 
@@ -103,17 +120,18 @@ describe('fluxo principal da API', () => {
 
     const registered = await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Sessao Teste', email, password: 'adm123' })
+      .send({ name: 'Sessao Teste', email, password: 'Teste123!' })
       .expect(201);
+    expect(registered.body.user.role).toBe('user');
 
     const firstLogin = await request(app)
       .post('/api/auth/login')
-      .send({ email: `  ${email.toUpperCase()}  `, password: 'adm123' })
+      .send({ email: `  ${email.toUpperCase()}  `, password: 'Teste123!' })
       .expect(200);
 
     const secondLogin = await request(app)
       .post('/api/auth/login')
-      .send({ email, password: 'adm123' })
+      .send({ email, password: 'Teste123!' })
       .expect(200);
 
     expect(firstLogin.body.user.id).toBe(registered.body.user.id);
@@ -134,7 +152,7 @@ describe('fluxo principal da API', () => {
     await request(app)
       .put('/api/users/password')
       .set('Authorization', `Bearer ${secondLogin.body.token}`)
-      .send({ currentPassword: 'senha-errada', newPassword: 'nova123' })
+      .send({ currentPassword: 'senha-errada', newPassword: 'Nova12345!' })
       .expect(401);
 
     const sessionAfterError = await request(app)
@@ -143,6 +161,31 @@ describe('fluxo principal da API', () => {
       .expect(200);
 
     expect(sessionAfterError.body.user.email).toBe(email);
+
+    await request(app)
+      .post('/api/auth/logout')
+      .set('Authorization', `Bearer ${secondLogin.body.token}`)
+      .expect(204);
+
+    await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${firstLogin.body.token}`)
+      .expect(401);
+
+    await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${secondLogin.body.token}`)
+      .expect(401);
+
+    const loginAfterLogout = await request(app)
+      .post('/api/auth/login')
+      .send({ email, password: 'Teste123!' })
+      .expect(200);
+
+    await request(app)
+      .get('/api/auth/me')
+      .set('Authorization', `Bearer ${loginAfterLogout.body.token}`)
+      .expect(200);
   });
 
   it('rejeita ficha invalida sem derrubar a API ou criar registro parcial', async () => {
@@ -293,9 +336,15 @@ describe('fluxo principal da API', () => {
       })
       .expect(201);
 
+    await request(app)
+      .post('/api/admin/powers')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Elemento invalido', type: 'magia', element: 'Inexistente', damageFormula: '1d6', recommendedLevel: 1 })
+      .expect(400);
+
     const user = await request(app)
       .post('/api/auth/register')
-      .send({ name: 'Jogador Teste', email: `jogador-${stamp}@lugubre.local`, password: 'adm123' })
+      .send({ name: 'Jogador Teste', email: `jogador-${stamp}@lugubre.local`, password: 'Teste123!' })
       .expect(201);
 
     let token = user.body.token;
@@ -319,7 +368,7 @@ describe('fluxo principal da API', () => {
     await request(app)
       .post('/api/auth/login')
       .send({ email: `nao-existe-${stamp}@lugubre.local`, password: 'adm123' })
-      .expect(404);
+      .expect(401);
 
     await request(app)
       .post('/api/auth/login')
@@ -334,6 +383,12 @@ describe('fluxo principal da API', () => {
 
     expect(profile.body.user.name).toBe('Jogador Editado');
     expect(profile.body.user.profile_image_url).toBe(profileImage);
+
+    await request(app)
+      .post('/api/users/profile-image')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ image: 'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=' })
+      .expect(400);
 
     const me = await request(app)
       .get('/api/auth/me')
@@ -360,18 +415,18 @@ describe('fluxo principal da API', () => {
     await request(app)
       .put('/api/users/password')
       .set('Authorization', `Bearer ${token}`)
-      .send({ currentPassword: 'errada123', newPassword: 'nova123' })
+      .send({ currentPassword: 'errada123', newPassword: 'Nova12345!' })
       .expect(401);
 
     await request(app)
       .put('/api/users/password')
       .set('Authorization', `Bearer ${token}`)
-      .send({ currentPassword: 'adm123', newPassword: 'nova123' })
+      .send({ currentPassword: 'Teste123!', newPassword: 'Nova12345!' })
       .expect(200);
 
     const loginAfterPasswordChange = await request(app)
       .post('/api/auth/login')
-      .send({ email: `jogador-editado-${stamp}@lugubre.local`, password: 'nova123' })
+      .send({ email: `jogador-editado-${stamp}@lugubre.local`, password: 'Nova12345!' })
       .expect(200);
     token = loginAfterPasswordChange.body.token;
 
@@ -802,6 +857,26 @@ describe('fluxo principal da API', () => {
     expect(damageRoll.body.isCritical).toBe(true);
     expect(damageRoll.body.total).toBe(damageRoll.body.baseTotal * 3);
 
+    const invalidRollStartedAt = Date.now();
+    await request(app)
+      .post(`/api/characters/${character.body.id}/powers/roll`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ formula: 'texto', criticalValue: 20, criticalMultiplier: 2, d20: 10 })
+      .expect(400);
+    expect(Date.now() - invalidRollStartedAt).toBeLessThan(2000);
+
+    await request(app)
+      .post(`/api/characters/${character.body.id}/powers/roll`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ formula: '999d999', criticalValue: 20, criticalMultiplier: 2, d20: 10 })
+      .expect(400);
+
+    await request(app)
+      .post('/api/admin/monsters')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ name: 'Categoria invalida', category: 'Demônios', difficulty: 'Média', baseHealth: 10, armor: 10 })
+      .expect(400);
+
     const monster = await request(app)
       .post('/api/admin/monsters')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -913,6 +988,51 @@ describe('fluxo principal da API', () => {
       .send({ name: `Campanha ${stamp}`, description: 'Teste' })
       .expect(201);
 
+    if (process.env.DATABASE_URL) {
+      await patchPlay({ wallet: { bronze: 0, silver: 10, platinum: 0, gold: 0 } });
+      const shop = await request(app)
+      .post(`/api/campaigns/${campaign.body.id}/shops`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: `Loja ${stamp}`, description: 'Teste de concorrencia', category: 'Mercado Geral', visibleToPlayers: true })
+      .expect(201);
+    const shopItem = await request(app)
+      .post(`/api/campaigns/${campaign.body.id}/shops/${shop.body.id}/items`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: `Item ${stamp}`, description: 'Compra unica', priceDracmas: 10, stock: 4, category: 'Outros', weight: 1, available: true })
+      .expect(201);
+
+    await request(app)
+      .post(`/api/campaigns/${campaign.body.id}/purchase-requests`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ itemId: shopItem.body.id, quantity: 1 })
+      .expect(400);
+
+    const purchase = await request(app)
+      .post(`/api/campaigns/${campaign.body.id}/purchase-requests`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ itemId: shopItem.body.id, characterId: character.body.id, quantity: 1 })
+      .expect(201);
+
+    const approvals = await Promise.all([
+      request(app).put(`/api/campaigns/${campaign.body.id}/purchase-requests/${purchase.body.id}/approve`).set('Authorization', `Bearer ${token}`).send({ note: 'Aprovado' }),
+      request(app).put(`/api/campaigns/${campaign.body.id}/purchase-requests/${purchase.body.id}/approve`).set('Authorization', `Bearer ${token}`).send({ note: 'Aprovado novamente' })
+    ]);
+    expect(approvals.every((response) => response.status === 200)).toBe(true);
+
+    const shopsAfterPurchase = await request(app)
+      .get(`/api/campaigns/${campaign.body.id}/shops`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(shopsAfterPurchase.body.shops[0].items.find((item) => item.id === shopItem.body.id).stock).toBe(3);
+
+    const characterAfterPurchase = await request(app)
+      .get(`/api/characters/${character.body.id}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+    expect(characterAfterPurchase.body.wallet_total_dracmas).toBe(90);
+      expect(characterAfterPurchase.body.inventory.filter((item) => item.name === `Item ${stamp}`)).toHaveLength(1);
+    }
+
     const message = await request(app)
       .post(`/api/campaigns/${campaign.body.id}/messages`)
       .set('Authorization', `Bearer ${token}`)
@@ -965,6 +1085,11 @@ describe('fluxo principal da API', () => {
       .delete(`/api/characters/${character.body.id}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(204);
+
+    await request(app)
+      .delete(`/api/characters/${crypto.randomUUID()}`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404);
 
     await expectAdminDelete(`/api/admin/skills/${skill.body.id}`, adminToken);
     await expectAdminDelete(`/api/admin/powers/${libraryPower.body.id}`, adminToken);

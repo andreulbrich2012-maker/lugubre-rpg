@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import authRoutes from './routes/auth.routes.js';
 import catalogRoutes from './routes/catalog.routes.js';
 import characterRoutes from './routes/character.routes.js';
@@ -12,13 +13,29 @@ import userRoutes from './routes/user.routes.js';
 import powerRoutes from './routes/power.routes.js';
 import feedbackRoutes from './routes/feedback.routes.js';
 import developerRoutes from './routes/developer.routes.js';
+import { apiLimiter, authLimiter, corsOrigin } from './config/security.js';
 
 export function createApp() {
   const app = express();
-  app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
+  app.set('trust proxy', 1);
+  app.disable('x-powered-by');
+  app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"]
+      }
+    },
+    crossOriginResourcePolicy: false
+  }));
+  app.use(cors({ origin: corsOrigin }));
   app.use(express.json({ limit: '4mb' }));
 
   app.get('/health', (_, res) => res.json({ ok: true, name: 'Lúgubre RPG API' }));
+  app.get('/api/health', (_, res) => res.json({ ok: true, name: 'Lúgubre RPG API' }));
+  app.use('/api', apiLimiter);
+  app.use('/api/auth/login', authLimiter);
+  app.use('/api/auth/register', authLimiter);
   app.use('/api/auth', authRoutes);
   app.use('/api/catalog', catalogRoutes);
   app.use('/api/dashboard', dashboardRoutes);
@@ -31,6 +48,10 @@ export function createApp() {
   app.use('/api/feedbacks', feedbackRoutes);
   app.use('/api', developerRoutes);
   app.use('/api/admin', adminRoutes);
+
+  app.use('/api', (req, res) => {
+    res.status(404).json({ message: 'Rota da API nao encontrada.' });
+  });
 
   app.use((err, req, res, next) => {
     if (err?.issues) {
@@ -48,7 +69,7 @@ export function createApp() {
     if (Number.isInteger(err?.status) && err.status >= 400 && err.status < 600) {
       return res.status(err.status).json({ message: err.message || 'Nao foi possivel concluir a operacao.' });
     }
-    console.error(err);
+    console.error(`[${req.method} ${req.originalUrl}]`, err);
     res.status(500).json({ message: 'Erro interno.' });
   });
 

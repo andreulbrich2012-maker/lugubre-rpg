@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import crypto from 'crypto';
 import { z } from 'zod';
-import { query, tryQuery } from '../db/pool.js';
+import { pool, query, tryQuery } from '../db/pool.js';
 import {
   createLocalCampaign,
   createLocalMessage,
@@ -62,7 +62,7 @@ const shopItemSchema = z.object({
 });
 const purchaseSchema = z.object({
   itemId: z.string().uuid(),
-  characterId: z.string().uuid().optional().nullable(),
+  characterId: z.string().uuid(),
   quantity: z.coerce.number().min(1).max(99).default(1)
 });
 const purchaseDecisionSchema = z.object({
@@ -112,7 +112,14 @@ function walletTotal(wallet = {}) {
 }
 
 function walletFromTotal(total) {
-  return { bronze: Math.max(0, Number(total || 0)), silver: 0, platinum: 0, gold: 0 };
+  let remaining = Math.max(0, Math.floor(Number(total || 0)));
+  const gold = Math.floor(remaining / 500);
+  remaining %= 500;
+  const platinum = Math.floor(remaining / 100);
+  remaining %= 100;
+  const silver = Math.floor(remaining / 10);
+  const bronze = remaining % 10;
+  return { bronze, silver, platinum, gold };
 }
 
 async function requireCampaignMember(campaignId, user) {
@@ -835,60 +842,98 @@ router.post('/:id/purchase-requests', async (req, res) => {
 async function decidePurchase(req, status) {
   const { note } = purchaseDecisionSchema.parse(req.body);
   await assertCampaignMaster(req.params.id, req.user);
-  const existing = await query(
-    `select pr.*, i.name as item_name, i.description as item_description, i.weight, i.stock, i.price_dracmas
-     from shop_purchase_requests pr
-     join campaign_shop_items i on i.id = pr.item_id
-     where pr.id=$1 and pr.campaign_id=$2`,
-    [req.params.requestId, req.params.id]
-  );
-  if (!existing.rowCount) {
-    const error = new Error('Solicitação não encontrada.');
-    error.status = 404;
-    throw error;
-  }
-  const request = existing.rows[0];
-  if (request.status !== 'pending') return request;
-  if (status === 'approved') {
-    if (request.stock < request.quantity) {
-      const error = new Error('Estoque insuficiente.');
-      error.status = 400;
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const existing = await client.query(
+      `select pr.*, i.name as item_name, i.description as item_description, i.weight, i.stock, i.price_dracmas
+       from shop_purchase_requests pr
+       join campaign_shop_items i on i.id = pr.item_id
+       where pr.id=$1 and pr.campaign_id=$2
+       for update of pr, i`,
+      [req.params.requestId, req.params.id]
+    );
+    if (!existing.rowCount) {
+      const error = new Error('Solicitação não encontrada.');
+      error.status = 404;
       throw error;
     }
-    if (request.character_id) {
-      const character = await query('select * from characters where id=$1 and owner_id=$2', [request.character_id, request.user_id]);
-      if (character.rowCount) {
-        const wallet = parseJsonField(character.rows[0].wallet, {});
-        const total = walletTotal(wallet);
-        if (total < request.total_price) {
-          const error = new Error('Dracmas insuficientes na carteira do personagem.');
-          error.status = 400;
-          throw error;
-        }
-        const inventory = parseJsonField(character.rows[0].inventory, []);
-        inventory.push({
-          id: crypto.randomUUID(),
-          quantity: request.quantity,
-          weight: Number(request.weight || 0),
-          name: request.item_name,
-          category: 'Compras',
-          description: request.item_description || '',
-          defenseBonus: 0
-        });
-        await query(
-          'update characters set wallet=$1, inventory=$2, updated_at=now() where id=$3',
-          [toJson(walletFromTotal(total - request.total_price)), toJson(inventory), request.character_id]
-        );
+    const request = existing.rows[0];
+    if (request.status !== 'pending') {
+      await client.query('commit');
+      return request;
+    }
+
+    if (status === 'approved') {
+      if (!request.character_id) {
+        const error = new Error('A solicitação não possui um personagem válido.');
+        error.status = 409;
+        throw error;
+      }
+      if (request.stock < request.quantity) {
+        const error = new Error('Estoque insuficiente.');
+        error.status = 400;
+        throw error;
+      }
+      const character = await client.query(
+        'select * from characters where id=$1 and owner_id=$2 for update',
+        [request.character_id, request.user_id]
+      );
+      if (!character.rowCount) {
+        const error = new Error('O personagem da compra não está mais disponível.');
+        error.status = 409;
+        throw error;
+      }
+      const wallet = parseJsonField(character.rows[0].wallet, {});
+      const total = walletTotal(wallet);
+      if (total < request.total_price) {
+        const error = new Error('Dracmas insuficientes na carteira do personagem.');
+        error.status = 400;
+        throw error;
+      }
+      const inventory = parseJsonField(character.rows[0].inventory, []);
+      inventory.push({
+        id: crypto.randomUUID(),
+        quantity: request.quantity,
+        weight: Number(request.weight || 0),
+        name: request.item_name,
+        category: 'Compras',
+        description: request.item_description || '',
+        defenseBonus: 0
+      });
+      await client.query(
+        'update characters set wallet=$1, inventory=$2, updated_at=now() where id=$3',
+        [toJson(walletFromTotal(total - request.total_price)), toJson(inventory), request.character_id]
+      );
+      const stock = await client.query(
+        'update campaign_shop_items set stock=stock-$1, updated_at=now() where id=$2 and stock >= $1 returning id',
+        [request.quantity, request.item_id]
+      );
+      if (!stock.rowCount) {
+        const error = new Error('Estoque insuficiente.');
+        error.status = 400;
+        throw error;
       }
     }
-    await query('update campaign_shop_items set stock = greatest(0, stock - $1), updated_at=now() where id=$2', [request.quantity, request.item_id]);
+
+    const updated = await client.query(
+      `update shop_purchase_requests set status=$1, gm_note=$2, updated_at=now()
+       where id=$3 and campaign_id=$4 and status='pending' returning *`,
+      [status, note, req.params.requestId, req.params.id]
+    );
+    if (!updated.rowCount) {
+      const error = new Error('Esta solicitação já foi processada.');
+      error.status = 409;
+      throw error;
+    }
+    await client.query('commit');
+    return updated.rows[0];
+  } catch (error) {
+    await client.query('rollback');
+    throw error;
+  } finally {
+    client.release();
   }
-  const updated = await query(
-    `update shop_purchase_requests set status=$1, gm_note=$2, updated_at=now()
-     where id=$3 and campaign_id=$4 returning *`,
-    [status, note, req.params.requestId, req.params.id]
-  );
-  return updated.rows[0];
 }
 
 router.put('/:id/purchase-requests/:requestId/approve', async (req, res) => {

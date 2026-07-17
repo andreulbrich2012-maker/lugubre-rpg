@@ -3,11 +3,12 @@ import { Server } from 'socket.io';
 import './config/env.js';
 import { createApp } from './app.js';
 import { requireSocketAuth, registerChatHandlers } from './socket.js';
+import { allowedOrigins } from './config/security.js';
 
 const app = createApp();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: process.env.CLIENT_URL || 'http://localhost:5173' }
+  cors: { origin: [...allowedOrigins()] }
 });
 
 io.use(requireSocketAuth);

@@ -30,7 +30,7 @@ export default function SharedCharacterPreview({ members }) {
         return (
           <article key={character.id} className="rounded-md border border-ember/15 bg-black/25 p-4">
             <div className="flex gap-3">
-              {character.photo ? <img src={character.photo} className="h-16 w-16 rounded-md border border-white/15 object-cover" /> : null}
+              {character.photo ? <img src={character.photo} alt={`Retrato de ${character.character_name}`} className="h-16 w-16 rounded-md border border-white/15 object-cover" /> : null}
               <div className="min-w-0">
                 <h3 className="font-display text-2xl text-ember">{character.character_name}</h3>
                 <p className="text-xs text-mist">Jogador: {member.name} · Nivel {character.level || 1}</p>

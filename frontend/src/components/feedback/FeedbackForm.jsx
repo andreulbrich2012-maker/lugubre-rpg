@@ -94,7 +94,7 @@ export default function FeedbackForm({ onSubmit, loading }) {
         <LoadingButton loading={loading} loadingText="Enviando..." className="min-h-12 w-full sm:w-auto">Enviar feedback</LoadingButton>
       </div>
 
-      {form.attachmentUrl && <img src={form.attachmentUrl} className="mt-4 max-h-56 w-full rounded-md border border-ember/15 object-cover" />}
+      {form.attachmentUrl && <img src={form.attachmentUrl} alt="Prévia do anexo" className="mt-4 max-h-56 w-full rounded-md border border-ember/15 object-cover" />}
       {error && <div className="mt-4"><Alert type="error">{error}</Alert></div>}
     </form>
   );

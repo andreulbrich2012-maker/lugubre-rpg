@@ -45,24 +45,32 @@ export default function Dashboard() {
   const [characters, setCharacters] = useState([]);
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   async function load() {
     setLoading(true);
-    const [dashboard, chars, camps] = await Promise.all([
-      api.get('/dashboard'),
-      api.get('/characters'),
-      api.get('/campaigns')
-    ]);
-    setSummary(dashboard.data);
-    setCharacters(chars.data);
-    setCampaigns(camps.data);
-    setLoading(false);
+    setLoadError('');
+    try {
+      const [dashboard, chars, camps] = await Promise.all([
+        api.get('/dashboard'),
+        api.get('/characters'),
+        api.get('/campaigns')
+      ]);
+      setSummary(dashboard.data);
+      setCharacters(chars.data);
+      setCampaigns(camps.data);
+    } catch (requestError) {
+      setLoadError(requestError.response?.data?.message || 'Não foi possível carregar o painel.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function removeCharacter(id) {
+    if (!window.confirm('Tem certeza que deseja excluir esta ficha? Essa ação não poderá ser desfeita.')) return;
     await api.delete(`/characters/${id}`);
-    load();
+    setCharacters((current) => current.filter((character) => character.id !== id));
   }
 
   function signOut() {
@@ -127,6 +135,7 @@ export default function Dashboard() {
 
       <section className="min-h-[640px] min-w-0">
         <DashboardTopbar user={user} onMenu={() => setSidebarOpen(true)} onSettings={() => activateTab('settings')} onLogout={signOut} />
+        {loadError && <div className="mb-4"><Alert type="error">{loadError} <button type="button" className="ml-2 underline" onClick={load}>Tentar novamente</button></Alert></div>}
         {loading ? (
           <div className="gothic-panel grid min-h-80 place-items-center rounded-md">
             <span className="h-8 w-8 animate-spin rounded-full border-2 border-ember/30 border-t-ember" />
@@ -326,7 +335,7 @@ function CharactersTab({ characters, onRemove }) {
               <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
                 <Link to={`/characters/${character.id}`}><Button variant="ghost" className="w-full sm:w-auto">Abrir ficha</Button></Link>
                 <Link to={`/characters/${character.id}/edit`}><Button variant="ghost" className="w-full sm:w-auto">Editar</Button></Link>
-                <Button variant="ghost" className="w-full sm:w-auto" onClick={() => onRemove(character.id)}><Trash2 size={16} /></Button>
+                <Button variant="ghost" className="w-full text-red-200 sm:w-auto" onClick={() => onRemove(character.id)} aria-label={`Excluir ${character.character_name}`} title="Excluir ficha"><Trash2 size={16} /></Button>
               </div>
             </article>
           ))}
@@ -614,8 +623,8 @@ function SettingsTab() {
       setPasswordMessage({ type: 'error', text: 'Preencha todos os campos de senha.' });
       return;
     }
-    if (passwords.newPassword.length < 6) {
-      setPasswordMessage({ type: 'error', text: 'A nova senha deve ter pelo menos 6 caracteres.' });
+    if (passwords.newPassword.length < 8) {
+      setPasswordMessage({ type: 'error', text: 'A nova senha deve ter pelo menos 8 caracteres.' });
       return;
     }
     if (passwords.newPassword !== passwords.confirmPassword) {

@@ -54,7 +54,7 @@ export default function FeedbackPanel() {
             </div>
             <p className="mt-5 whitespace-pre-wrap text-sm leading-relaxed text-mist">{selected.description}</p>
             {selected.page_context && <p className="mt-4 text-sm text-ember">Página: {selected.page_context}</p>}
-            {selected.attachment_url && <img src={selected.attachment_url} className="mt-4 max-h-80 w-full rounded-md border border-ember/15 object-contain" />}
+            {selected.attachment_url && <img src={selected.attachment_url} alt={`Anexo do feedback ${selected.title}`} className="mt-4 max-h-80 w-full rounded-md border border-ember/15 object-contain" />}
             {selected.admin_response && (
               <div className="mt-5 rounded-md border border-ember/20 bg-ember/10 p-4">
                 <p className="text-xs uppercase tracking-[.18em] text-ember">Resposta do admin</p>

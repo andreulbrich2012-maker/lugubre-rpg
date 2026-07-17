@@ -827,7 +827,7 @@ function PowerCard({ item, field, editing, index, onRoll, onEdit, onDelete, onUp
           <div className="min-w-0">
             <div className="flex items-start gap-3">
               <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-md border border-ember/25 bg-[radial-gradient(circle,rgba(142,92,246,.25),transparent_62%)] text-sm font-bold uppercase text-ember">
-                {item.image ? <img src={item.image} className="h-full w-full object-cover" /> : (isSpell ? String(item.element || 'Ér').slice(0, 2) : 'AT')}
+                {item.image ? <img src={item.image} alt={`Imagem de ${item.name}`} className="h-full w-full object-cover" /> : (isSpell ? String(item.element || 'Ér').slice(0, 2) : 'AT')}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold uppercase tracking-[.18em] text-ember/80">{isSpell ? 'Magia' : 'Ataque Normal'}</p>

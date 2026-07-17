@@ -3,7 +3,7 @@ import MessageFormatter from './MessageFormatter';
 
 function MessageAvatar({ message }) {
   if (message.user_avatar) {
-    return <img src={message.user_avatar} className="h-8 w-8 rounded-full border border-white/15 object-cover" />;
+    return <img src={message.user_avatar} alt={`Avatar de ${message.user_name || 'participante'}`} className="h-8 w-8 rounded-full border border-white/15 object-cover" />;
   }
 
   const initial = message.user_name?.trim()?.[0]?.toUpperCase() || '?';

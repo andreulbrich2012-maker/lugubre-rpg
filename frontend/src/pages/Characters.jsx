@@ -12,15 +12,29 @@ function formatSaveDate(value) {
 
 export default function Characters() {
   const [characters, setCharacters] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   async function load() {
-    const { data } = await api.get('/characters');
-    setCharacters(data);
+    setError('');
+    try {
+      const { data } = await api.get('/characters');
+      setCharacters(data);
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'Não foi possível carregar seus personagens.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function remove(id) {
-    await api.delete(`/characters/${id}`);
-    load();
+    if (!window.confirm('Tem certeza que deseja excluir esta ficha? Essa ação não poderá ser desfeita.')) return;
+    try {
+      await api.delete(`/characters/${id}`);
+      setCharacters((current) => current.filter((character) => character.id !== id));
+    } catch (requestError) {
+      setError(requestError.response?.data?.message || 'Não foi possível excluir a ficha.');
+    }
   }
 
   async function share(id) {
@@ -38,6 +52,9 @@ export default function Characters() {
         <Link to="/characters/new"><Button className="w-full sm:w-auto">Nova ficha</Button></Link>
       </div>
       <div className="mt-8 space-y-4">
+        {error && <div role="alert" className="rounded-md border border-red-400/40 bg-red-950/35 px-4 py-3 text-sm text-red-100">{error}</div>}
+        {loading && <div className="gothic-panel grid min-h-48 place-items-center rounded-md" aria-label="Carregando personagens"><span className="h-8 w-8 animate-spin rounded-full border-2 border-ember/30 border-t-ember" /></div>}
+        {!loading && !error && characters.length === 0 && <div className="gothic-panel rounded-md p-6 text-center text-mist">Você ainda não criou nenhum personagem.</div>}
         {characters.map((character) => (
           <article key={character.id} className="gothic-panel grid gap-4 rounded-md p-4 md:grid-cols-[96px_1fr_300px_auto] md:items-center">
             <EntityImage src={character.photo} label="Personagem" name={character.character_name} className="h-24" compact />
@@ -56,9 +73,9 @@ export default function Characters() {
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2 md:flex md:justify-end">
-              <Link to={`/characters/${character.id}/edit`}><Button variant="ghost" className="w-full"><Edit size={16} /></Button></Link>
-              <Button variant="ghost" className="w-full" onClick={() => share(character.id)}><Share2 size={16} /></Button>
-              <Button variant="ghost" className="w-full" onClick={() => remove(character.id)}><Trash2 size={16} /></Button>
+              <Link to={`/characters/${character.id}/edit`} aria-label={`Editar ${character.character_name}`} title="Editar ficha"><Button variant="ghost" className="w-full"><Edit size={16} /></Button></Link>
+              <Button variant="ghost" className="w-full" onClick={() => share(character.id)} aria-label={`Compartilhar ${character.character_name}`} title="Compartilhar ficha"><Share2 size={16} /></Button>
+              <Button variant="ghost" className="w-full text-red-200" onClick={() => remove(character.id)} aria-label={`Excluir ${character.character_name}`} title="Excluir ficha"><Trash2 size={16} /></Button>
             </div>
           </article>
         ))}

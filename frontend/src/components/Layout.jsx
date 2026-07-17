@@ -1,6 +1,6 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { BookOpen, Home, LogOut, MessageSquareText, Menu, MoreHorizontal, Palette, ScrollText, Settings, Shield, ShoppingBag, Skull, Swords, Users, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../store/authStore';
 import Button from './Button';
 
@@ -8,6 +8,7 @@ export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenuButtonRef = useRef(null);
   const inCampaignRoom = /^\/campaigns\/[^/]+/.test(location.pathname);
   const onDashboard = location.pathname === '/dashboard';
 
@@ -54,6 +55,20 @@ export default function Layout({ children }) {
     };
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const previousFocus = document.activeElement;
+    closeMenuButtonRef.current?.focus();
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setMenuOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      previousFocus?.focus?.();
+    };
+  }, [menuOpen]);
+
   function activePath(to) {
     const [path, search] = to.split('?');
     if (search) return location.pathname === path && location.search === `?${search}`;
@@ -62,6 +77,10 @@ export default function Layout({ children }) {
 
   function closeMenu() {
     setMenuOpen(false);
+  }
+
+  function openMenu() {
+    setMenuOpen(true);
   }
 
   function signOut() {
@@ -77,7 +96,8 @@ export default function Layout({ children }) {
           <button
             type="button"
             className="grid h-10 w-10 place-items-center rounded-md border border-ember/25 text-ember lg:hidden"
-            onClick={() => setMenuOpen(true)}
+            onClick={openMenu}
+            onPointerUp={openMenu}
             aria-label="Abrir menu"
             aria-expanded={menuOpen}
             aria-controls="mobile-menu-sheet"
@@ -123,7 +143,7 @@ export default function Layout({ children }) {
                 <p className="text-xs uppercase tracking-[.24em] text-ember/70">Navegação</p>
                 <h2 className="font-display text-2xl text-ember">Menu</h2>
               </div>
-              <button type="button" className="grid h-11 w-11 place-items-center rounded-md border border-ember/25 text-ember" onClick={closeMenu} aria-label="Fechar menu">
+              <button ref={closeMenuButtonRef} type="button" className="grid h-11 w-11 place-items-center rounded-md border border-ember/25 text-ember" onClick={closeMenu} aria-label="Fechar menu">
                 <X size={19} />
               </button>
             </div>
@@ -173,7 +193,8 @@ export default function Layout({ children }) {
           <button
             type="button"
             className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-semibold transition-colors ${menuOpen ? 'bg-ember/15 text-ember' : 'text-mist hover:bg-white/5 hover:text-white'}`}
-            onClick={() => setMenuOpen(true)}
+            onClick={openMenu}
+            onPointerUp={openMenu}
             aria-label="Menu"
             aria-expanded={menuOpen}
             aria-controls="mobile-menu-sheet"

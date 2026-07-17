@@ -7,7 +7,7 @@ export default function EntityImage({ src, label = 'Imagem', name = '', classNam
   if (hasImage) {
     return (
       <div className={`overflow-hidden rounded-md border border-ember/20 bg-black/30 ${className}`}>
-        <img src={src} className="h-full w-full object-cover" onError={() => setBroken(true)} />
+        <img src={src} alt={name ? `${label} de ${name}` : label} className="h-full w-full object-cover" onError={() => setBroken(true)} />
       </div>
     );
   }

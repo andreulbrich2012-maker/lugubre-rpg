@@ -21,7 +21,7 @@ export default function Register() {
     if (!form.email.trim()) next.email = 'Email obrigatorio.';
     else if (!emailPattern.test(form.email)) next.email = 'Informe um email valido.';
     if (!form.password) next.password = 'Senha obrigatoria.';
-    else if (form.password.length < 6) next.password = 'A senha deve ter pelo menos 6 caracteres.';
+    else if (form.password.length < 8) next.password = 'A senha deve ter pelo menos 8 caracteres.';
     if (!form.confirmPassword) next.confirmPassword = 'Confirme sua senha.';
     else if (form.confirmPassword !== form.password) next.confirmPassword = 'As senhas nao conferem.';
     setErrors(next);

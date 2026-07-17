@@ -2,7 +2,7 @@ import { Trash2 } from 'lucide-react';
 
 function MemberAvatar({ member }) {
   if (member.display_avatar) {
-    return <img src={member.display_avatar} className="h-10 w-10 rounded-full border border-white/15 object-cover" />;
+    return <img src={member.display_avatar} alt={`Avatar de ${member.display_name || member.name || 'participante'}`} className="h-10 w-10 rounded-full border border-white/15 object-cover" />;
   }
 
   const initial = member.display_name?.trim()?.[0]?.toUpperCase() || '?';

@@ -214,7 +214,7 @@ function AdminFeedbackDetails({ feedback, onClose, onStatus, onResponse, onDelet
             {feedback.attachment_url && (
               <div>
                 <p className="text-xs uppercase tracking-[.16em] text-ember">Anexo</p>
-                <img src={feedback.attachment_url} className="mt-2 max-h-80 w-full rounded-md border border-ember/15 object-contain" />
+                <img src={feedback.attachment_url} alt={`Anexo do feedback ${feedback.title}`} className="mt-2 max-h-80 w-full rounded-md border border-ember/15 object-contain" />
               </div>
             )}
           </div>

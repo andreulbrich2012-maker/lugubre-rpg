@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home';
 import { useAuth } from './store/authStore';
+import { AUTH_TOKEN_KEY } from './lib/api';
 
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
@@ -22,6 +23,11 @@ function RouteLoading() {
   return <main className="grid min-h-[60vh] place-items-center" aria-label="Carregando página"><span className="h-9 w-9 animate-spin rounded-full border-2 border-ember/30 border-t-ember" /></main>;
 }
 
+function isProtectedPath(pathname) {
+  return ['/dashboard', '/characters', '/campaigns', '/monsters', '/powers', '/feedback', '/admin']
+    .some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+}
+
 export default function App() {
   const { user, initAuth } = useAuth();
 
@@ -33,6 +39,20 @@ export default function App() {
   useEffect(() => {
     initAuth();
   }, [initAuth]);
+
+  useEffect(() => {
+    const enforceLoggedOutHistory = () => {
+      if (isProtectedPath(window.location.pathname) && !localStorage.getItem(AUTH_TOKEN_KEY)) {
+        window.location.replace('/login');
+      }
+    };
+    window.addEventListener('pageshow', enforceLoggedOutHistory);
+    window.addEventListener('popstate', enforceLoggedOutHistory);
+    return () => {
+      window.removeEventListener('pageshow', enforceLoggedOutHistory);
+      window.removeEventListener('popstate', enforceLoggedOutHistory);
+    };
+  }, []);
 
   return (
     <Layout>

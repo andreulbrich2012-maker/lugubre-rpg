@@ -573,7 +573,6 @@ function FriendsTab() {
 
 function SettingsTab() {
   const { user, updateProfile, setUser, logout } = useAuth();
-  const navigate = useNavigate();
   const [profile, setProfile] = useState({ name: user?.name || '', email: user?.email || '' });
   const [preview, setPreview] = useState(user?.profile_image_url || '');
   const [profileMessage, setProfileMessage] = useState(null);
@@ -678,7 +677,7 @@ function SettingsTab() {
 
   async function confirmLogout() {
     await logout();
-    navigate('/login', { replace: true });
+    window.location.replace('/login');
   }
 
   return (

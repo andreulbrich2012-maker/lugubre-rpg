@@ -94,7 +94,7 @@ function HeroSection() {
         src={lugubreImages.hero}
         alt=""
         aria-hidden="true"
-        fetchPriority="high"
+        fetchpriority="high"
         decoding="async"
         className="absolute inset-0 h-full w-full scale-[1.04] object-cover object-[60%_center] opacity-95 sm:object-center"
       />

@@ -2,7 +2,11 @@ import { Dice5, Edit, Minus, Plus, Save, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import Button from '../components/Button';
+import CharacterSheetMobile from '../components/character-sheet/CharacterSheetMobile';
+import CharacterSheetLoading from '../components/character-sheet/CharacterSheetLoading';
+import { ResourceStepper } from '../components/character-sheet/ResourceStepper';
 import { api } from '../lib/api';
+import { calculateResourceAdjustment, normalizeResourcePair } from '../lib/characterVitals';
 
 const attributes = [
   ['forca', 'Força'],
@@ -41,20 +45,6 @@ const referenceConfig = {
   class: { title: 'Trocar classe', endpoint: '/catalog/classes', payload: 'classId', empty: 'Nenhuma classe ativa encontrada.' },
   origin: { title: 'Trocar origem', endpoint: '/catalog/origins', payload: 'originId', empty: 'Nenhuma origem ativa encontrada.' }
 };
-
-function clampCurrentValue(value, max) {
-  const safeMax = Number(max ?? 0);
-  const safeValue = Math.max(0, Number(value || 0));
-  return safeMax > 0 ? Math.min(safeValue, safeMax) : safeValue;
-}
-
-function normalizeVitalPair(current, max) {
-  const safeMax = Math.max(0, Number(max || 0));
-  return {
-    current: clampCurrentValue(current, safeMax),
-    max: safeMax
-  };
-}
 
 function normalizeWalletValues(wallet = {}) {
   return {
@@ -119,6 +109,9 @@ export default function CharacterSheet() {
   const draftRef = useRef(null);
   const sheetRef = useRef(null);
   const persistQueueRef = useRef(Promise.resolve());
+  const vitalSaveTimerRef = useRef(null);
+  const vitalSaveVersionRef = useRef(0);
+  const dirtyVitalTypesRef = useRef(new Set());
 
   async function load() {
     try {
@@ -131,6 +124,10 @@ export default function CharacterSheet() {
   }
 
   useEffect(() => { load(); }, [id]);
+
+  useEffect(() => () => {
+    clearTimeout(vitalSaveTimerRef.current);
+  }, [id]);
 
   function syncSheet(data) {
     sheetRef.current = data;
@@ -172,34 +169,65 @@ export default function CharacterSheet() {
     await persist(draft, true);
   }
 
-  function updateManualVital(type, field, value) {
+  function updateVital(type, field, value) {
     const config = editableVitals[type];
     const source = draftRef.current || draft;
     const currentValue = field === 'current' ? value : source[config.current];
     const maxValue = field === 'max' ? value : source[config.max];
-    const normalized = normalizeVitalPair(currentValue, maxValue);
+    const normalized = normalizeResourcePair(currentValue, maxValue);
     const nextDraft = { ...source, [config.current]: normalized.current, [config.max]: normalized.max };
     setInteractiveState(nextDraft, {
       [config.currentColumn]: normalized.current,
       [config.maxColumn]: normalized.max
     });
-    setVitalSaveStatus((status) => ({ ...status, [type]: 'Alterado' }));
+    return nextDraft;
   }
 
-  async function saveManualVital(type) {
+  function persistVital(type, immediate = false) {
+    dirtyVitalTypesRef.current.add(type);
+    clearTimeout(vitalSaveTimerRef.current);
+    const version = vitalSaveVersionRef.current + 1;
+    vitalSaveVersionRef.current = version;
+
+    const save = async () => {
+      const savingTypes = [...dirtyVitalTypesRef.current];
+      const nextDraft = draftRef.current || draft;
+      setVitalSaveStatus((status) => ({ ...status, ...Object.fromEntries(savingTypes.map((item) => [item, 'Salvando...'])) }));
+      await persistQueued(nextDraft, {
+        onSuccess: () => {
+          if (vitalSaveVersionRef.current === version) {
+            dirtyVitalTypesRef.current.clear();
+            setVitalSaveStatus((status) => ({ ...status, ...Object.fromEntries(savingTypes.map((item) => [item, 'Salvo'])) }));
+          }
+        },
+        onError: () => {
+          if (vitalSaveVersionRef.current === version) {
+            setVitalSaveStatus((status) => ({ ...status, ...Object.fromEntries(savingTypes.map((item) => [item, 'Erro ao salvar'])) }));
+          }
+        }
+      });
+    };
+
+    if (immediate) save();
+    else vitalSaveTimerRef.current = setTimeout(save, 220);
+  }
+
+  function adjustVital(type, field, delta) {
     const config = editableVitals[type];
     const source = draftRef.current || draft;
-    const normalized = normalizeVitalPair(source[config.current], source[config.max]);
-    const nextDraft = { ...source, [config.current]: normalized.current, [config.max]: normalized.max };
-    setInteractiveState(nextDraft, {
-      [config.currentColumn]: normalized.current,
-      [config.maxColumn]: normalized.max
+    const adjustment = calculateResourceAdjustment({
+      type,
+      current: source[config.current],
+      max: source[config.max],
+      field,
+      delta
     });
-    setVitalSaveStatus((status) => ({ ...status, [type]: 'Salvando...' }));
-    await persistQueued(nextDraft, {
-      onSuccess: () => setVitalSaveStatus((status) => ({ ...status, [type]: 'Salvo' })),
-      onError: () => setVitalSaveStatus((status) => ({ ...status, [type]: 'Erro ao salvar' }))
-    });
+
+    if (!adjustment.changed) return;
+    updateVital(type, 'current', adjustment.current);
+    if (field === 'max') updateVital(type, 'max', adjustment.max);
+    setVitalSaveStatus((status) => ({ ...status, [type]: adjustment.currentWasAdjusted ? 'Atual ajustado' : 'Alterado' }));
+    persistVital(type);
   }
 
   function rollSkill(skill, training = 0, other = 0) {
@@ -260,17 +288,18 @@ export default function CharacterSheet() {
 
   async function updateSkillValue(key, value) {
     const nextValue = Math.max(0, Math.min(15, Math.round(Number(value || 0) / 5) * 5));
-    const nextDraft = { ...draft, skills: { ...draft.skills, [key]: nextValue } };
-    setDraft(nextDraft);
-    setSheet({ ...sheet, skills: { ...sheet.skills, [key]: nextValue } });
-    await persist(nextDraft);
+    const source = draftRef.current || draft;
+    const nextDraft = { ...source, skills: { ...source.skills, [key]: nextValue } };
+    setInteractiveState(nextDraft, { skills: { ...(sheetRef.current?.skills || {}), [key]: nextValue } });
+    await persistQueued(nextDraft);
   }
 
   async function updateSkillOther(key, value) {
-    const nextDraft = { ...draft, skillBonuses: { ...draft.skillBonuses, [key]: Number(value || 0) } };
-    setDraft(nextDraft);
-    setSheet({ ...sheet, skill_bonuses: { ...(sheet.skill_bonuses || {}), [key]: Number(value || 0) } });
-    await persist(nextDraft);
+    const source = draftRef.current || draft;
+    const nextValue = Number(value || 0);
+    const nextDraft = { ...source, skillBonuses: { ...source.skillBonuses, [key]: nextValue } };
+    setInteractiveState(nextDraft, { skill_bonuses: { ...(sheetRef.current?.skill_bonuses || {}), [key]: nextValue } });
+    await persistQueued(nextDraft);
   }
 
   async function saveWallet(walletOrUpdater) {
@@ -313,11 +342,11 @@ export default function CharacterSheet() {
   }
 
   async function updateQuickModifier(value) {
-    const diceSettings = { ...(draft.diceSettings || {}), quickRollModifier: Number(value || 0) };
-    const nextDraft = { ...draft, diceSettings };
-    setDraft(nextDraft);
-    setSheet({ ...sheet, dice_settings: diceSettings, quick_roll_modifier: diceSettings.quickRollModifier });
-    await persist(nextDraft);
+    const source = draftRef.current || draft;
+    const diceSettings = { ...(source.diceSettings || {}), quickRollModifier: Number(value || 0) };
+    const nextDraft = { ...source, diceSettings };
+    setInteractiveState(nextDraft, { dice_settings: diceSettings, quick_roll_modifier: diceSettings.quickRollModifier });
+    await persistQueued(nextDraft);
   }
 
   function rollQuickDie(sides) {
@@ -327,7 +356,7 @@ export default function CharacterSheet() {
   }
 
   if (notFound) return <main className="mx-auto max-w-3xl px-4 py-16 text-center text-mist"><h1 className="font-display text-4xl text-ember">Ficha não encontrada</h1><p className="mt-3">Ela pode ter sido removida ou pertencer a outro armazenamento local.</p><Link className="mt-6 inline-block text-ember" to="/characters">Voltar para personagens</Link></main>;
-  if (!sheet || !draft) return <main className="px-4 py-10 text-mist">Carregando ficha...</main>;
+  if (!sheet || !draft) return <CharacterSheetLoading />;
 
   const inventory = editing ? draft.inventory : sheet.inventory || [];
   const attacks = editing ? draft.attacks : sheet.attacks || [];
@@ -336,30 +365,42 @@ export default function CharacterSheet() {
   const skillsCatalog = sheet.skills_catalog || [];
   const origin = sheet.origin_name || sheet.origin || 'Sem origem';
   const referenceWarnings = sheet.reference_warnings || [];
-  const mobileSections = [
-    ['#sheet-status', 'Status'],
-    ['#sheet-attributes', 'Atributos'],
-    ['#sheet-powers', 'Poderes'],
-    ['#sheet-skills', 'Perícias'],
-    ['#sheet-inventory', 'Inventário'],
-    ['#sheet-dice', 'Dados'],
-    ['#sheet-saves', 'Salvos']
-  ];
-
   return (
-    <main className="min-h-[calc(100vh-64px)] overflow-x-hidden bg-[#050506] px-2 pb-24 pt-3 sm:px-4 sm:py-5">
-      <nav className="mx-auto mb-3 flex w-full max-w-[1480px] gap-2 overflow-x-auto pb-1 xl:hidden" aria-label="Seções da ficha">
-        {mobileSections.map(([href, label]) => (
-          <a key={href} href={href} className="shrink-0 rounded-full border border-ember/20 bg-black/35 px-3 py-2 text-xs font-semibold uppercase tracking-[.12em] text-mist">
-            {label}
-          </a>
-        ))}
-      </nav>
-      <section className="mx-auto grid w-full max-w-[1480px] gap-4 rounded-md border border-ember/40 bg-[#101011] p-2 shadow-glow sm:p-3 xl:grid-cols-[minmax(360px,0.95fr)_minmax(520px,1.35fr)]">
+    <main className="min-h-[calc(100vh-64px)] overflow-x-hidden bg-[#050506] pb-24 lg:px-4 lg:py-5">
+      <CharacterSheetMobile
+        sheet={sheet}
+        draft={draft}
+        origin={origin}
+        totalDefense={totalDefense}
+        inventory={inventory}
+        attacks={attacks}
+        spells={spells}
+        vitalStatus={vitalSaveStatus}
+        skillRoll={skillRoll}
+        damageRoll={damageRoll}
+        quickRoll={quickRoll}
+        onAdjustVital={adjustVital}
+        onRetryVital={(type) => persistVital(type, true)}
+        onTrainingChange={updateSkillValue}
+        onOtherChange={updateSkillOther}
+        onRollSkill={rollSkill}
+        onAddPower={(type = 'attacks') => setPowerModal({ mode: 'add', type, power: blankPower })}
+        onEditPower={(type, power) => setPowerModal({ mode: 'edit', type, power })}
+        onDeletePower={deletePower}
+        onRollPower={rollSavedPower}
+        onAddItem={() => setItemModal({ mode: 'add', item: blankItem })}
+        onEditItem={(item) => setItemModal({ mode: 'edit', item })}
+        onDeleteItem={deleteItem}
+        onWalletChange={saveWallet}
+        onRollQuickDie={rollQuickDie}
+        onQuickModifierChange={updateQuickModifier}
+        onSwapReference={openReferenceSwap}
+      />
+      <section data-testid="desktop-character-sheet" className="mx-auto hidden w-full max-w-[1480px] gap-4 rounded-md border border-ember/40 bg-[#101011] p-3 shadow-glow lg:grid xl:grid-cols-[minmax(360px,0.95fr)_minmax(520px,1.35fr)]">
         <aside className="min-w-0 space-y-4">
           <header className="grid gap-3 sm:grid-cols-[96px_1fr]">
             <div className="h-24 overflow-hidden border border-ember/30 bg-black/40">
-              {sheet.photo ? <img src={sheet.photo} className="h-full w-full object-cover" /> : <div className="h-full bg-[radial-gradient(circle,rgba(143,29,44,.38),transparent_58%)]" />}
+              {sheet.photo ? <img src={sheet.photo} alt="" className="h-full w-full object-cover" /> : <div className="h-full bg-[radial-gradient(circle,rgba(143,29,44,.38),transparent_58%)]" />}
             </div>
             <div className="grid gap-2 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
               <InfoBlock label="Personagem" value={sheet.character_name} subLabel="Origem" subValue={origin} />
@@ -380,9 +421,9 @@ export default function CharacterSheet() {
           </Panel>
 
           <section id="sheet-status" className="scroll-mt-24 grid gap-3">
-            <EditableVitalsBar label="Vida" current={draft.lifeCurrent} max={draft.lifeMax} tone="red" status={vitalSaveStatus.life} onChange={(field, value) => updateManualVital('life', field, value)} onSave={() => saveManualVital('life')} />
-            <EditableVitalsBar label="Sanidade" current={draft.sanityCurrent} max={draft.sanityMax} tone="purple" status={vitalSaveStatus.sanity} onChange={(field, value) => updateManualVital('sanity', field, value)} onSave={() => saveManualVital('sanity')} />
-            <EditableVitalsBar label="Mana" current={draft.mana} max={draft.manaMax} tone="orange" status={vitalSaveStatus.mana} onChange={(field, value) => updateManualVital('mana', field, value)} onSave={() => saveManualVital('mana')} />
+            <ResourceStepper type="life" label="Vida" current={draft.lifeCurrent} max={draft.lifeMax} status={vitalSaveStatus.life} onAdjust={(field, delta) => adjustVital('life', field, delta)} onRetry={() => persistVital('life', true)} />
+            <ResourceStepper type="sanity" label="Sanidade" current={draft.sanityCurrent} max={draft.sanityMax} status={vitalSaveStatus.sanity} onAdjust={(field, delta) => adjustVital('sanity', field, delta)} onRetry={() => persistVital('sanity', true)} />
+            <ResourceStepper type="mana" label="Mana" current={draft.mana} max={draft.manaMax} status={vitalSaveStatus.mana} onAdjust={(field, delta) => adjustVital('mana', field, delta)} onRetry={() => persistVital('mana', true)} />
           </section>
 
           <section className="grid grid-cols-3 gap-2">
@@ -1120,44 +1161,6 @@ function SaveHistory({ saves }) {
 
 function InfoBlock({ label, value, subLabel, subValue }) {
   return <div className="space-y-2 text-sm"><div className="grid grid-cols-[90px_1fr] gap-2"><span className="text-xs font-bold uppercase text-mist">{label}</span><span className="min-w-0 border-b border-white/50 pb-1 text-white">{value}</span></div><div className="grid grid-cols-[90px_1fr] gap-2"><span className="text-xs font-bold uppercase text-mist">{subLabel}</span><span className="min-w-0 border-b border-white/50 pb-1 text-white">{subValue}</span></div></div>;
-}
-
-function EditableVitalsBar({ label, current, max, tone, status, onChange, onSave }) {
-  const safeCurrent = Number(current ?? 0);
-  const safeMax = Number(max ?? 0);
-  const width = safeMax > 0 ? Math.min(100, (safeCurrent / safeMax) * 100) : safeCurrent > 0 ? 100 : 0;
-  const tones = {
-    red: 'from-red-950 via-red-800 to-red-600 border-red-500/40 shadow-red-950/40',
-    purple: 'from-purple-950 via-purple-800 to-fuchsia-600 border-purple-400/40 shadow-purple-950/40',
-    orange: 'from-orange-950 via-orange-700 to-amber-500 border-orange-400/40 shadow-orange-950/40'
-  };
-  const statusTone = status === 'Erro ao salvar' ? 'text-red-300' : status === 'Salvo' ? 'text-emerald-300' : 'text-mist';
-
-  return (
-    <div className="rounded border border-white/10 bg-black/25 p-3">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <p className="text-xs font-bold uppercase tracking-[.18em] text-mist">{label}</p>
-        <span className={`text-xs uppercase tracking-[.14em] ${statusTone}`}>{status || 'Pronto'}</span>
-      </div>
-      <div className={`relative min-h-12 overflow-hidden rounded border bg-black/50 shadow-lg ${tones[tone]}`}>
-        <div className={`pointer-events-none absolute inset-y-0 left-0 bg-gradient-to-r ${tones[tone]} opacity-80 transition-all duration-200`} style={{ width: `${width}%` }} />
-        <div className="relative grid min-h-12 place-items-center px-3 text-lg font-black text-white drop-shadow">{safeCurrent} / {safeMax}</div>
-      </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-        <label className="text-xs uppercase tracking-[.12em] text-mist">
-          Atual
-          <NumberInput className="mt-1 h-10 w-full text-center" value={safeCurrent} onChange={(value) => onChange('current', value)} />
-        </label>
-        <label className="text-xs uppercase tracking-[.12em] text-mist">
-          Máxima
-          <NumberInput className="mt-1 h-10 w-full text-center" value={safeMax} onChange={(value) => onChange('max', value)} />
-        </label>
-        <button type="button" className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded border border-ember/30 bg-ember/10 px-4 text-sm font-semibold text-ember soft-motion hover:bg-ember/20 sm:mt-5" onClick={onSave}>
-          <Save size={16} /> Salvar
-        </button>
-      </div>
-    </div>
-  );
 }
 
 function NumberField({ label, value, onChange }) {

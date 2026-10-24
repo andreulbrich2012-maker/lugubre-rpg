@@ -192,3 +192,83 @@ Bancos antigos que ainda têm raças de outro cenário caem na raça do livro ma
    - O topo de cajados longos passa na frente do rosto em alguns quadros de perfil.
 7. **Botão "Aleatório".** Sorteia qualquer item de cada categoria; dá para refinar por estilo (guerreiro, mago, camponês).
 8. **Ambiente de teste deste PC.** A porta 55432 já era usada pelo container `noharm-demo-db-1`. O primeiro `db:init` e os testes criaram as tabelas do Lúgubre no banco `postgres` desse container; o banco `noharm` não foi tocado. A limpeza automática foi bloqueada, então essas tabelas continuam lá. O teste local passou a usar um container próprio, `lugubre-pg`, na porta 55433.
+
+
+---
+
+# Segunda rodada (plano de arte completo, seções B–J do `PROMPT-CONTINUAR`)
+
+## Antes de publicar
+- **O banco mudou de novo, só acrescentando.** A coluna `characters.appearance` já veio na primeira rodada. Itens da ficha ganharam o campo opcional `icon`, que não precisa de coluna nova (fica no jsonb). Depois do deploy: **Admin > Sistema > "Baixar cópia de segurança"** e depois **"Atualizar banco"**.
+- **Este PC não está logado no GitHub nem na Vercel.** Todos os commits estão só na `pixelart-wip` local. Para publicar:
+  1. `gh auth login`
+  2. `git push origin pixelart-wip`
+  3. `git checkout master`
+  4. `git merge pixelart-wip`
+  5. `git push origin master`
+  6. `npx vercel login`
+  7. `npx vercel link --yes --project lugubre-rpg`
+  8. `npx vercel deploy --prod --yes`
+- **As 180 magias e os 336 monstros citados no prompt não estão neste repositório.** Nem a `master` nem a `pixelart-wip` têm esses seeds. Por isso a arte de monstros e magias é gerada **pelo registro** (nome, elemento, tipo e descrição): o que existir no banco de produção ganha arte sozinho.
+
+## Testes
+- Frontend: **302/302**.
+- Backend: **20/20** com Postgres local.
+- `vite build` passa.
+
+## O que entrou
+
+**Personagem**
+- **Cor livre** (#hex) em cabelo, barba, olhos, pele, traços e em cada canal de cada peça, com seletor "+" no criador. A rampa de luz e sombra sai da própria cor.
+- **Proporção nova:** tronco de 7 linhas e perna maior, então calças, saias e joelheiras passam a se ler.
+- **Correções da auditoria** (`docs/AUDITORIA-STARDEW.md`):
+  - braço de perfil limpo;
+  - raspados sólidos, coque redondo e nuca com pontas de mecha;
+  - poá, malha e escamas redesenhados;
+  - grevas sem o desenho de "E";
+  - joias, piercings, cicatrizes e tatuagens legíveis (2 px ou mais, brilho e contraste).
+- **As 29 armas do livro na mão**, com 55 itens na mão no total.
+
+**Mapas**
+- **50 blocos novos**, feitos com o pintor em código `tiles/paint.js` (mesma rampa e contorno sépia):
+  - 18 terrenos, entre eles mar e lodo animados e solos do Tártaro e de Éter que pulsam e brilham;
+  - cerca de pedra e sebe;
+  - 16 objetos;
+  - 10 construções grandes de várias células: poço, moinho, barraca de feira, carroça, barco, fonte, estátua, forja, tenda e pedra grande;
+  - 4 árvores novas: carvalho grande, macieira, cerejeira e palmeira.
+- **Os códigos novos são letras acentuadas**, porque o ASCII acabou. Frontend e backend aceitam.
+- **Repintura** dos terrenos chapados: terra, areia, neve, pântano, gelo, lama, cinzas e abismo.
+- **Transições** na ordem água < areia < terra < grama < neve. Decoração por bioma também nos terrenos novos.
+- **Telhados:** 8 opções (4 materiais × 2 cores), chaminé nas casas grandes, e telhado automático na mesa para salas fechadas com porta.
+- **Prompt da IA** explica objetos grandes e códigos acentuados.
+- **Fluxo do editor testado no navegador:** descrever → copiar prompt → colar resposta → "Usar este mapa" salvou a cena.
+
+**Ícones e criaturas**
+- **Ícones de itens:** 190 desenhos (mínimo pedido: 150) mais as 29 armas em ferro, aço e ouro encantado.
+  - Escolha automática pelo nome, com seletor manual no item.
+  - Aparecem no inventário, no item pegável do mapa (que agora brilha com o próprio ícone) e no "Pegar".
+- **Monstros:** 91 bases por elemento.
+  - Os epítetos são variantes reais (paleta e detalhes) e o tamanho cresce com o nível.
+  - Parado, andando e ataque, nas 4 direções.
+  - Bestiário com retrato; token de monstro ou NPC sem imagem vira o sprite.
+- **Ícones de magias e técnicas:** moldura por elemento × 12 formas, e arma × 7 manobras. Aparecem na Biblioteca, no Admin e na ficha.
+
+**Animações**
+- 32 famílias (12 corpo a corpo, 4 à distância, 9 magias, 7 de monstro) e 9 assinaturas de elemento.
+- Resultados acerto, crítico, erro, falha no 1 e caído.
+- Galeria em **Admin > Animações**.
+- Ligadas na mesa: o evento `roll` toca o ataque e o `token:hit` toca o impacto. A semente é o rollId, então todos veem igual.
+
+## Prévias novas (`docs/pixelart/`)
+- `mapa-vila-objetos-grandes.png`, `mapa-vila-rascunho.png`, `mapa-vila-noite.png`, `mapa-terrenos-transicoes.png`
+- `icones-itens.png`, `icones-armas.png`, `icones-magias.png`, `icones-tecnicas.png`
+- `monstros-bases.png`, `monstros-variantes.png`, `monstros-andando.png`
+- `animacoes.png`
+- `auditoria/*`: as folhas de todas as categorias do criador, refeitas.
+
+## O que ficou faltando ou merece revisão
+- **Animações não vistas tocando ao vivo.** No navegador de teste o painel ficava escondido e o `requestAnimationFrame` não roda em aba oculta. Os quadros foram conferidos nas folhas PNG, o evento chega e registra o ataque, e os 53 testes passam. Vale ver ao vivo numa mesa de verdade.
+- **Poses de ataque do personagem** (o boneco golpeando) ainda não existem. A animação usa o efeito por cima do boneco.
+- **Monstros:** o nível é estimado (não há coluna de nível); quadrúpedes de frente ficam estreitos; a aranha e a esfinge a 16 px leem fraco.
+- **Ícones:** as raízes de Gaia parecem um "Ω"; espadas parecidas a 24 px; dardos, linguiça, cinto, pote de mel e bestas mais fracos.
+- **Pendências do catálogo** (nomes de raças diferentes do livro, raças, origens e perícias faltando): o prompt manda perguntar antes de mexer, então não mexi. Por enquanto as raças antigas caem na raça do livro mais parecida, só para a aparência.

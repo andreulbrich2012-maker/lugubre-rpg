@@ -607,6 +607,16 @@ function planToMapOnce(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     }
     return true;
   };
+  // encaixe apertado (enchimento da vila do texto): casas podem encostar de lado; telhado e porta continuam livres
+  const freeTight = (d, x, y) => {
+    const CLEAR = clear(d);
+    if (x < 1 || y < CLEAR || x + d.w > C - 1 || y + d.h > R - 1) return false;
+    for (let yy = y - CLEAR; yy <= y + d.h; yy++) for (let xx = x; xx < x + d.w; xx++) {
+      if (lock[yy * C + xx] === 2 || (yy >= y - 1 && fenceAt(xx, yy))) return false;
+      if (yy >= y && yy < y + d.h && (WATER.has(G[yy][xx]) || ';c-ûP,'.includes(G[yy][xx]) || 'çñLâ'.includes(G[yy][xx]))) return false;
+    }
+    return true;
+  };
   // porta virada para a estrada/praca mais perto (quando a IA nao disse)
   const ROADISH = new Set([';', 'c', 'û', '-', ',']);
   const faceRoad = (d, x, y) => {
@@ -692,7 +702,7 @@ function planToMapOnce(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
         const t = pickDesign({ type: dist.type, size }, rnd);
         if (!t) continue;
         const tx = cx - Math.floor(t.w / 2); const ty = cy - Math.floor(t.h / 2);
-        if (free(t, tx, ty) && !overNoHouse(t, tx, ty) && !(dist.avoidRoad && overRoad(t, tx, ty))) { d = t; x = tx; y = ty; break; }
+        if ((dist.tight ? freeTight : free)(t, tx, ty) && !overNoHouse(t, tx, ty) && !(dist.avoidRoad && overRoad(t, tx, ty))) { d = t; x = tx; y = ty; break; }
       }
       if (!d) continue;
       occupy(d, x, y);
@@ -935,7 +945,8 @@ function planToMapOnce(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
       const spec = { cells, small: 0.7, density: camp ? 1 : 1.5, type: camp ? 'tenda' : 'casa', want: target - have, avoidRoad: true, scatter: camp };
       const got = (camp ? fillDistrict : fillStreets)(spec);
       // ruas de menos dentro da cerca: completa em fileiras (sem pisar em rua)
-      if (!camp && got < spec.want * 0.6) fillDistrict({ ...spec, want: spec.want - got });
+      // a reserva de folga dos bairros nao vale aqui: encaixa casas nos vaos (sem sobrepor nem pisar em rua)
+      if (!camp && got < spec.want * 0.6) fillDistrict({ ...spec, want: spec.want - got, tight: true });
     }
   }
 

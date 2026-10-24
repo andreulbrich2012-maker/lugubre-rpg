@@ -214,4 +214,14 @@ describe('plano de mapa', () => {
     expect(count(planToMap(base, { cols: 120, rows: 100 }))).toBe(0);
     expect(count(planToMap({ ...base, mode: 'texto' }, { cols: 120, rows: 100 }))).toBeGreaterThan(10);
   });
+  it('modo texto: vila com bairros esparsos ganha casas nos vaos, sem sobrepor', () => {
+    const plan = { mode: 'texto', areas: [{ type: 'praca', circle: [500, 500, 40] }, { type: 'bairro', size: 'pequena', density: 0.4, rect: [300, 300, 150, 120] }], fences: [{ type: 'palicada', points: [[250, 250], [750, 250], [750, 750], [250, 750], [250, 250]] }], roads: [{ type: 'terra', points: [[500, 250], [500, 750]] }] };
+    const r = planToMap(plan, { cols: 120, rows: 100 });
+    const bs = r.map.buildings;
+    expect(bs.length).toBeGreaterThan(20);
+    for (let i = 0; i < bs.length; i++) for (let j = i + 1; j < bs.length; j++) {
+      const a = bs[i]; const b = bs[j];
+      expect(a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h).toBe(false);
+    }
+  });
 });

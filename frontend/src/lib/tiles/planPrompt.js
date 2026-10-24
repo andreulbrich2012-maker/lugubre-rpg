@@ -97,13 +97,13 @@ ${items ? `- "items": coisas para os jogadores pegarem (até 20): {"x","y","name
 ${monsters ? '- "monsters": [{"name","x","y","hp"}] (até 12), em lugares onde dá para andar, longe da entrada.' : ''}
 
 ${fromImage ? `PASSO A PASSO (faça nesta ordem)
-0. TAMANHO (obrigatório): ponha "cols" e "rows" no JSON (números, no topo, junto de "name"). cols = 8 × (largura da imagem ÷ largura de uma casa comum); rows = cols × altura ÷ largura da imagem.
+0. TAMANHO (obrigatório): ponha "cols" e "rows" no JSON (números, no topo, junto de "name"). cols = 8 × (largura da imagem ÷ largura de uma casa comum); rows = cols × altura ÷ largura da imagem. Pintura com casas miúdas e apertadas (40+ telhados): cols entre 200 e 260.
 1. NOMES: leia a legenda (1, 2, 3...) e todo nome escrito no mapa → "pois".
 2. VILA: siga com o dedo a borda da vila e faça a cerca com esses pontos (repita o 1º no fim): muralha de pedra cinza = "muro"; troncos = "palicada"; sem cerca na imagem = nenhuma.
 3. CHÃO: olhe entre a vila e a borda da imagem. Árvores grudadas cobrindo tudo → uma "floresta" do mapa inteiro [[0,0],[1000,0],[1000,1000],[0,1000]]. Grama verde aberta → NADA de floresta do mapa inteiro: uma "floresta" (points) para CADA mancha de mata, "bosque" para árvores soltas. "campo"/"clareira" para descampados; "rocha"/"montanha" onde houver; costa = "mar" até a borda + "areia" na praia.
 4. ÁGUA: para cada rio diga por qual borda ele ENTRA ("from") e por qual SAI ("exit"): olhe os 4 lados da moldura e veja onde a água toca. O rio principal é o mais largo; rio largo não vira 90° de repente: onde parece virar para outra borda, o braço que vira é um riacho (outro item) e o largo continua na direção em que vinha. Riacho/afluente = outro item que começa na borda ou na nascente e TERMINA num ponto do rio principal. Píer = "cais" da praia para dentro do mar.
 5. CAMINHOS: cada estrada até a borda (0 ou 1000); a estrada que contorna a vila também; ruas de "terra" da praça até cada grupo de casas.
-6. CASAS: um "bairro" para CADA amontoado de telhados, até os de 3–4 casas, do tamanho do amontoado (não junte dois). Vila pintada e apertada: "size":"pequena", "density":1.5.
+6. CASAS: um "bairro" para CADA amontoado de telhados, até os de 3–4 casas, cobrindo TODOS os telhados dele com folga de meia casa em volta (não junte dois). Vila pintada e apertada: "size":"pequena", "density":1.5.
 7. ESPECIAIS: em "buildings" cada prédio com nome e cada telhado diferente (castelo = pedra cinza com torre, templo, taverna junto à praça, capela, celeiro, estábulo, serraria...). Casa de pedra cinza com sininho = "capela"; prédio com colunas na porta = "prefeitura"; "igreja_gotica" só se for escura, alta e pontuda. Quadrado cercado com lápides = "cemiterio" (plantação tem fileiras de terra).
 8. DETALHES: praça com fogueira grande, bancos e tochas em volta; mercado: área "terra" com barracas, tendas e carroça; placas nas saídas; troncos na serraria.
 9. CLIMA: igual ao da imagem (noite escura → "light": "noite"; tons sombrios → "style": "obscuro").
@@ -125,7 +125,7 @@ Ponha "mode":"texto" no JSON. O pedido costuma ser curto e informal: complete co
 6. Vila: "palicada" em volta das casas; cidade: "muro". Porto fica fora dela, ligado por estrada. Plantação com "cerca" e o celeiro AO LADO dela, nunca dentro.
 7. Como desenhar: morro = "montanha" circle raio 110 + "clareira" raio 60 no topo, a construção no centro; ponta de pedra = "rocha" entrando no mar; costa = "mar" numa borda (a praia é automática); porto = "mar" com ~250 de largura numa borda e 3–4 "cais" de 120 da praia para dentro dele (barcos automáticos), armazéns e pescadores na beira; castelo = "castelo" grande dentro de um "muro" quadrado ~160x150, "torre" nos 4 cantos por dentro, "quartel" e "estabulo" no pátio, "praca" na frente; "em volta" = nos 4 lados; mina = "montanha" + "cabana" + carroça e trilha; acampamento = "clareira" raio 150 com 6–10 "tenda" em "buildings" em roda, "fogueira_grande" no meio, caixotes, barris, carroça e "palicada" em volta; mapa de mata: varie com 2–3 clareiras, "rocha" e "bosque".
 8. Clima do pedido (sombrio/assombrado → "style":"gotico" ou "obscuro", "light":"entardecer" ou "noite").
-9. Região grande (várias vilas): cada vila com praça, 5–8 bairros, prédios e cerca, ligadas por estradas curvas; vilas de tamanhos e formas diferentes (nada simétrico); o resto é floresta, campo, rio, lago ou montanha.
+9. Região grande (várias vilas): cada vila com ~300x250, praça, 5–8 bairros, prédios e cerca, ligadas por estradas curvas; vilas de tamanhos e formas diferentes (nada simétrico); o resto é floresta, campo, rio, lago ou montanha.
 
 `}EXEMPLO (só o formato; faça o seu):
 ${JSON.stringify(fromImage ? { name: PLAN_EXAMPLE.name, cols: 84, rows: 62, ...PLAN_EXAMPLE } : TEXT_EXAMPLE)}`;

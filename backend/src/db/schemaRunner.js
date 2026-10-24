@@ -61,13 +61,22 @@ export function splitStatements(source) {
 export async function applySchema(pool) {
   const sql = (await fs.readFile(SCHEMA_PATH, 'utf8')).replace(/^\uFEFF/, '');
   const statements = splitStatements(sql);
-  for (const [index, statement] of statements.entries()) {
+  // Lotes de 40 comandos por ida ao banco: um por vez estourava o limite de 60 s da Vercel (24/10).
+  // Se um lote falhar, refaz um a um para dizer exatamente qual comando quebrou.
+  for (let start = 0; start < statements.length; start += 40) {
+    const batch = statements.slice(start, start + 40);
     try {
-      await pool.query(statement);
-    } catch (error) {
-      const preview = statement.replace(/\s+/g, ' ').slice(0, 160);
-      error.message = `Falha no SQL #${index + 1}: ${preview}\n${error.message}`;
-      throw error;
+      await pool.query(batch.join(';\n'));
+    } catch {
+      for (const [offset, statement] of batch.entries()) {
+        try {
+          await pool.query(statement);
+        } catch (error) {
+          const preview = statement.replace(/\s+/g, ' ').slice(0, 160);
+          error.message = `Falha no SQL #${start + offset + 1}: ${preview}\n${error.message}`;
+          throw error;
+        }
+      }
     }
   }
   return statements.length;

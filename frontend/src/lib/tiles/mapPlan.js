@@ -130,6 +130,16 @@ export function planToMap(plan, opts = {}) {
   let r = planToMapOnce(plan, opts);
   if (!(num(plan?.cols, 0) > 0 && num(plan?.rows, 0) > 0)) return r;
   let p = plan;
+  // mapa folgado demais (IA mandou o dobro): cada bairro da foto vira 10+ casas. Encolhe ate ~5 por bairro
+  if (strip(plan.mode ?? plan.modo) !== 'texto') {
+    for (let k = 0; k < 4 && r.districts >= 3 && r.auto / r.districts > 5.5; k++) {
+      const q = { ...p, cols: Math.round(num(p.cols) / 1.2), rows: Math.round(num(p.rows) / 1.2) };
+      if (q.cols < 24 || q.rows < 18) break;
+      const r2 = planToMapOnce(q, opts);
+      if (r2.missing > r.missing) break;
+      p = q; r = r2;
+    }
+  }
   for (let k = 0; k < 3 && r.missing > Math.max(1, r.asked * 0.08); k++) {
     p = { ...p, cols: Math.round(num(p.cols) * 1.2), rows: Math.round(num(p.rows) * 1.2) };
     if (p.cols > 300 || p.rows > 300) break;
@@ -1148,5 +1158,5 @@ function planToMapOnce(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
   const asked = (Array.isArray(plan.buildings) ? plan.buildings : []).filter((b) => !/moinho|portao/.test(strip(b?.type ?? b?.tipo))).length;
   const placed = buildings.filter((b) => !b.auto).length;
   if (asked > placed) warnings.push(`${asked - placed} construção(ões) não couberam no mapa e ficaram de fora.`);
-  return { map, warnings, monsters, asked, missing: Math.max(0, asked - placed), name: String(plan.name ?? plan.nome ?? '').slice(0, 80), notes: String(plan.notes ?? plan.notas ?? '').slice(0, 300) };
+  return { map, warnings, monsters, asked, missing: Math.max(0, asked - placed), auto: buildings.filter((b) => b.auto).length, districts: districts.length, name: String(plan.name ?? plan.nome ?? '').slice(0, 80), notes: String(plan.notes ?? plan.notas ?? '').slice(0, 300) };
 }

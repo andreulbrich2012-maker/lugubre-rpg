@@ -224,4 +224,11 @@ describe('plano de mapa', () => {
       expect(a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h).toBe(false);
     }
   });
+  it('foto com cols/rows folgado demais (bairros viram 10+ casas) encolhe o mapa; texto nao', () => {
+    const areas = [0, 1, 2, 3].map((k) => ({ type: 'bairro', size: 'pequena', density: 1.5, rect: [100 + k * 200, 300, 150, 120] }));
+    const foto = planToMap({ cols: 240, rows: 160, areas }, { cols: 60, rows: 40 });
+    expect(foto.map.cols).toBeLessThan(240);
+    const texto = planToMap({ mode: 'texto', cols: 240, rows: 160, areas }, { cols: 60, rows: 40 });
+    expect(texto.map.cols).toBe(240);
+  });
 });

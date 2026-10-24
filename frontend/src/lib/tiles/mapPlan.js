@@ -124,7 +124,23 @@ export function pickDesign(b, rnd = Math.random) {
   return DESIGNS.find((d) => d.category === 'Casas' && d.size === 'media');
 }
 
-export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
+// tamanho dito pela IA (foto) costuma vir pequeno demais (~75%): se construcoes pedidas nao cabem,
+// aumenta o mapa (mesma proporcao) e desenha de novo, ate 3 vezes
+export function planToMap(plan, opts = {}) {
+  let r = planToMapOnce(plan, opts);
+  if (!(num(plan?.cols, 0) > 0 && num(plan?.rows, 0) > 0)) return r;
+  let p = plan;
+  for (let k = 0; k < 3 && r.missing > Math.max(1, r.asked * 0.08); k++) {
+    p = { ...p, cols: Math.round(num(p.cols) * 1.2), rows: Math.round(num(p.rows) * 1.2) };
+    if (p.cols > 300 || p.rows > 300) break;
+    const r2 = planToMapOnce(p, opts);
+    if (r2.missing >= r.missing) { r = r2.missing < r.missing ? r2 : r; break; }
+    r = r2;
+  }
+  return r;
+}
+
+function planToMapOnce(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
   // tamanho dito pela IA (foto: proporcao da imagem e escala das casas) vale, ate 300 blocos
   const C = Math.max(16, Math.min(MAX_SIZE, Math.round(num(plan.cols, 0) > 0 ? Math.min(300, num(plan.cols)) : num(cols, 64))));
   const R = Math.max(12, Math.min(MAX_SIZE, Math.round(num(plan.rows, 0) > 0 ? Math.min(300, num(plan.rows)) : num(rows, 48))));
@@ -606,14 +622,36 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     for (let xx = x - 1; xx <= x + d.w; xx++) if (inside(xx, y + d.h)) { forest[(y + d.h) * C + xx] = 0; lock[(y + d.h) * C + xx] = Math.max(lock[(y + d.h) * C + xx], 1); }
   };
   const extraObjects = [];
-  for (const b of (Array.isArray(plan.buildings) ? plan.buildings : []).slice(0, MAX_BUILDINGS)) {
+  // as maiores primeiro (castelo, igreja): a torre/quartel pequenos acham lugar em volta depois
+  const sizeRank = { grande: 0, media: 1, pequena: 2 };
+  const isBig = (b) => /castel|forte|igreja|templo|catedral|prefeitura/.test(strip(b?.type ?? b?.tipo));
+  const ordered = (Array.isArray(plan.buildings) ? plan.buildings : []).slice(0, MAX_BUILDINGS).map((b, i) => [b, i])
+    .sort((a, c) => (isBig(c[0]) - isBig(a[0])) || ((sizeRank[strip(a[0]?.size)] ?? 1) - (sizeRank[strip(c[0]?.size)] ?? 1)) * (isBig(a[0]) ? 1 : 0) || a[1] - c[1]).map(([b]) => b);
+  for (const b of ordered) {
     // moinho de vento fica melhor como o objeto grande com pas
     if (/moinho/.test(strip(b?.type ?? b?.tipo)) && !/agua/.test(strip(b?.type ?? b?.tipo))) { extraObjects.push({ type: 'moinho', x: b.x, y: b.y }); continue; }
     // portao: a abertura na cerca ja e automatica; vira duas tochas na entrada
     if (/portao/.test(strip(b?.type ?? b?.tipo)) && (plan.fences || []).length) { extraObjects.push({ type: 'tocha', x: num(b.x) - SCALE * 0.01, y: b.y }, { type: 'tocha', x: num(b.x) + SCALE * 0.01, y: b.y }); continue; }
-    const d = pickDesign(b || {}, rnd);
+    let d = pickDesign(b || {}, rnd);
     if (!d) continue;
     const cx = px(b.x); const cy = py(b.y);
+    let spot = null;
+    // nao coube no tamanho pedido: tenta os menores (castelo grande dentro de muro pequeno)
+    for (const size of ['media', 'pequena']) {
+      if (spot || !b || strip(b.size) === 'pequena' || (size === 'media' && strip(b.size) === 'media')) break;
+      if (findSpot(d, cx, cy, b)) break;
+      const d2 = pickDesign({ ...b, size, design: undefined }, rnd);
+      if (d2 && d2.w * d2.h < d.w * d.h) d = d2;
+    }
+    spot = findSpot(d, cx, cy, b);
+    if (!spot) continue;
+    const [x, y] = spot;
+    occupy(d, x, y);
+    const want = strip(b.facing ?? b.porta);
+    const facing = ['sul', 'norte', 'leste', 'oeste'].includes(want) ? want : faceRoad(d, x, y);
+    buildings.push({ id: `b${buildings.length + 1}`, x, y, w: d.w, h: d.h, design: d.id, name: String(b.name ?? b.nome ?? d.name).slice(0, 60), ...(facing !== 'sul' ? { facing } : {}) });
+  }
+  function findSpot(d, cx, cy, b) {
     let spot = null;
     // busca em aneis; farol e pescador preferem o lugar livre com mais agua em volta
     const RMAX = Math.max(14, Math.round(Math.min(C, R) * 0.15));
@@ -632,12 +670,7 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
         if (score > best) { best = score; spot = [x, y]; }
       }
     }
-    if (!spot) continue;
-    const [x, y] = spot;
-    occupy(d, x, y);
-    const want = strip(b.facing ?? b.porta);
-    const facing = ['sul', 'norte', 'leste', 'oeste'].includes(want) ? want : faceRoad(d, x, y);
-    buildings.push({ id: `b${buildings.length + 1}`, x, y, w: d.w, h: d.h, design: d.id, name: String(b.name ?? b.nome ?? d.name).slice(0, 60), ...(facing !== 'sul' ? { facing } : {}) });
+    return spot;
   }
 
   // ---- acampamento: tendas espalhadas pela clareira (bairro de casas usa fillStreets, abaixo) ----
@@ -896,8 +929,9 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
       if (cells.length < 60) continue;
       const set = new Set(cells.map(([x, y]) => y * C + x));
       const have = buildings.filter((b) => set.has((b.y + (b.h >> 1)) * C + b.x + (b.w >> 1))).length;
-      const target = Math.max(6, Math.round((cells.length / 24) * (camp ? 0.22 : 0.45)));
-      if (have >= Math.min(6, target) && have >= target * 0.5) continue;
+      // vila do modo texto: pelo menos ~40 casas se o lugar comporta (cada casa ~20 celulas de chao)
+      const target = Math.max(camp ? 6 : Math.min(40, Math.round(cells.length / 20)), Math.round((cells.length / 24) * (camp ? 0.22 : 0.45)));
+      if (have >= Math.min(6, target) && have >= target * (camp ? 0.5 : 0.75)) continue;
       (camp ? fillDistrict : fillStreets)({ cells, small: 0.7, density: 1, type: camp ? 'tenda' : 'casa', want: target - have, avoidRoad: true, scatter: camp });
     }
   }
@@ -1026,6 +1060,26 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     }
   }
 
+  // ---- modo texto: mata grande e vazia ganha lugares (afloramento de pedra, clareira com tocos e pedras) ----
+  if (TEXT) {
+    const spots = [];
+    const far = (x, y, d) => { for (let yy = y - d; yy <= y + d; yy += 2) for (let xx = x - d; xx <= x + d; xx += 2) if (!inside(xx, yy) || lock[yy * C + xx] || forest[yy * C + xx] !== 2) return false; return true; };
+    const want = Math.min(10, Math.round(forest.reduce((n, v) => n + (v === 2 ? 1 : 0), 0) / 1800));
+    for (let k = 0; k < want * 40 && spots.length < want; k++) {
+      const x = 6 + Math.floor(rnd() * (C - 12)); const y = 6 + Math.floor(rnd() * (R - 12));
+      if (!far(x, y, 9) || spots.some(([a, b]) => Math.hypot(a - x, b - y) < Math.min(C, R) * 0.22)) continue;
+      spots.push([x, y]);
+      const rock = spots.length % 2 === 1; const rad = (rock ? 4 : 6) + Math.floor(rnd() * 4);
+      for (let yy = y - rad - 2; yy <= y + rad + 2; yy++) for (let xx = x - rad - 2; xx <= x + rad + 2; xx++) {
+        if (!inside(xx, yy) || lock[yy * C + xx]) continue;
+        const d = Math.hypot(xx - x, (yy - y) * 1.2) + (wob(xx, yy, 14) - 0.5) * 3;
+        if (d > rad) continue;
+        if (rock) { G[yy][xx] = 'é'; forest[yy * C + xx] = 3; if (rnd() < 0.12) O[yy][xx] = rnd() < 0.3 ? 'Þ' : 'o'; }
+        else { G[yy][xx] = rnd() < 0.5 ? 'g' : 'á'; forest[yy * C + xx] = 0; const r = rnd(); if (r < 0.05) O[yy][xx] = ['l', 'm', 'o', 'f', 'f'][Math.floor(rnd() * 5)]; }
+      }
+    }
+  }
+
   // ---- arvores: mata com clareiras e capoes, borda com moitas, especies em manchas ----
   // f: 0 nada, 1 bosque, 2 floresta, 3 montanha/rocha
   const fAt = (x, y) => (inside(x, y) ? forest[y * C + x] : 2);
@@ -1080,5 +1134,5 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
   const asked = (Array.isArray(plan.buildings) ? plan.buildings : []).filter((b) => !/moinho|portao/.test(strip(b?.type ?? b?.tipo))).length;
   const placed = buildings.filter((b) => !b.auto).length;
   if (asked > placed) warnings.push(`${asked - placed} construção(ões) não couberam no mapa e ficaram de fora.`);
-  return { map, warnings, monsters, name: String(plan.name ?? plan.nome ?? '').slice(0, 80), notes: String(plan.notes ?? plan.notas ?? '').slice(0, 300) };
+  return { map, warnings, monsters, asked, missing: Math.max(0, asked - placed), name: String(plan.name ?? plan.nome ?? '').slice(0, 80), notes: String(plan.notes ?? plan.notas ?? '').slice(0, 300) };
 }

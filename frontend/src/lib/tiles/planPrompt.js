@@ -97,7 +97,7 @@ ${items ? `- "items": coisas para os jogadores pegarem (até 20): {"x","y","name
 ${monsters ? '- "monsters": [{"name","x","y","hp"}] (até 12), em lugares onde dá para andar, longe da entrada.' : ''}
 
 ${fromImage ? `PASSO A PASSO (faça nesta ordem)
-0. TAMANHO (obrigatório): ponha "cols" e "rows" no JSON (números, no topo, junto de "name"). cols = 6 × (largura da imagem ÷ largura de uma casa comum); rows = cols × altura ÷ largura da imagem.
+0. TAMANHO (obrigatório): ponha "cols" e "rows" no JSON (números, no topo, junto de "name"). cols = 8 × (largura da imagem ÷ largura de uma casa comum); rows = cols × altura ÷ largura da imagem.
 1. NOMES: leia a legenda (1, 2, 3...) e todo nome escrito no mapa → "pois".
 2. VILA: siga com o dedo a borda da vila e faça a cerca com esses pontos (repita o 1º no fim): muralha de pedra cinza = "muro"; troncos = "palicada"; sem cerca na imagem = nenhuma.
 3. CHÃO: olhe entre a vila e a borda da imagem. Árvores grudadas cobrindo tudo → uma "floresta" do mapa inteiro [[0,0],[1000,0],[1000,1000],[0,1000]]. Grama verde aberta → NADA de floresta do mapa inteiro: uma "floresta" (points) para CADA mancha de mata, "bosque" para árvores soltas. "campo"/"clareira" para descampados; "rocha"/"montanha" onde houver; costa = "mar" até a borda + "areia" na praia.

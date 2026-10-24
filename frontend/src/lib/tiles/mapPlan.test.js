@@ -203,4 +203,15 @@ describe('plano de mapa', () => {
     const top = g[Math.round(0.15 * 59)].slice(Math.round(0.2 * 79), Math.round(0.6 * 79));
     expect(top).toMatch(/^ç+$/);
   });
+  it('castelo grande que nao cabe no muro cai para um tamanho menor (nao some)', () => {
+    const r = planToMap({ fences: [{ type: 'muro', points: [[420, 425], [580, 425], [580, 575], [420, 575], [420, 425]] }], buildings: [{ type: 'torre', size: 'pequena', x: 435, y: 440 }, { type: 'castelo', size: 'grande', x: 500, y: 490 }] }, { cols: 180, rows: 146 });
+    expect(r.map.buildings.some((b) => /castelo/.test(b.design))).toBe(true);
+  });
+
+  it('modo texto: mata grande vazia ganha afloramentos de pedra; sem modo texto nao', () => {
+    const base = { areas: [{ type: 'floresta', rect: [0, 0, 1000, 1000] }] };
+    const count = (m) => m.map.layers.ground.join('').split('é').length - 1;
+    expect(count(planToMap(base, { cols: 120, rows: 100 }))).toBe(0);
+    expect(count(planToMap({ ...base, mode: 'texto' }, { cols: 120, rows: 100 }))).toBeGreaterThan(10);
+  });
 });

@@ -15,7 +15,9 @@ import MonsterSprite from '../monsters/MonsterSprite';
 import { monsterLook } from '../../lib/monsters/classify';
 import { skyAt, clockLabel, phaseAt, resolveLight } from '../../lib/tiles/daylight';
 import { padMap, PAD } from '../../lib/tiles/outside';
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, Coins as ShopCoin } from 'lucide-react';
+import { hasWander, wanderPos } from '../../lib/economy/wander';
+import '../economy/economy.css';
 
 // Construcao 3D (estilo Stardew): fachada + telhado em perspectiva, desenhada uma vez no tamanho
 // nativo (16 px/celula) e ampliada nitida pelo CSS. z-index pela linha de baixo da pegada:
@@ -165,7 +167,12 @@ export default function Board({
   clock,
   onClockChange,
   visionCells = null,
-  speedFactor = 1
+  speedFactor = 1,
+  // economia: abrir a loja de um mercador (token de NPC com shop_id)
+  onOpenShop = null,
+  // viagens pelo mar: camada extra no mapa (barcos, portos, convés) e clique em celula do mestre
+  mapLayer = null,
+  onCellPick = null
 }) {
   const cell = scene?.grid_size || 70;
   const isTiles = scene?.map_kind === 'tiles' && scene?.tiles;
@@ -173,7 +180,7 @@ export default function Board({
   const height = isTiles ? scene.tiles.rows * cell : scene?.height || cell * 16;
   const viewportRef = useRef(null);
   // luz da cena: com o relogio do mestre ligado, as cenas de fora seguem a hora (interior nao)
-  const sceneLight = isTiles && clock?.on && !scene?.parent_scene_id ? skyAt(clock.minutes) : (scene?.tiles?.light || 'dia');
+  const sceneLight = isTiles && clock?.on && (!scene?.parent_scene_id || scene?.tiles?.vessel?.part === 'deck') ? skyAt(clock.minutes) : (scene?.tiles?.light || 'dia');
   const litTiles = useMemo(() => (isTiles && scene.tiles.light !== sceneLight ? { ...scene.tiles, light: sceneLight } : scene?.tiles), [isTiles, scene?.tiles, sceneLight]);
   // margem so depende do mapa (luz troca sem refazer a margem)
   const paddedBase = useMemo(() => (isTiles ? padMap(scene.tiles) : null), [isTiles, scene?.tiles]);
@@ -214,6 +221,28 @@ export default function Board({
   const sendTimer = useRef({});
 
   const tokenPos = useCallback((t) => localRef.current[t.id] || { x: t.x, y: t.y }, []);
+
+  // NPCs andando (lib/economy/wander.js): a posicao sai do relogio, igual para todos; 4 quadros/s
+  const wanderers = tokens.some(hasWander);
+  const [wanderNow, setWanderNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!wanderers) return undefined;
+    const t = setInterval(() => setWanderNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, [wanderers]);
+  // mercador mais perto (ate ~2 celulas) de uma posicao de token
+  const merchantNear = useCallback((pos) => {
+    const half = ((pos.size || 1) * cell) / 2;
+    let best = null;
+    for (const t of tokens) {
+      if (!t.shop_id) continue;
+      const p = wanderPos(t, cell) || { x: t.x, y: t.y };
+      const th = ((t.size || 1) * cell) / 2;
+      const d = Math.hypot(p.x + th - (pos.x + half), p.y + th - (pos.y + half)) / cell;
+      if (d <= 2.2 && (!best || d < best.d)) best = { t, d };
+    }
+    return best?.t || null;
+  }, [tokens, cell]);
 
   // ---- modo jogo (parte 3): boneco animado, camera seguindo o jogador ----
   // Direcao e "andando" de cada token saem da diferenca entre a posicao nova e a anterior
@@ -294,6 +323,8 @@ export default function Board({
       if (e.key.toLowerCase() !== 'e' || e.ctrlKey || e.metaKey || e.altKey) return;
       if (/input|textarea|select/i.test(e.target.tagName) || e.target.isContentEditable) return;
       const pos = { ...myToken, ...(localRef.current[myToken.id] || {}) };
+      const seller = onOpenShop && !isMaster ? merchantNear(pos) : null;
+      if (seller) { e.preventDefault(); onOpenShop(seller); return; }
       const near = visibleItems.map((it) => [tokenItemDistance(pos, it, cell), it]).filter(([d]) => d <= PICKUP_RANGE).sort((a, b) => a[0] - b[0])[0];
       if (near) { e.preventDefault(); setPopover({ x: near[1].x, y: near[1].y }); return; }
       const half = ((myToken.size || 1) * cell) / 2;
@@ -338,12 +369,13 @@ export default function Board({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [myToken, visibleItems, cell, isTiles, scene?.tiles, toggleRoof, roofOpen, buildings, isMaster, isInterior, onEnterBuilding, onExitScene]);
+  }, [myToken, visibleItems, cell, isTiles, scene?.tiles, toggleRoof, roofOpen, buildings, isMaster, isInterior, onEnterBuilding, onExitScene, onOpenShop, merchantNear]);
 
   // Toque/clique sem arrastar: item abre o popover; construcao alterna o telhado.
   function onTap(p) {
     const x = Math.floor(p.x / cell);
     const y = Math.floor(p.y / cell);
+    if (onCellPick) { onCellPick({ x, y }); return; }
     if (itemsAt(x, y).length) { setPopover({ x, y }); return; }
     setPopover(null);
     const b = isTiles ? (buildingAt(tilesWithRoofs, x, y) || buildings.find((d) => x >= d.x && x < d.x + d.w && y >= d.y - 2 && y < d.y)) : null;
@@ -418,6 +450,8 @@ export default function Board({
 
   const blocked = useCallback((token, x, y) => {
     if (!isTiles) return false;
+    // no mar aberto o mestre leva monstros para onde quiser (a agua funda e solida para gente)
+    if (isMaster && scene.tiles.sea) return false;
     const size = token.size || 1;
     for (let dx = 0; dx < size; dx += 1) {
       for (let dy = 0; dy < size; dy += 1) {
@@ -557,6 +591,13 @@ export default function Board({
       onTarget?.(token);
       return;
     }
+    // jogador clicou num mercador: abre a loja se estiver perto
+    if (!isMaster && token.shop_id && onOpenShop) {
+      const me = myToken && { ...myToken, ...(localRef.current[myToken.id] || {}) };
+      if (me && merchantNear(me)?.id === token.id) onOpenShop(token);
+      else setNotice(`${token.name}: chegue mais perto e aperte E.`);
+      return;
+    }
     onSelect?.(token.id);
     if (!canMove(token)) return;
     const p = toMap(event);
@@ -622,7 +663,7 @@ export default function Board({
     <div className="relative h-full min-h-[300px] w-full overflow-hidden bg-[#050407]">
       <div
         ref={viewportRef}
-        className={`absolute inset-0 touch-none ${targeting ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'}`}
+        className={`absolute inset-0 touch-none ${targeting || onCellPick ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'}`}
         onWheel={onWheel}
         onPointerDown={onPointerDownBg}
         onPointerMove={onPointerMove}
@@ -671,7 +712,8 @@ export default function Board({
           ))}
 
           {sortedTokens.map((t) => {
-            const pos = local[t.id] || { x: t.x, y: t.y };
+            const wpos = !local[t.id] && hasWander(t) ? wanderPos(t, cell, wanderNow) : null;
+            const pos = local[t.id] || wpos || { x: t.x, y: t.y };
             const keep = t.id === selectedId || t.id === myTokenId || t.id === activeTokenId || drag.current?.token?.id === t.id;
             if (!keep && !inView(pos.x, pos.y, pos.x + (t.size || 1) * cell, pos.y + (t.size || 1) * cell)) return null;
             const hiddenInside = !isMaster && t.id !== myTokenId && isTiles && (() => {
@@ -683,7 +725,7 @@ export default function Board({
             const fx = effects[t.id];
             const down = t.conditions?.includes('caído') || fx?.down;
             const active = t.id === activeTokenId;
-            const sprite = isTiles && t.kind === 'character' ? t.appearance || appearanceCache.current[t.character_id || t.id] : null;
+            const sprite = isTiles && (t.kind === 'character' || (t.kind === 'npc' && t.appearance)) ? t.appearance || appearanceCache.current[t.character_id || t.id] : null;
             // monstro/NPC sem imagem enviada vira o bicho em pixel art (gerado pelo nome)
             const mlook = isTiles && !sprite && !t.image_url && (t.kind === 'monster' || t.kind === 'npc') ? monsterLook({ name: t.name }) : null;
             return (
@@ -700,11 +742,11 @@ export default function Board({
               >
                 {mlook ? (
                   <span key={fx?.n} className={`vtt-sprite ${fx?.n && fx?.hit ? 'hit-shake' : ''}`} style={{ width: size * (mlook.size / 16) * 0.9, height: size * (mlook.size / 16) * 0.9 }}>
-                    <MonsterSprite look={mlook} mapStyle={scene.tiles?.style} direction={motion[t.id]?.dir || 'down'} moving={Boolean(motion[t.id]?.moving)} scale={4} style={{ width: '100%', height: '100%' }} title={t.name} />
+                    <MonsterSprite look={mlook} mapStyle={scene.tiles?.style} direction={wpos?.dir || motion[t.id]?.dir || 'down'} moving={wpos ? wpos.moving : Boolean(motion[t.id]?.moving)} scale={4} style={{ width: '100%', height: '100%' }} title={t.name} />
                   </span>
                 ) : sprite ? (
                   <span key={fx?.n} className={`vtt-sprite ${fx?.n && fx?.hit ? 'hit-shake' : ''}`} style={{ width: size * 1.05, height: size * 1.4 }}>
-                    <AvatarSprite appearance={sprite} mapStyle={scene.tiles?.style} direction={motion[t.id]?.dir || 'down'} moving={Boolean(motion[t.id]?.moving)} scale={4} style={{ width: '100%', height: '100%' }} title={t.name} />
+                    <AvatarSprite appearance={sprite} mapStyle={scene.tiles?.style} direction={wpos?.dir || motion[t.id]?.dir || 'down'} moving={wpos ? wpos.moving : Boolean(motion[t.id]?.moving)} scale={4} style={{ width: '100%', height: '100%' }} title={t.name} />
                   </span>
                 ) : (
                   <span key={fx?.n} className={`vtt-token-face ${fx?.n && fx?.hit ? 'hit-shake' : ''}`}>
@@ -716,10 +758,13 @@ export default function Board({
                   <span className="vtt-conditions">{t.conditions.slice(0, 3).map((c) => <span key={c}>{c.slice(0, 3)}</span>)}</span>
                 )}
                 {fx?.label && <span key={`l${fx.n}`} className="vtt-float font-display">{fx.label}</span>}
+                {t.shop_id && <span className="vtt-shop-badge" aria-hidden="true"><ShopCoin size={12} /></span>}
                 <span className="vtt-name">{t.name}</span>
               </button>
             );
           })}
+
+          {mapLayer}
 
           {shownBuildings.map((b) => (
             <House key={b.id} building={b} tiles={scene.tiles} light={sceneLight} cell={cell} open={roofOpen(b)} lazy={buildings.length > 60} />
@@ -814,7 +859,7 @@ export default function Board({
       {isMaster && isInterior && (
         <button type="button" className="btn btn-glass absolute left-3 top-3 z-20 !min-h-9 text-sm" onClick={() => onViewScene?.(scene.parent_scene_id)}><DoorOpen size={16} /> Voltar para fora</button>
       )}
-      {!isMaster && isInterior && !notice && (
+      {!isMaster && isInterior && !notice && !scene.tiles?.vessel && (
         <p className="pointer-events-none absolute left-3 top-3 z-10 border-2 border-lead bg-abyss/85 px-2 py-1 text-xs text-mist">Para sair, vá até a porta e aperte E</p>
       )}
       {popover && (() => {

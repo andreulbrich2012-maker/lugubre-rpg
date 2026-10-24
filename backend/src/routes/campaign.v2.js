@@ -14,6 +14,8 @@ import { inventoryLimitError, roundKg, unitWeight } from '../utils/itemWeight.js
 import { STATS_LOCKED } from '../utils/sheetLocks.js';
 import { parseDiceFormula, rollDiceFormula, SKILL_DEFINITIONS } from '../utils/rules.js';
 import { enrich } from './character.routes.js';
+import { registerCampaignSeaRoutes } from './campaign.sea.js';
+import { advanceWorld, expireRentalsSoon } from '../utils/economy/rentals.js';
 
 const MAX_MAP_URL = 3_500_000;
 const mapUrlSchema = z.string().max(MAX_MAP_URL, 'Mapa muito grande (máximo ~3,5 MB).').refine(
@@ -162,7 +164,9 @@ function sceneView(scene, master = true) {
 async function playerSceneIds(campaignId) {
   const { rows } = await query(
     `with recursive vis as (
-       select id, 0 as depth from campaign_scenes where campaign_id = $1 and is_active
+       select id, 0 as depth from campaign_scenes where campaign_id = $1 and (is_active
+         -- mar de uma viagem em andamento (o convés do barco e "interior" dele)
+         or id in (select sea_scene_id from campaign_voyages where campaign_id = $1 and status in ('sailing', 'paused')))
        union all
        select s.id, vis.depth + 1 from campaign_scenes s join vis on s.parent_scene_id = vis.id where vis.depth < 4
      ) select id from vis`,
@@ -233,9 +237,12 @@ async function playerCombatTurn(campaignId, userId) {
   return { scene, state, token };
 }
 
-const TOKEN_SELECT = `select t.*, ch.owner_id as character_owner_id, ch.life_current as character_life_current, ch.life_max as character_life_max,
-  ch.appearance as character_appearance
-  from campaign_tokens t left join characters ch on ch.id = t.character_id`;
+// economia: NPC com aparencia em pixel art e mercador (loja ligada ao NPC do token)
+export const TOKEN_SELECT = `select t.*, ch.owner_id as character_owner_id, ch.life_current as character_life_current, ch.life_max as character_life_max,
+  ch.appearance as character_appearance, npc.appearance as npc_appearance,
+  (select s.id from campaign_shops s where t.npc_id is not null and s.npc_id = t.npc_id order by s.created_at limit 1) as shop_id,
+  (select s.visible_to_players from campaign_shops s where t.npc_id is not null and s.npc_id = t.npc_id order by s.created_at limit 1) as shop_visible
+  from campaign_tokens t left join characters ch on ch.id = t.character_id left join campaign_npcs npc on npc.id = t.npc_id`;
 
 // master: tudo; jogador: sem tokens ocultos, sem PV de npc/monstro, PV do proprio personagem.
 export function tokenView(token, { master = false, userId = null } = {}) {
@@ -269,7 +276,10 @@ export function tokenView(token, { master = false, userId = null } = {}) {
     controlled_by: token.controlled_by,
     // boneco em pixel art no modo jogo; so vem quando a consulta trouxe a ficha (senao o
     // upsert do cliente apagaria a aparencia que ele ja tem)
-    ...('character_appearance' in token ? { appearance: isCharacter ? parseJson(token.character_appearance, null) : null } : {}),
+    ...('character_appearance' in token ? { appearance: isCharacter ? parseJson(token.character_appearance, null) : parseJson(token.npc_appearance, null) } : {}),
+    // NPC andando (lib/economy/wander.js) e mercador (abre a loja com E)
+    ...('wander' in token ? { wander: parseJson(token.wander, null) } : {}),
+    ...('shop_id' in token ? { shop_id: token.shop_id && (master || token.shop_visible) ? token.shop_id : null } : {}),
     updated_at: token.updated_at
   };
 }
@@ -337,9 +347,11 @@ export function registerCampaignV2Routes(router) {
   }
   router.use('/:id', (req, res, next) => {
     // recursos v2 dependem do Postgres
-    if (/^\/(events|notes|characters|scenes|npcs|tokens|rolls|ping|cursor|maps|action-requests)(\/|$)/.test(req.path)) requireDatabase();
+    if (/^\/(events|notes|characters|scenes|npcs|tokens|rolls|ping|cursor|maps|action-requests|boats|voyages)(\/|$)/.test(req.path)) requireDatabase();
     next();
   });
+  // barcos e viagens pelo mar (campaign.sea.js); funcoes declaradas mais abaixo (hoisting)
+  const sea = registerCampaignSeaRoutes(router, { loadScene, loadToken, tokenView, moveTokenToScene, emitSceneUpdated, asking, ownsToken, loadRules, TOKEN_SELECT });
 
   // ===== feed de eventos =====
   router.get('/:id/events', async (req, res) => {
@@ -349,6 +361,7 @@ export function registerCampaignV2Routes(router) {
     }
     const after = Number(req.query.after);
     if (!Number.isSafeInteger(after) || after < 0) throw httpError('Parâmetro after inválido.');
+    expireRentalsSoon(req.params.id); // alugueis vencidos voltam sozinhos
     const events = await listEvents(req.params.id, req.user.id, master, after);
     res.json({ events, cursor: events.length ? events[events.length - 1].id : after });
   });
@@ -960,8 +973,10 @@ export function registerCampaignV2Routes(router) {
   router.put('/:id/rules', async (req, res) => {
     await assertCampaignMaster(req.params.id, req.user);
     const rules = normalizeRules(tableRulesSchema.parse(req.body));
+    const before = await loadRules(req.params.id);
     await query('update campaigns set table_rules = $1, updated_at = now() where id = $2', [JSON.stringify(rules), req.params.id]);
     await emitEvent(req.params.id, 'rules:updated', { rules }, 'all', req.user.id);
+    await advanceWorld(req.params.id, before, rules); // relogio do mundo: conta os dias dos alugueis
     res.json(rules);
   });
 
@@ -1437,6 +1452,9 @@ export function registerCampaignV2Routes(router) {
       const member = await requireCampaignMember(req.params.id, asPlayer.user);
       if (member.master) throw httpError('Esse pedido é do mestre.', 409);
       if (row.kind === 'pickup') result = await doPickup(asPlayer, false, row.scene_id, payload, true);
+      else if (row.kind === 'trade') result = await (await import('./campaign.economy.js')).doTrade(asPlayer, payload, true);
+      else if (row.kind === 'enter' && payload.boatId) result = await sea.doBoard(asPlayer, false, payload, true);
+      else if (row.kind === 'exit' && payload.boatId) result = await sea.doLeave(asPlayer, false, payload, true);
       else if (row.kind === 'enter') result = await doEnter(asPlayer, false, row.scene_id, payload.buildingId, { tokenId: payload.tokenId }, true);
       else if (row.kind === 'exit') result = await doExit(asPlayer, false, row.scene_id, { tokenId: payload.tokenId }, true);
       else result = { roll: await doRoll({ campaignId: req.params.id, user: asPlayer.user, master: false, member: member.member }, rollSchema.parse(payload), true) };

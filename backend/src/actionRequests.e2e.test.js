@@ -26,7 +26,7 @@ describe('regras da mesa: modos (sem banco)', () => {
   it('booleanos antigos viram livre/travado e a excecao do jogador troca o geral', () => {
     const r = normalizeRules({ move: true, powers: false, players: { [U]: { pickup: false, move: true } } });
     expect(r.act).toBe(true);
-    expect(r.actions).toEqual({ move: 'livre', attack: 'travado', pickup: 'livre', doors: 'livre' });
+    expect(r.actions).toEqual({ move: 'livre', attack: 'travado', pickup: 'livre', doors: 'livre', trade: 'livre' });
     // antigo false trava so ele; antigo true nao vira excecao
     expect(r.players[U]).toEqual({ actions: { pickup: 'travado' } });
     expect(playerRights(r, U)).toMatchObject({ move: 'livre', attack: 'travado', pickup: 'travado', doors: 'livre' });

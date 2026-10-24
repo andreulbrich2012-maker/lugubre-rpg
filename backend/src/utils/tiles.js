@@ -82,7 +82,18 @@ const extrasSchema = z.object({
     name: z.string().trim().min(1).max(60),
     note: z.string().max(300).optional(),
     hidden: z.boolean().optional()
-  })).max(99, 'No máximo 99 pontos principais no mapa.').optional()
+  })).max(99, 'No máximo 99 pontos principais no mapa.').optional(),
+  // viagens pelo mar: portos do mapa, cena de mar aberto e convés/porão de barco
+  ports: z.array(z.object({ id, x: cell, y: cell, name: z.string().trim().min(1).max(60) })).max(20, 'No máximo 20 portos no mapa.').optional(),
+  sea: z.boolean().optional(),
+  vessel: z.object({
+    type: z.string().regex(/^[a-z-]{1,30}$/),
+    part: z.enum(['deck', 'hold']),
+    masts: z.array(z.object({ x: cell, y: cell })).max(6).optional(),
+    helm: z.object({ x: cell, y: cell }).optional(),
+    hatch: z.object({ x: cell, y: cell }).optional(),
+    ladder: z.object({ x: cell, y: cell }).optional()
+  }).optional()
 });
 
 // Valida o formato {cols, rows, layers:{nome:[linhas]}} com 1 caractere ASCII por celula,
@@ -136,7 +147,7 @@ export function validateTiles(tiles) {
     const issue = parsed.error.issues[0];
     throw httpError(`Mapa: ${issue.path.join('.')} — ${issue.message}`);
   }
-  const { items, buildings, light, decor, style, pois } = parsed.data;
+  const { items, buildings, light, decor, style, pois, ports, sea, vessel } = parsed.data;
   for (const list of [items, buildings]) {
     if (new Set(list.map((entry) => entry.id)).size !== list.length) throw httpError('Mapa: ids repetidos em itens ou construções.');
   }
@@ -147,9 +158,12 @@ export function validateTiles(tiles) {
   if (items.some((item) => item.x >= cols || item.y >= rows)) throw httpError('Mapa: item fora do mapa.');
   if (buildings.some((b) => b.x + b.w > cols || b.y + b.h > rows)) throw httpError('Mapa: construção fora do mapa.');
   if ((pois || []).some((p) => p.x >= cols || p.y >= rows)) throw httpError('Mapa: ponto principal fora do mapa.');
+  if ((ports || []).some((p) => p.x >= cols || p.y >= rows)) throw httpError('Mapa: porto fora do mapa.');
+  if (ports && new Set(ports.map((p) => p.id)).size !== ports.length) throw httpError('Mapa: ids repetidos nos portos.');
   return {
     cols, rows, layers: Object.fromEntries(names.map((name) => [name, [...layers[name]]])),
-    items, buildings, ...(light ? { light } : {}), ...(decor ? { decor } : {}), ...(style && style !== 'padrao' ? { style } : {}), ...(pois?.length ? { pois } : {})
+    items, buildings, ...(light ? { light } : {}), ...(decor ? { decor } : {}), ...(style && style !== 'padrao' ? { style } : {}), ...(pois?.length ? { pois } : {}),
+    ...(ports?.length ? { ports } : {}), ...(sea ? { sea } : {}), ...(vessel ? { vessel } : {})
   };
 }
 

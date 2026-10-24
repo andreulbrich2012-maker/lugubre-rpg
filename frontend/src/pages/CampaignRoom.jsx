@@ -11,7 +11,8 @@ import Board from '../components/vtt/Board';
 import CampaignActions from '../components/campaigns/CampaignActions';
 import CampaignDiaryTab from '../components/campaigns/CampaignDiaryTab';
 import CampaignMembersList from '../components/campaigns/CampaignMembersList';
-import CampaignShopsTab from '../components/campaigns/CampaignShopsTab';
+import EconomyPanel from '../components/economy/EconomyPanel';
+import ShopWindow from '../components/economy/ShopWindow';
 import ActionBar from '../components/campaigns/room/ActionBar';
 import ChatPanel from '../components/campaigns/room/ChatPanel';
 import DiceOverlay from '../components/campaigns/room/DiceOverlay';
@@ -19,6 +20,10 @@ import GameMode, { requestGameFullscreen } from '../components/game/GameMode';
 import GMPanel from '../components/campaigns/room/GMPanel';
 import ActionRequests from '../components/campaigns/room/ActionRequests';
 import TableControl from '../components/campaigns/room/TableControl';
+import { useVoyages } from '../components/sea/useVoyages';
+import BoatLayer from '../components/sea/BoatLayer';
+import VoyageHud from '../components/sea/VoyageHud';
+import VoyagePanel from '../components/sea/VoyagePanel';
 import NotesPanel from '../components/campaigns/room/NotesPanel';
 import SheetsPanel from '../components/campaigns/room/SheetsPanel';
 import { useCampaignFeed } from '../hooks/useCampaignFeed';
@@ -87,6 +92,9 @@ export default function CampaignRoom() {
   const [sharing, setSharing] = useState(false);
   const [tileEditor, setTileEditor] = useState(null);
   const [sheetReload, setSheetReload] = useState(0);
+  // economia: loja aberta (token do mercador) e recarga quando estoque/preco/carteira mudam
+  const [shopToken, setShopToken] = useState(null);
+  const [ecoReload, setEcoReload] = useState(0);
   // modo jogo do jogador (tela cheia); o chat vira gaveta. skipOwnFree: rolagens livres que o
   // painel de dados ja anima sozinho nao repetem o d20 do centro da mesa.
   const [gameMode, setGameMode] = useState(false);
@@ -171,6 +179,11 @@ export default function CampaignRoom() {
 
   useEffect(() => { loadScene(viewSceneId).catch(() => null); }, [viewSceneId, loadScene]);
 
+  // viagens pelo mar (components/sea): barcos, viagem em andamento e a camada do mapa
+  const voyage = useVoyages(id, { enabled: Boolean(room), onScenesChanged: () => loadScenes(true).catch(() => null) });
+  const seaEvents = useRef(null);
+  seaEvents.current = voyage.onEvent;
+
   // ---- feed de eventos ----
   const showHit = useCallback((p) => {
     const n = ++fxCounter.current;
@@ -192,6 +205,7 @@ export default function CampaignRoom() {
     const reload = { room: false, notes: false, scenes: false, scene: false, sheet: false };
     events.forEach((ev) => {
       const p = ev.payload || {};
+      seaEvents.current?.(ev);
       if (master && p.view === 'player') return;
       switch (ev.type) {
         case 'message:created': setMessages((cur) => (cur.some((m) => m.id === p.message.id) ? cur : [...cur, p.message])); break;
@@ -234,6 +248,8 @@ export default function CampaignRoom() {
           reload.scenes = true;
           break;
         case 'rules:updated': setRules(normalizeRules(p.rules)); break;
+        case 'economy:updated': case 'economy:trade': setEcoReload((n) => n + 1); break;
+        case 'rental:ended': if (!master) { notify(p.message || 'Um aluguel acabou.'); setEcoReload((n) => n + 1); } break;
         case 'action:request':
           if (master) setRequests((cur) => (cur.some((r) => r.id === p.id) ? cur : [...cur, p]));
           break;
@@ -520,7 +536,8 @@ export default function CampaignRoom() {
     askContext.current.delete(p.id);
     if (p.status !== 'approved') { notify(p.message || 'O mestre não deixou.', 'error'); return; }
     if (p.kind === 'attack' && p.result?.roll && context) afterAttack(p.result.roll, context.power, context.target);
-    if (p.kind === 'pickup') setSheetReload((n) => n + 1);
+    if (p.kind === 'pickup' || p.kind === 'trade') setSheetReload((n) => n + 1);
+    if (p.kind === 'trade') { setEcoReload((n) => n + 1); notify(`O mestre deixou: ${p.result?.received?.message || 'negócio fechado.'}`); return; }
     const got = p.result?.received;
     const coins = got?.dracmas ? ` +${got.dracmas} dracmas na bolsa.` : '';
     notify(p.kind === 'pickup' && got ? (got.kind === 'dracmas' ? `O mestre deixou:${coins}` : `O mestre deixou: ${got.name} foi para o inventário.${coins}`) : 'O mestre deixou.');
@@ -612,7 +629,8 @@ export default function CampaignRoom() {
     ['sheets', 'Fichas'],
     isMaster && ['gm', 'Mestre'],
     ['diary', 'Diário'],
-    ['shops', 'Loja'],
+    ['shops', isMaster ? 'Economia' : 'Loja'],
+    isMaster && ['sea', 'Viagem'],
     ['group', 'Grupo']
   ].filter(Boolean), [isMaster]);
 
@@ -749,11 +767,14 @@ export default function CampaignRoom() {
                 onCreateInterior={createInterior}
                 onViewScene={setViewSceneId}
                 onPatchItem={patchMapItem}
+                mapLayer={<BoatLayer scene={scene} boats={voyage.boats} voyages={voyage.voyages} now={voyage.now} isMaster={isMaster} />}
+                onCellPick={isMaster ? voyage.pick?.onCell : null}
                 rights={rights}
                 clock={rules.clock}
                 onClockChange={(minutes) => api.put(`/campaigns/${id}/rules`, { ...rules, clock: { on: true, minutes } }).then(({ data }) => setRules(normalizeRules(data))).catch((err) => notify(err.response?.data?.message || 'Não deu para mudar a hora.', 'error'))}
                 visionCells={VISION_RADII[rules.vision ?? 9]}
                 speedFactor={loadSummary(sheet?.inventory || [], rules, user?.id).speed ?? 1}
+                onOpenShop={(t) => setShopToken(t.id)}
               />
             ) : (
               <div className="grid h-full min-h-[50svh] place-items-center bg-[#050407] p-6 text-center">
@@ -764,7 +785,12 @@ export default function CampaignRoom() {
                 </div>
               </div>
             )}
+            {scene && <VoyageHud campaignId={id} scene={scene} isMaster={isMaster} myToken={isMaster ? tokens.find((t) => t.id === selectedId) : myToken} voyage={voyage} notify={notify} onViewScene={setViewSceneId} />}
             {currentRoll && <DiceOverlay key={currentRoll.rollId} roll={currentRoll} onDone={() => setRollQueue((q) => q.slice(1))} />}
+            {shopToken && (
+              <ShopWindow campaignId={id} merchantTokenId={shopToken} reloadKey={ecoReload + sheetReload} notify={notify}
+                onClose={() => setShopToken(null)} onDone={() => setSheetReload((n) => n + 1)} onAsked={(data) => asked(data)} />
+            )}
             {gameMode && !isMaster && (
               <GameMode
                 sheet={sheet}
@@ -871,7 +897,8 @@ export default function CampaignRoom() {
               />
             )}
             {tab === 'diary' && <div className="h-full overflow-y-auto p-3"><CampaignDiaryTab campaignId={id} isMaster={isMaster} currentUserId={user?.id} /></div>}
-            {tab === 'shops' && <div className="h-full overflow-y-auto p-3"><CampaignShopsTab campaignId={id} isMaster={isMaster} characters={myCharacters} /></div>}
+            {tab === 'sea' && isMaster && <VoyagePanel campaignId={id} scenes={scenes} scene={scene} onViewScene={setViewSceneId} voyage={voyage} notify={notify} onChanged={() => Promise.all([loadScenes(true).catch(() => null), loadScene(stateRef.current.viewSceneId).catch(() => null)])} />}
+            {tab === 'shops' && <div className="h-full overflow-y-auto p-3"><EconomyPanel campaignId={id} isMaster={isMaster} scene={scene} characters={myCharacters} reloadKey={ecoReload} notify={notify} onOpenShop={setShopToken} /></div>}
             {tab === 'group' && (
               <div className="h-full space-y-6 overflow-y-auto p-3">
                 <section>

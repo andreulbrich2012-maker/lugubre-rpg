@@ -1,0 +1,68 @@
+/* Loja dos mercadores (jeito Stardew: madeira, pergaminho, moedas) em cima do tema gotico. */
+.shop-backdrop {
+  position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 1rem;
+  background: radial-gradient(circle at 50% 40%, rgb(10 6 4 / .45), rgb(4 2 2 / .78));
+  animation: shop-fade .18s ease-out;
+}
+@keyframes shop-fade { from { opacity: 0; } to { opacity: 1; } }
+.shop-window {
+  display: flex; flex-direction: column; width: min(640px, calc(100vw - 2rem));
+  max-height: min(88svh, 760px); animation: shop-pop .22s cubic-bezier(.2, 1.4, .4, 1);
+}
+@keyframes shop-pop { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+.shop-bubble {
+  position: relative; display: inline-block; max-width: 100%; padding: .35rem .6rem; font-size: .85rem; line-height: 1.25;
+  color: #3a2614; background: #f6e7c2; border: 2px solid #6a4423; box-shadow: inset 0 0 0 1px #fff6dc, 0 2px 0 #1c0e06;
+}
+.shop-bubble::before {
+  content: ''; position: absolute; left: -9px; top: 9px; border: 5px solid transparent; border-right: 6px solid #6a4423;
+}
+.shop-tab {
+  padding: .35rem .9rem; font-weight: 800; font-size: .82rem; letter-spacing: .05em; text-transform: uppercase;
+  color: #e8c98e; background: linear-gradient(180deg, #3e2716, #2b1a0e); border: 2px solid #1c0e06; border-bottom: 0;
+  box-shadow: inset 0 1px 0 rgb(255 220 160 / .18);
+}
+.shop-tab.is-on { color: #2a1608; background: linear-gradient(#e7b765, #c48a3a); box-shadow: inset 0 1px 0 #ffe3a8; }
+.shop-tab:focus-visible, .shop-row:focus-visible, .shop-step:focus-visible, .shop-deal:focus-visible { outline: 2px solid #ffd27a; outline-offset: 2px; }
+.shop-list { flex: 1 1 auto; min-height: 9rem; overflow-y: auto; padding: .3rem; display: flex; flex-direction: column; gap: .25rem; }
+.shop-row {
+  display: flex; align-items: center; gap: .6rem; width: 100%; padding: .3rem .45rem;
+  background: linear-gradient(180deg, #2f1f13, #24170e); border: 2px solid #120804; box-shadow: inset 0 0 0 1px #5b3b20;
+  transition: transform .08s, background .12s;
+}
+.shop-row:hover { background: linear-gradient(180deg, #3d2817, #2c1c10); transform: translateX(2px); }
+.shop-row.is-picked { background: linear-gradient(180deg, #5a3a1c, #3e2814); box-shadow: inset 0 0 0 2px #ffd27a, 0 0 14px rgb(255 210 122 / .25); }
+.shop-row.is-off { filter: saturate(.4) brightness(.8); }
+.shop-price { display: flex; align-items: center; gap: .2rem; font-weight: 900; color: #ffd27a; text-shadow: 0 1px 0 #1c0e06; white-space: nowrap; }
+.shop-total { display: flex; align-items: center; gap: .3rem; font-size: 1.25rem; font-weight: 900; color: #ffd27a; text-shadow: 0 2px 0 #1c0e06; }
+.shop-step {
+  display: grid; place-items: center; width: 1.9rem; height: 1.9rem; color: #2a1608;
+  background: linear-gradient(#e7b765, #c48a3a); border: 2px solid #1c0e06; box-shadow: inset 0 1px 0 #ffe3a8, 0 2px 0 #120804;
+}
+.shop-step:disabled { filter: grayscale(.8) brightness(.6); }
+.shop-deal {
+  padding: .5rem 1.1rem; font-weight: 900; font-size: .95rem; letter-spacing: .04em; color: #1d2a0c;
+  background: linear-gradient(#b6e07a, #6fa63a); border: 2px solid #142007; box-shadow: inset 0 1px 0 #e6ffb8, 0 3px 0 #0c1404;
+}
+.shop-deal:hover:not(:disabled) { filter: brightness(1.08); }
+.shop-deal:disabled { filter: grayscale(.9) brightness(.6); cursor: not-allowed; }
+@media (max-width: 639px) {
+  .shop-backdrop { padding: .4rem; align-items: end; }
+  .shop-window { width: 100%; max-height: 92svh; }
+}
+
+/* moedinha em cima do mercador no mapa */
+.vtt-shop-badge {
+  position: absolute; left: 50%; top: -14%; z-index: 3; display: grid; place-items: center; width: 1.35rem; height: 1.35rem;
+  transform: translateX(-50%); color: #2a1608; background: radial-gradient(circle at 35% 30%, #fff1b8, #e8b03a 60%, #a8701e);
+  border: 2px solid #1c0e06; border-radius: 999px; box-shadow: 0 2px 0 #120804; pointer-events: none;
+  animation: shop-bob 1.6s ease-in-out infinite;
+}
+@keyframes shop-bob { 50% { transform: translate(-50%, -3px); } }
+@media (prefers-reduced-motion: reduce) { .vtt-shop-badge { animation: none; } .shop-window, .shop-backdrop { animation: none; } }
+
+/* painel do mestre */
+.eco-mult { min-width: 2.6rem; padding: .2rem .4rem; font-size: .8rem; font-weight: 800; border: 2px solid var(--color-lead, #3b3442); }
+.eco-mult.is-on { color: #2a1608; background: linear-gradient(#e7b765, #c48a3a); border-color: #1c0e06; }
+.eco-card { border: 3px solid var(--color-lead, #3b3442); background: rgb(0 0 0 / .25); }
+.eco-picker-canvas { image-rendering: pixelated; touch-action: none; cursor: crosshair; }

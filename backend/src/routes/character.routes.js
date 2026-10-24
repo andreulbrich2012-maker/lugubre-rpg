@@ -29,7 +29,10 @@ const itemShape = {
   // icone pixel art escolhido a mao (frontend/src/lib/icons); sem ele o icone sai do nome
   icon: z.string().regex(/^[a-z0-9_-]{1,60}$/).optional(),
   // mapa-item: abre o mapa completo desta cena (so o lado de fora, com os pontos principais)
-  mapSceneId: z.string().uuid().optional()
+  mapSceneId: z.string().uuid().optional(),
+  // comercio: item comprado de um mercador (preco de recompra) e item alugado (volta no prazo)
+  catalogId: z.string().regex(/^[a-z0-9-]{1,60}$/).optional(),
+  rentalId: z.string().uuid().optional()
 };
 // mochila/bau no inventario: guarda itens dentro (1 nivel so, max 30)
 export const itemSchema = z.object({

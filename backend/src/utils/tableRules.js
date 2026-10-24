@@ -13,16 +13,17 @@
 import { z } from 'zod';
 import { httpError } from './http.js';
 
-export const ACTIONS = ['move', 'attack', 'pickup', 'doors'];
+export const ACTIONS = ['move', 'attack', 'pickup', 'doors', 'trade'];
 // chave antiga (booleano) de cada acao
 const LEGACY = { move: 'move', attack: 'powers', pickup: 'pickup' };
-const ASKABLE = { move: false, attack: true, pickup: true, doors: true };
+const ASKABLE = { move: false, attack: true, pickup: true, doors: true, trade: true };
 const modeSchema = z.enum(['livre', 'pedir', 'travado']);
 const actionsSchema = z.object({
   move: z.enum(['livre', 'travado']).nullable().optional(),
   attack: modeSchema.nullable().optional(),
   pickup: modeSchema.nullable().optional(),
-  doors: modeSchema.nullable().optional()
+  doors: modeSchema.nullable().optional(),
+  trade: modeSchema.nullable().optional() // comprar, vender e alugar com os mercadores
 });
 const flags = { move: z.boolean().optional(), powers: z.boolean().optional(), pickup: z.boolean().optional() };
 const limit = (max) => z.coerce.number().min(0).max(max).nullable().optional();
@@ -137,6 +138,7 @@ export function playerRights(rules, userId) {
     pickup: mode('pickup'),
     // passar pela porta tambem e andar: movimento travado trava as portas
     doors: move === 'travado' ? 'travado' : mode('doors'),
+    trade: mode('trade'),
     turn: r.turn
   };
 }
@@ -146,7 +148,8 @@ export const RIGHT_MESSAGES = {
   move: 'O mestre travou o movimento agora.',
   attack: 'O mestre travou poderes e ataques agora.',
   pickup: 'O mestre não liberou pegar itens agora.',
-  doors: 'O mestre não liberou passar por portas agora.'
+  doors: 'O mestre não liberou passar por portas agora.',
+  trade: 'O mestre não liberou o comércio agora.'
 };
 
 // Lanca erro em pt-BR se o jogador nao pode; devolve o modo ('livre' ou 'pedir').

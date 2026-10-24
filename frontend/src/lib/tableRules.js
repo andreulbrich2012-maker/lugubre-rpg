@@ -1,10 +1,10 @@
 // Espelho no navegador das regras da mesa (backend/src/utils/tableRules.js): so para a
 // interface explicar o que esta travado; quem decide de verdade e o servidor.
-export const ACTIONS = ['move', 'attack', 'pickup', 'doors'];
+export const ACTIONS = ['move', 'attack', 'pickup', 'doors', 'trade'];
 const LEGACY = { move: 'move', attack: 'powers', pickup: 'pickup' };
-const ASKABLE = { move: false, attack: true, pickup: true, doors: true };
+const ASKABLE = { move: false, attack: true, pickup: true, doors: true, trade: true };
 // rotulos para o painel do mestre (mover nao tem "pedir")
-export const ACTION_LABELS = { move: 'Mover', attack: 'Atacar e magias', pickup: 'Pegar itens', doors: 'Portas e construções' };
+export const ACTION_LABELS = { move: 'Mover', attack: 'Atacar e magias', pickup: 'Pegar itens', doors: 'Portas e construções', trade: 'Comprar e vender' };
 export const MODE_LABELS = { livre: 'Livre', pedir: 'Pedir', travado: 'Bloqueado' };
 export const modesFor = (action) => (ASKABLE[action] ? ['livre', 'pedir', 'travado'] : ['livre', 'travado']);
 function cleanMode(action, value) {
@@ -74,7 +74,7 @@ export function playerRights(rules, userId) {
   const own = r.players[userId]?.actions || {};
   const mode = (a) => (r.act ? own[a] ?? r.actions[a] : 'travado');
   const move = mode('move');
-  return { paused: !r.act, move, attack: mode('attack'), pickup: mode('pickup'), doors: move === 'travado' ? 'travado' : mode('doors'), turn: r.turn };
+  return { paused: !r.act, move, attack: mode('attack'), pickup: mode('pickup'), doors: move === 'travado' ? 'travado' : mode('doors'), trade: mode('trade'), turn: r.turn };
 }
 
 // Mesmas mensagens do servidor.
@@ -82,7 +82,7 @@ export function rightBlock(rights, action) {
   if (rights[action] !== 'travado') return null;
   if (rights.paused) return 'O mestre pausou a mesa: espere ele liberar.';
   if (action === 'move' || (action === 'doors' && rights.move === 'travado')) return 'O mestre travou o movimento agora.';
-  return { attack: 'O mestre travou poderes e ataques agora.', pickup: 'O mestre não liberou pegar itens agora.', doors: 'O mestre não liberou passar por portas agora.' }[action];
+  return { attack: 'O mestre travou poderes e ataques agora.', pickup: 'O mestre não liberou pegar itens agora.', doors: 'O mestre não liberou passar por portas agora.', trade: 'O mestre não liberou o comércio agora.' }[action];
 }
 
 // Troca o modo de uma acao, geral (userId vazio) ou so para um jogador (mode null = volta a valer o geral).

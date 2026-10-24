@@ -8,7 +8,7 @@ import { emitEvent } from './events.js';
 export const REQUEST_TTL_MINUTES = 3;
 const TTL = `interval '${REQUEST_TTL_MINUTES} minutes'`;
 // acao da regra que cada tipo de pedido usa
-export const REQUEST_ACTION = { pickup: 'pickup', enter: 'doors', exit: 'doors', attack: 'attack' };
+export const REQUEST_ACTION = { pickup: 'pickup', enter: 'doors', exit: 'doors', attack: 'attack', trade: 'trade' };
 
 export class AskMaster extends Error {
   constructor(info) {

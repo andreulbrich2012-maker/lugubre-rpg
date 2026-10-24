@@ -778,3 +778,125 @@ create table if not exists campaign_action_requests (
   decided_at timestamptz
 );
 create index if not exists campaign_action_requests_campaign_idx on campaign_action_requests (campaign_id, status, created_at);
+
+-- ===== viagens pelo mar (24/10) =====
+-- barcos da campanha (tabela compartilhada com a loja/NPCs, que vendem e alugam barcos):
+-- home_scene_id + x/y = onde o barco esta agora (porto ou mar); convés e porão sao cenas
+create table if not exists campaign_boats (
+  id uuid primary key default uuid_generate_v4(),
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  name text not null,
+  type text not null,
+  owner_character_id uuid references characters(id) on delete set null,
+  home_scene_id uuid references campaign_scenes(id) on delete set null,
+  x double precision not null default 0,
+  y double precision not null default 0,
+  deck_scene_id uuid references campaign_scenes(id) on delete set null,
+  hold_scene_id uuid references campaign_scenes(id) on delete set null,
+  rented_until timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists campaign_boats_campaign_idx on campaign_boats (campaign_id);
+
+-- viagem: o barco anda por uma rota (celulas da cena de mar) do porto de origem ao de destino;
+-- progresso = progress + (agora - progress_at) * speed / tamanho da rota enquanto 'sailing'
+create table if not exists campaign_voyages (
+  id uuid primary key default uuid_generate_v4(),
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  boat_id uuid not null references campaign_boats(id) on delete cascade,
+  sea_scene_id uuid not null references campaign_scenes(id) on delete cascade,
+  from_scene_id uuid references campaign_scenes(id) on delete set null,
+  from_port text,
+  to_scene_id uuid references campaign_scenes(id) on delete set null,
+  to_port text,
+  from_x double precision,
+  from_y double precision,
+  route jsonb not null default '[]',
+  status text not null default 'sailing' check (status in ('sailing', 'paused', 'arrived', 'returned')),
+  progress double precision not null default 0,
+  speed double precision not null default 1,
+  progress_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  ended_at timestamptz
+);
+alter table campaign_voyages add column if not exists from_x double precision;
+alter table campaign_voyages add column if not exists from_y double precision;
+create index if not exists campaign_voyages_campaign_idx on campaign_voyages (campaign_id, status);
+create index if not exists campaign_voyages_boat_idx on campaign_voyages (boat_id, status);
+
+-- ===== economia: mercadores NPC, precos por lugar, alugueis (24/10) =====
+-- multiplicadores: preco final = base do item x campanha x cena x area da cena x mercador
+alter table campaigns add column if not exists price_mult numeric not null default 1;
+-- 1 dia de aluguel sem o relogio do mundo = estas horas reais
+alter table campaigns add column if not exists rent_hours_per_day numeric not null default 2;
+-- minutos do mundo que ja passaram (o relogio do mestre so guarda a hora do dia): conta prazos
+alter table campaigns add column if not exists world_minutes bigint not null default 0;
+alter table campaign_scenes add column if not exists price_mult numeric not null default 1;
+-- areas do mapa com preco proprio: [{ id, name, x, y, w, h, mult }] em celulas
+alter table campaign_scenes add column if not exists price_areas jsonb not null default '[]';
+-- aparencia em pixel art do NPC (mesmo formato da ficha) e movimento do token
+alter table campaign_npcs add column if not exists appearance jsonb;
+alter table campaign_tokens add column if not exists wander jsonb;
+-- loja vira mercador: modelo, NPC dono, multiplicador, recompra
+alter table campaign_shops add column if not exists archetype text;
+alter table campaign_shops add column if not exists npc_id uuid references campaign_npcs(id) on delete set null;
+alter table campaign_shops add column if not exists greeting text not null default '';
+alter table campaign_shops add column if not exists price_mult numeric not null default 1;
+alter table campaign_shops add column if not exists buys boolean not null default false;
+alter table campaign_shops add column if not exists buy_rate numeric not null default 0.5;
+alter table campaign_shops add column if not exists buy_categories jsonb not null default '[]';
+create index if not exists campaign_shops_npc_idx on campaign_shops (npc_id);
+alter table campaign_shop_items add column if not exists catalog_id text;
+alter table campaign_shop_items add column if not exists kind text not null default 'item';
+alter table campaign_shop_items add column if not exists rent_per_day int;
+alter table campaign_shop_items add column if not exists rent_only boolean not null default false;
+alter table campaign_shop_items add column if not exists unlimited boolean not null default false;
+alter table campaign_shop_items add column if not exists base_stock int;
+alter table campaign_shop_items add column if not exists icon text;
+alter table campaign_shop_items add column if not exists boat_type text;
+
+-- alugueis: o item alugado vai para o inventario (id guardado aqui) e volta sozinho no prazo
+create table if not exists campaign_rentals (
+  id uuid primary key default uuid_generate_v4(),
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  shop_id uuid references campaign_shops(id) on delete set null,
+  item_id uuid references campaign_shop_items(id) on delete set null,
+  user_id uuid references users(id) on delete set null,
+  character_id uuid references characters(id) on delete cascade,
+  inventory_item_id text,
+  boat_id uuid references campaign_boats(id) on delete set null,
+  name text not null,
+  kind text not null default 'item',
+  days int not null default 1,
+  price int not null default 0,
+  ends_at timestamptz,
+  ends_world_minutes bigint,
+  status text not null default 'active' check (status in ('active', 'returned', 'ended')),
+  created_at timestamptz not null default now(),
+  ended_at timestamptz
+);
+create index if not exists campaign_rentals_campaign_idx on campaign_rentals (campaign_id, status);
+
+-- livro-caixa do comercio (compras, vendas, alugueis, devolucoes, reposicao)
+create table if not exists campaign_trades (
+  id uuid primary key default uuid_generate_v4(),
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  shop_id uuid references campaign_shops(id) on delete set null,
+  user_id uuid references users(id) on delete set null,
+  character_id uuid references characters(id) on delete set null,
+  kind text not null check (kind in ('compra', 'venda', 'aluguel', 'devolucao', 'reposicao')),
+  item_name text not null default '',
+  quantity int not null default 1,
+  unit_price int not null default 0,
+  total int not null default 0,
+  meta jsonb not null default '{}',
+  created_at timestamptz not null default now()
+);
+create index if not exists campaign_trades_campaign_idx on campaign_trades (campaign_id, created_at desc);
+create index if not exists campaign_trades_shop_idx on campaign_trades (shop_id, created_at desc);
+
+-- pedido ao mestre tambem para comprar/vender/alugar (regra 'trade'); o tipo fica livre (palavra
+-- curta) para os outros sistemas (viagens) criarem os proprios pedidos sem brigar pela constraint
+alter table campaign_action_requests drop constraint if exists campaign_action_requests_kind_check;
+alter table campaign_action_requests add constraint campaign_action_requests_kind_check check (kind ~ '^[a-z_]{1,30}$');

@@ -25,6 +25,7 @@ import { inventoryLimitError, roundKg, unitWeight } from '../utils/itemWeight.js
 import { inventoryLimits } from '../utils/tableRules.js';
 import { registerCampaignV2Routes } from './campaign.v2.js';
 import { registerCampaignMasterRoutes } from './campaign.master.js';
+import { registerCampaignEconomyRoutes } from './campaign.economy.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -984,5 +985,6 @@ router.put('/:id/purchase-requests/:requestId/deny', async (req, res) => {
 
 registerCampaignV2Routes(router);
 registerCampaignMasterRoutes(router);
+registerCampaignEconomyRoutes(router);
 
 export default router;

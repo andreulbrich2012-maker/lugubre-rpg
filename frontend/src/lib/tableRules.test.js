@@ -6,7 +6,7 @@ const U = 'u1';
 describe('regras da mesa (espelho do servidor)', () => {
   it('booleanos antigos viram livre/travado', () => {
     const r = normalizeRules({ move: false, powers: true, pickup: false, players: { [U]: { powers: false, move: true } } });
-    expect(r.actions).toEqual({ move: 'travado', attack: 'livre', pickup: 'travado', doors: 'livre' });
+    expect(r.actions).toEqual({ move: 'travado', attack: 'livre', pickup: 'travado', doors: 'livre', trade: 'livre' });
     expect(r.players[U]).toEqual({ actions: { attack: 'travado' } });
     expect(normalizeRules({}).act).toBe(true);
   });

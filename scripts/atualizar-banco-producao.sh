@@ -6,12 +6,21 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-tmp="$(mktemp)"; chmod 600 "$tmp"
-trap 'rm -f "$tmp"' EXIT
-echo "1/4 Buscando as variaveis de producao na Vercel..."
-npx --yes vercel env pull "$tmp" --environment=production --yes >/dev/null
-DATABASE_URL="$(grep -E '^DATABASE_URL=' "$tmp" | head -1 | cut -d= -f2- | sed -e 's/^"//' -e 's/"$//')"
-[ -n "$DATABASE_URL" ] || { echo "DATABASE_URL de producao nao encontrado na Vercel."; exit 1; }
+# A Vercel nao entrega variaveis marcadas como "sensiveis"; entao o endereco e digitado aqui,
+# escondido, e fica so na memoria deste script.
+echo "1/4 Endereco do banco de producao"
+if [ -z "${DATABASE_URL:-}" ]; then
+  echo "    Cole o DATABASE_URL (Neon/Supabase > Connection string). Nao aparece na tela:"
+  read -rs DATABASE_URL
+  echo
+fi
+case "$DATABASE_URL" in
+  postgres://*|postgresql://*) ;;
+  *) echo "Isso nao parece um endereco postgres:// . Nada foi alterado."; exit 1 ;;
+esac
+case "$DATABASE_URL" in
+  *localhost*|*127.0.0.1*) echo "Esse e o banco LOCAL, nao o de producao. Nada foi alterado."; exit 1 ;;
+esac
 
 mkdir -p "$HOME/lugubre-backups"; chmod 700 "$HOME/lugubre-backups"
 backup="$HOME/lugubre-backups/lugubre-$(date +%Y%m%d-%H%M%S).sql.gz"

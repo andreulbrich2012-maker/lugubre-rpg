@@ -289,3 +289,14 @@ Bancos antigos que ainda têm raças de outro cenário caem na raça do livro ma
 
 ## Depois do deploy
 O schema só acrescentou colunas (`campaign_scenes.parent_scene_id`, `parent_building_id`, `campaigns.table_rules`, `characters.appearance`): depois do deploy, Admin > Sistema > backup e "Atualizar banco".
+
+## Também nesta rodada
+- **Objetos do mapa em 3D** (`lib/tiles/objects3d.js`, `solid.js`): poço, fonte, estátua, carroça, barco, forja, móveis, barris, baús, lápides, cercas, postes etc. com topo + frente. Ficam planos só os que deitam no chão (teia, tapete, sangue, ossos). Prévia: `objetos-3d.png`.
+- **Inventário com peso e limites**: todo item tem peso sensato (`lib/itemWeight.js`, cópia idêntica no backend). O mestre define peso máximo e quantidade máxima de itens (geral e por jogador) em Mestre > Regras da mesa; valem ao pegar itens do mapa e ao aprovar compras. A ficha mostra a carga com barra.
+- **Mochilas, baús e sacos no mapa**: item recipiente com itens dentro, pode ser trancado ou escondido. Jogador perto tira um item ou leva tudo (a mochila vira item com conteúdo e peso somado).
+
+## O que ficou faltando
+- Limite de inventário não vale quando o jogador adiciona item pela própria ficha (rota sem campanha).
+- Ainda não há tela para mover itens para dentro/fora de uma mochila já no inventário.
+- `docs/API-v2.md` não documenta `style`, `cursor`, recipientes e `inventory`.
+- Rio desenhado sempre na horizontal (também em rios verticais); candelabro e armadura merecem outra passada.

@@ -27,9 +27,9 @@ describe('formato do mapa', () => {
   });
 
   it('repairMap completa, corta, troca desconhecido e move camada', () => {
-    const { map, warnings } = repairMap({ layers: { ground: ['##', '#é##########', '.T..'], objects: ['....', ' # '] } }, { cols: 4, rows: 4 });
+    const { map, warnings } = repairMap({ layers: { ground: ['##', '#€##########', '.T..'], objects: ['....', ' # '] } }, { cols: 4, rows: 4 });
     expect(validateMap(map).ok).toBe(true);
-    // 'é' (desconhecido) vira chao padrao, mas a parede que veio nos objetos ocupa a mesma celula
+    // '€' (desconhecido) vira chao padrao, mas a parede que veio nos objetos ocupa a mesma celula
     expect(map.layers.ground).toEqual(['##..', '####', '....', '....']);
     expect(map.layers.objects[2][1]).toBe('T');
     expect(map.layers.objects[0]).toBe('    '); // '.' nos objetos = vazio

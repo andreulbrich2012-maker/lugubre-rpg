@@ -6,7 +6,7 @@ import { repairMap, ITEM_CATEGORIES, MAX_ITEMS, MAX_BUILDINGS } from './format.j
 export function catalogText() {
   return CATEGORIES.map((cat) => {
     const items = TILES.filter((t) => t.category === cat)
-      .map((t) => `"${t.code}" ${t.name} (${t.layer === 'ground' ? 'chão' : 'objeto'}${t.solid ? ', bloqueia' : ''}${t.loot ? ', pode guardar itens' : ''})`);
+      .map((t) => `"${t.code}" ${t.name} (${t.layer === 'ground' ? 'chão' : 'objeto'}${t.span ? `, grande ${t.span[0]}×${t.span[1]}` : ''}${t.solid ? ', bloqueia' : ''}${t.loot ? ', pode guardar itens' : ''})`);
     return items.length ? `${cat}: ${items.join('; ')}` : '';
   }).filter(Boolean).join('\n');
 }
@@ -73,6 +73,9 @@ COMO FAZER UM MAPA BOM
 - Objeto que bloqueia nunca tapa porta nem fecha a única passagem.
 - Paredes, portas, escadas, água e pisos só em "ground"; móveis, árvores e decoração só em "objects".
 - Não invente códigos e não use aspas nem barra invertida dentro da grade.
+- Alguns códigos são letras acentuadas ("á", "Ô", "ç"...): copie exatamente como estão na lista.
+- Objeto "grande L×A" (poço, moinho, carroça, barco, tenda...): escreva o código SÓ na célula de baixo à esquerda e deixe vazias (" ") as outras células que ele ocupa, à direita e acima. O desenho e o bloqueio ocupam a área toda sozinhos.
+- O desenho final arredonda bordas entre terrenos, espalha flores, pedrinhas e folhas e põe telhado nas casas: não tente desenhar isso na grade.
 
 CONSTRUÇÕES COM TELHADO ("buildings", até ${MAX_BUILDINGS})
 - Para cada casa/taverna/capela com paredes, registre o retângulo INTEIRO incluindo as paredes:

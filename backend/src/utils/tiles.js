@@ -3,7 +3,8 @@
 import { z } from 'zod';
 import { httpError } from './http.js';
 
-const PRINTABLE = /^[\x20-\x7E]*$/;
+// ASCII imprimivel + Latin-1: os blocos novos usam letras acentuadas como codigo.
+const PRINTABLE = /^[\x20-\x7E\u00A1-\u00FF]*$/;
 const MAX_LAYERS = 2;
 export const ITEM_CATEGORIES = ['Achados', 'Armas', 'Armaduras', 'Poções', 'Tesouro', 'Livros', 'Ingredientes', 'Outros'];
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, 'Id inválido.');
@@ -53,7 +54,7 @@ export function validateTiles(tiles) {
     if (!Array.isArray(lines) || lines.length !== rows) throw httpError(`A camada "${name}" deve ter ${rows} linhas.`);
     for (const line of lines) {
       if (typeof line !== 'string' || line.length !== cols || !PRINTABLE.test(line)) {
-        throw httpError(`Cada linha da camada "${name}" deve ter exatamente ${cols} caracteres ASCII.`);
+        throw httpError(`Cada linha da camada "${name}" deve ter exatamente ${cols} caracteres (ASCII ou letras acentuadas).`);
       }
     }
   }

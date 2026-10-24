@@ -8,8 +8,9 @@ describe('catalogo de blocos', () => {
     expect(new Set(codes).size).toBe(codes.length);
     for (const c of codes) {
       expect(c).toHaveLength(1);
-      expect(c.charCodeAt(0)).toBeGreaterThan(0x20);
-      expect(c.charCodeAt(0)).toBeLessThan(0x7f);
+      // ASCII imprimivel ou Latin-1 (os ASCII acabaram; 24/10)
+      const n = c.charCodeAt(0);
+      expect((n > 0x20 && n < 0x7f) || (n >= 0xa1 && n <= 0xff), c).toBe(true);
       expect('"\\').not.toContain(c); // quebraria o JSON da IA
     }
     expect(codes).toContain(DEFAULT_GROUND);

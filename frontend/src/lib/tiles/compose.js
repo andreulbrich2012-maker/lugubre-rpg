@@ -15,11 +15,12 @@ import { wallVariant, wallPixels, FACE_SHADOW } from './walls.js';
 
 // ---------- terrenos que se misturam (resto e "construido": borda reta) ----------
 // Ordem = precedencia: quem vem depois cobre a borda de quem vem antes.
-const BLEND_ORDER = ['L', '@', 'W', '~', '0', 'G', '%', 'j', ':', 'I', '*', 'z', ',', ';', 'c', 'v', '.', 'g'];
+// Plano de arte: agua < areia < terra < grama < neve (a neve cobre tudo por cima).
+const BLEND_ORDER = ['L', '@', 'W', 'ó', '~', '0', 'ô', 'G', '%', 'j', 'I', ':', 'ä', 'å', 'z', 'ã', ',', 'â', 'û', 'ü', 'é', ';', 'c', 'v', 'à', '.', 'á', 'g', '*'];
 const PRECEDENCE = Object.fromEntries(BLEND_ORDER.map((c, i) => [c, i + 1]));
-const WATER = new Set(['~', 'W', '0']);
-const GRASS = new Set(['.', 'g']);
-const PATH = new Set([';', 'c']);
+const WATER = new Set(['~', 'W', '0', 'ó']);
+const GRASS = new Set(['.', 'g', 'á', 'à']);
+const PATH = new Set([';', 'c', 'û', 'ü']);
 export const DECOR_LEVELS = { nenhuma: 0, pouca: 0.45, normal: 1, muita: 1.8 };
 
 export const blends = (code) => Boolean(PRECEDENCE[code]);
@@ -157,7 +158,17 @@ const BIOME = {
   Q: [['dust', 0.06]],
   U: [['crack', 0.08]],
   ';': [['pebbleS', 0.08]],
-  c: [['pebbleS', 0.05]]
+  c: [['pebbleS', 0.05]],
+  'á': [['tuft', 0.4], ['tuft2', 0.2]],
+  'à': [['leaf', 0.5], ['twig', 0.2], ['tuft2', 0.15]],
+  'ä': [['pebbleS', 0.08], ['shell', 0.04]],
+  'å': [['pebble', 0.15]],
+  'â': [['pebbleS', 0.1], ['twig', 0.05]],
+  'ã': [['crack', 0.12], ['dust', 0.1]],
+  'û': [['pebbleS', 0.12]],
+  'é': [['crack', 0.08], ['tuft', 0.06]],
+  'ë': [['dust', 0.08]],
+  'ê': [['dust', 0.04]]
 };
 
 // ---------- terreno ----------
@@ -381,6 +392,9 @@ export function renderTerrain(map, { frame = 0, beautify = true, decor = 'normal
 // ---------- objetos ----------
 // Arvores grandes geradas por codigo (copa de bolhas com luz do alto-esquerda, tronco, contorno colorido).
 const TREE_PAL = {
+  'ð': ['#1a4236', '#265e3a', '#3e7e36', '#5c9c40', '#8cbc52', '#c2dc7c'],
+  'ò': ['#1d4a3e', '#2b6a40', '#468c3a', '#6aac44', '#a0cc5a', '#d2e888'],
+  'ù': ['#6a2a4a', '#a04a6a', '#d0708c', '#e898b0', '#f6c0d0', '#fff0f4'],
   T: ['#1d4a3e', '#2b6a40', '#468c3a', '#6aac44', '#a0cc5a', '#d2e888'],
   A: ['#173a3a', '#1f5640', '#2f7444', '#4a9046', '#76b052', '#a8d070'],
   Y: ['#3a2a4a', '#5a3a5a', '#7a4a5e', '#9c6a6a', '#c09080', '#e0b8a0']
@@ -388,7 +402,44 @@ const TREE_PAL = {
 const TRUNK = ['#3d2230', '#5c3328', '#7d4a2e', '#9e6635'];
 const OUT = hexRgb('#1f1a2e');
 
+// Palmeira: tronco curvo com aneis e folhas longas em leque (nao cabe no gerador de copa).
+function makePalm(variant) {
+  const w = 32;
+  const h = 44;
+  const data = new Uint8Array(w * h * 4);
+  const img = { w, h, data: new Uint8ClampedArray(w * h * 4) };
+  const set = (x, y, rgb) => { x = Math.round(x); y = Math.round(y); if (x >= 0 && y >= 0 && x < w && y < h) img.data.set([...rgb, 255], (y * w + x) * 4); };
+  const trunk = ['#5c3a24', '#7d5432', '#a07246', '#c49a64'].map(hexRgb);
+  const leaf = ['#1d4a3e', '#2b6a40', '#468c3a', '#6aac44', '#a0cc5a'].map(hexRgb);
+  for (let y = 12; y < 44; y++) {
+    const bend = Math.round(Math.sin((y - 12) / 32 * 1.4) * (variant ? -3 : 3));
+    for (let x = 0; x < 3; x++) set(15 + bend + x, y, trunk[(y % 3 === 0) ? 0 : x === 0 ? 3 : x === 1 ? 2 : 1]);
+  }
+  const top = [16, 12];
+  for (const [ang, len] of [[-2.7, 12], [-2.2, 13], [-1.6, 9], [-0.9, 13], [-0.4, 12], [0.3, 10], [3.0, 10]]) {
+    for (let k = 0; k <= len; k++) {
+      const x = top[0] + Math.cos(ang) * k; const y = top[1] + Math.sin(ang) * k + (k * k) / 26;
+      set(x, y, leaf[k < 3 ? 3 : 2]); set(x, y + 1, leaf[1]);
+      if (k % 2 === 0 && k > 2) set(x + Math.sin(ang), y + 2, leaf[0]);
+    }
+  }
+  for (const [dx, dy] of [[-1, 1], [1, 1], [0, 2]]) set(top[0] + dx, top[1] + dy, hexRgb('#6a4a2a'));
+  void data;
+  outlineImage(img);
+  return img;
+}
+function outlineImage(img) {
+  const { w, h, data } = img;
+  const add = [];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (data[(y * w + x) * 4 + 3]) continue;
+    if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => x + dx >= 0 && x + dx < w && y + dy >= 0 && y + dy < h && data[((y + dy) * w + x + dx) * 4 + 3])) add.push(y * w + x);
+  }
+  for (const i of add) data.set([...OUT, 255], i * 4);
+}
+
 function makeTree(kind, variant) {
+  if (kind === 'ý') return makePalm(variant);
   const w = 32;
   const h = 44;
   const pal = TREE_PAL[kind].map(hexRgb);
@@ -434,6 +485,9 @@ function makeTree(kind, variant) {
       set(x, y, pal[tone]);
     }
   }
+  // macieira: macas vermelhas; cerejeira: florzinhas brancas; carvalho grande: mais textura
+  if (kind === 'ò') for (let k = 0; k < 9; k++) { const x = 6 + ((k * 7 + variant * 3) % 20); const y = 8 + ((k * 5 + variant) % 18); if (inside[y * w + x]) { set(x, y, hexRgb('#d8343a')); set(x - 1, y - 1, hexRgb('#f07a6a')); } }
+  if (kind === 'ù') for (let k = 0; k < 12; k++) { const x = 5 + ((k * 7 + variant * 5) % 22); const y = 5 + ((k * 3 + variant) % 22); if (inside[y * w + x]) set(x, y, hexRgb('#fff6fa')); }
   // contorno colorido escuro em volta da copa
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -444,7 +498,29 @@ function makeTree(kind, variant) {
   }
   return { w, h, data };
 }
-const TREES = { T: [0, 1, 2].map((v) => makeTree('T', v)), A: [0, 1].map((v) => makeTree('A', v)), Y: [0, 1].map((v) => makeTree('Y', v)) };
+const TREES = { T: [0, 1, 2].map((v) => makeTree('T', v)), A: [0, 1].map((v) => makeTree('A', v)), Y: [0, 1].map((v) => makeTree('Y', v)), 'ð': [0, 1].map((v) => scaleUp(makeTree('ð', v + 3))), 'ò': [0, 1].map((v) => makeTree('ò', v)), 'ù': [0, 1].map((v) => makeTree('ù', v)), 'ý': [0, 1].map((v) => makeTree('ý', v)) };
+function scaleUp(img, f = 1.5) {
+  const w = Math.round(img.w * f); const h = Math.round(img.h * f);
+  const data = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const si = (Math.floor(y / f) * img.w + Math.floor(x / f)) * 4;
+    data.set(img.data.subarray(si, si + 4), (y * w + x) * 4);
+  }
+  return { w, h, data };
+}
+// Objetos grandes (stamps): imagem RGBA uma vez so, a partir do canvas de hex do pintor.
+const bigCache = new Map();
+function bigRgba(t) {
+  let out = bigCache.get(t.code);
+  if (!out) {
+    const { w, h, px } = t.big;
+    const data = new Uint8ClampedArray(w * h * 4);
+    px.forEach((hex, i) => { if (hex) data.set([...hexRgb(hex), 255], i * 4); });
+    out = { w, h, data };
+    bigCache.set(t.code, out);
+  }
+  return out;
+}
 const NATURAL = new Set(['b', 'o', 'm', 'f', 'd', 'l', 'x', 'N', "'"]);
 
 export const isAnimatedObject = (t) => Boolean(t?.frames);
@@ -469,8 +545,16 @@ export function renderObjects(map, { beautify = true } = {}) {
       if (big) {
         const tree = big[hash(cx, cy, 5) % big.length];
         const dx = (hash(cx, cy, 6) % 5) - 2;
-        ellipse(img, x0 + 8 + dx, y0 + 14, 10, 3.6, 0.42);
-        stamp(img, tree.data, tree.w, tree.h, x0 - 8 + dx, y0 + SIZE - tree.h + 1, { flip: hash(cx, cy, 7) % 2 === 1 });
+        ellipse(img, x0 + 8 + dx, y0 + 14, tree.w * 0.32, 3.6, 0.42);
+        stamp(img, tree.data, tree.w, tree.h, x0 + 8 - tree.w / 2 + dx, y0 + SIZE - tree.h + 1, { flip: hash(cx, cy, 7) % 2 === 1 });
+        continue;
+      }
+      if (t.big) {
+        // ancora = celula de baixo-esquerda da pegada; o sprite fica centrado na pegada
+        const b = bigRgba(t);
+        const fw = t.span[0] * SIZE;
+        ellipse(img, x0 + fw / 2, y0 + 13, fw * 0.48, 4, 0.4);
+        stamp(img, b.data, b.w, b.h, x0 + Math.round((fw - b.w) / 2), y0 + SIZE - b.h);
         continue;
       }
       ellipse(img, x0 + 8, y0 + 14, t.solid ? 7 : 5.5, t.solid ? 2.6 : 2, t.solid ? 0.4 : 0.3);

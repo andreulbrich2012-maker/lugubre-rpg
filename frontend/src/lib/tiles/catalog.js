@@ -3,6 +3,9 @@
 // cada bloco recebe so as cores que usa. '.' e transparente nos objetos.
 // Luz vem do alto-esquerda: realce em cima/esquerda, sombra embaixo/direita.
 
+import { MORE_TILES, REPAINT } from './extra.js';
+import { toImages } from './paint.js';
+
 export const SIZE = 16;
 export const DEFAULT_GROUND = '.';
 export const EMPTY_OBJECT = ' ';
@@ -2050,18 +2053,29 @@ const EXTRA_TILES = [
   })
 ];
 
-export const TILES = [...BASE_TILES, ...EXTRA_TILES];
+export const TILES = [...BASE_TILES, ...EXTRA_TILES, ...MORE_TILES];
 
 // loot: objeto onde faz sentido achar item pegavel (so dica para a IA e o editor; quem decide e a IA/mestre).
 const LOOT_CODES = 'C$78&9qukmNfx4' + "52a3'E";
 // wall: parede que escolhe o desenho pelo vizinho (topo x face). face: sempre de frente
 // (porta, janela, portao, tocha na parede: so fazem sentido vistos de frente).
-const WALL_CODES = '#BMHZ?';
+const WALL_CODES = '#BMHZ?çñ';
 const FACE_CODES = 'DXJ()/]';
 for (const t of TILES) {
   if (LOOT_CODES.includes(t.code)) t.loot = true;
   if (WALL_CODES.includes(t.code)) t.wall = true;
   if (FACE_CODES.includes(t.code)) { t.wall = true; t.face = true; }
+}
+
+// repintura dos terrenos chapados (extra.js): troca imagens e paleta, mantem as regras
+for (const t of TILES) {
+  const canvases = REPAINT[t.code];
+  if (!canvases) continue;
+  const { images, palette } = toImages(canvases);
+  t.variants = images;
+  t.pixels = images[0];
+  t.palette = palette;
+  delete t.frames;
 }
 
 export const TILE_BY_CODE = Object.fromEntries(TILES.map((t) => [t.code, t]));

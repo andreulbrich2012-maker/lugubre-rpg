@@ -12,7 +12,8 @@ export const LAYERS = ['ground', 'objects'];
 
 const emptyCode = (layer) => (layer === 'ground' ? DEFAULT_GROUND : EMPTY_OBJECT);
 const clampSize = (n) => Math.min(MAX_SIZE, Math.max(MIN_SIZE, Math.round(Number(n)) || MIN_SIZE));
-const PRINTABLE = /^[\x20-\x7e]*$/;
+// ASCII imprimivel + Latin-1 (codigos dos blocos novos: á, ç, Ô...).
+const PRINTABLE = /^[\x20-\x7e\u00a1-\u00ff]*$/;
 
 export const MAX_ITEMS = 60;
 export const MAX_BUILDINGS = 30;
@@ -307,7 +308,17 @@ export function isSolid(map, x, y) {
   const cx = Math.floor(x);
   const cy = Math.floor(y);
   if (!map || !inside(map, cx, cy)) return true;
-  return !!(getTile(getCell(map, 'ground', cx, cy))?.solid || getTile(getCell(map, 'objects', cx, cy))?.solid);
+  if (getTile(getCell(map, 'ground', cx, cy))?.solid || getTile(getCell(map, 'objects', cx, cy))?.solid) return true;
+  // objeto grande (poco, carroca, moinho): a ancora e a celula de baixo-esquerda; a "pegada"
+  // dele bloqueia as celulas vizinhas tambem (so a base, nao o telhado/copa)
+  for (let ay = cy; ay <= cy + 2; ay++) {
+    for (let ax = cx - 2; ax <= cx; ax++) {
+      if (ax === cx && ay === cy) continue;
+      const t = getTile(getCell(map, 'objects', ax, ay));
+      if (t?.foot && t.solid && t.foot.some(([dx, dy]) => ax + dx === cx && ay + dy === cy)) return true;
+    }
+  }
+  return false;
 }
 
 // Movimento (WASD): bloqueia parede/objeto solido e celula com outro token.

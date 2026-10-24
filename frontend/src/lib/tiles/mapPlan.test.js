@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { planToMap, isPlan, pickDesign } from './mapPlan.js';
+import { planToMap, isPlan, pickDesign, enrichText } from './mapPlan.js';
 import { PLAN_EXAMPLE, buildPlanPrompt } from './planPrompt.js';
 import { parseMapResponse } from './aiPrompt.js';
 import { validateMap } from './format.js';
@@ -230,5 +230,15 @@ describe('plano de mapa', () => {
     expect(foto.map.cols).toBeLessThan(240);
     const texto = planToMap({ mode: 'texto', cols: 240, rows: 160, areas }, { cols: 60, rows: 40 });
     expect(texto.map.cols).toBe(240);
+  });
+  it('modo texto: palicada retangular fica organica e mapa sem agua ganha riacho; foto fica igual', () => {
+    const base = { areas: [{ type: 'floresta', rect: [0, 0, 1000, 1000] }, { type: 'bairro', rect: [400, 400, 200, 200] }], fences: [{ type: 'palicada', points: [[350, 350], [650, 350], [650, 650], [350, 650], [350, 350]] }] };
+    const t = enrichText({ ...base, mode: 'texto' });
+    expect(t.fences[0].points.length).toBeGreaterThan(10);
+    expect(t.rivers.length).toBe(1);
+    const foto = planToMap(base, { cols: 80, rows: 60 });
+    expect(foto.map.layers.ground.join('')).not.toContain('0');
+    const texto = planToMap({ ...base, mode: 'texto' }, { cols: 80, rows: 60 });
+    expect(texto.map.layers.ground.join('')).toContain('0');
   });
 });

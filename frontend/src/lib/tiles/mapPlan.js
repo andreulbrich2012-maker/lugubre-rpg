@@ -124,9 +124,79 @@ export function pickDesign(b, rnd = Math.random) {
   return DESIGNS.find((d) => d.category === 'Casas' && d.size === 'media');
 }
 
+// modo texto (IA inventa o mapa): deixa menos "quadrado no meio da mata".
+// 1) palicada retangular vira contorno organico (cantos arredondados, lados com barriga)
+// 2) sem agua nenhuma no plano: um riacho atravessa a faixa mais vazia do mapa e um laguinho no canto mais vazio
+// Foto nunca passa por aqui (a composicao vem da imagem).
+export function enrichText(plan) {
+  const out = { ...plan };
+  const h = (k) => { let v = (k * 2654435761) >>> 0; v = ((v ^ (v >>> 15)) * 2246822519) >>> 0; return ((v ^ (v >>> 13)) & 0xffff) / 0xffff; };
+  const isRect = (p) => {
+    if (!Array.isArray(p) || p.length < 4 || p.length > 5) return null;
+    const q = p.slice(0, 4).map((v) => [num(v?.[0]), num(v?.[1])]);
+    const xs = [...new Set(q.map((v) => Math.round(v[0])))]; const ys = [...new Set(q.map((v) => Math.round(v[1])))];
+    if (xs.length !== 2 || ys.length !== 2) return null;
+    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+  };
+  out.fences = (Array.isArray(plan.fences) ? plan.fences : []).map((f, fi) => {
+    const box = strip(f?.type ?? f?.tipo) === 'palicada' ? isRect(f?.points) : null;
+    if (!box) return f;
+    const [x0, y0, x1, y1] = box; const cx = (x0 + x1) / 2; const cy = (y0 + y1) / 2; const a = (x1 - x0) / 2; const b = (y1 - y0) / 2;
+    const pts = [];
+    const N = 16;
+    for (let k = 0; k < N; k++) {
+      const t = (k / N) * Math.PI * 2;
+      // superelipse (quase retangulo, cantos cortados) + barriga aleatoria
+      const c = Math.cos(t); const s2 = Math.sin(t);
+      const e = 0.5; // expoente 4 -> |c|^0.5
+      const r = 1.1 + (h(fi * 97 + k) - 0.5) * 0.12;
+      pts.push([Math.round(cx + a * r * Math.sign(c) * Math.abs(c) ** e), Math.round(cy + b * r * Math.sign(s2) * Math.abs(s2) ** e)]);
+    }
+    pts.push(pts[0]);
+    return { ...f, points: pts.map(([x, y]) => [Math.max(5, Math.min(995, x)), Math.max(5, Math.min(995, y))]) };
+  });
+  const areas = Array.isArray(plan.areas) ? plan.areas : [];
+  const wet = (plan.rivers || []).length || areas.some((x) => ['mar', 'lago', 'pantano', 'lava'].includes(strip(x?.type ?? x?.tipo)));
+  if (!wet) {
+    // caixas ocupadas (vila, cemiterio, clareiras, construcoes) em escala 0-1000
+    const boxes = [];
+    const S = planMax(plan) > 100.5 ? 1 : 10;
+    for (const x of areas) {
+      const t = strip(x?.type ?? x?.tipo);
+      if (['floresta', 'bosque', 'campo', 'neve', 'areia'].includes(t)) continue;
+      if (Array.isArray(x.rect)) boxes.push([x.rect[0] * S, x.rect[1] * S, (num(x.rect[0]) + num(x.rect[2])) * S, (num(x.rect[1]) + num(x.rect[3])) * S]);
+      else if (Array.isArray(x.circle)) { const [X, Y, Rr] = x.circle.map((v) => num(v) * S); boxes.push([X - Rr, Y - Rr, X + Rr, Y + Rr]); }
+      else if (Array.isArray(x.points) && x.points.length) { const xs = x.points.map((v) => num(v?.[0]) * S); const ys = x.points.map((v) => num(v?.[1]) * S); boxes.push([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]); }
+    }
+    for (const f of out.fences) if (Array.isArray(f?.points) && f.points.length) { const xs = f.points.map((v) => num(v?.[0]) * S); const ys = f.points.map((v) => num(v?.[1]) * S); boxes.push([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]); }
+    for (const b of plan.buildings || []) boxes.push([num(b?.x) * S - 40, num(b?.y) * S - 40, num(b?.x) * S + 40, num(b?.y) * S + 40]);
+    const gapX = (x) => Math.min(...boxes.map(([a, , c]) => (x < a ? a - x : x > c ? x - c : 0)), 999);
+    const gapY = (y) => Math.min(...boxes.map(([, b, , d]) => (y < b ? b - y : y > d ? y - d : 0)), 999);
+    const cand = [];
+    for (const v of [90, 150, 850, 910]) { cand.push(['v', v, gapX(v)]); cand.push(['h', v, gapY(v)]); }
+    cand.sort((p, q) => q[2] - p[2]);
+    const [dir, v, gap] = cand[0];
+    if (boxes.length && gap >= 50) {
+      const pts = [];
+      for (let k = 0; k <= 6; k++) {
+        const along = Math.round((k / 6) * 1000);
+        const off = Math.round(v + (h(k + 7) - 0.5) * Math.min(80, gap));
+        pts.push(dir === 'v' ? [off, along] : [along, off]);
+      }
+      out.rivers = [{ points: pts, width: 2, from: dir === 'v' ? 'norte' : 'oeste', exit: dir === 'v' ? 'sul' : 'leste' }];
+    }
+    // laguinho no canto mais longe de tudo
+    const corners = [[160, 160], [840, 160], [160, 840], [840, 840]].map(([x, y]) => [x, y, Math.min(...boxes.map(([a, b, c, d]) => Math.hypot(x < a ? a - x : x > c ? x - c : 0, y < b ? b - y : y > d ? y - d : 0)), 999)]);
+    corners.sort((p, q) => q[2] - p[2]);
+    if (boxes.length && corners[0][2] >= 120) out.areas = [...areas, { type: 'lago', circle: [corners[0][0], corners[0][1], 55] }];
+  }
+  return out;
+}
+
 // tamanho dito pela IA (foto) costuma vir pequeno demais (~75%): se construcoes pedidas nao cabem,
 // aumenta o mapa (mesma proporcao) e desenha de novo, ate 3 vezes
-export function planToMap(plan, opts = {}) {
+export function planToMap(plan0, opts = {}) {
+  const plan = strip(plan0?.mode ?? plan0?.modo) === 'texto' ? enrichText(plan0) : plan0;
   let r = planToMapOnce(plan, opts);
   if (!(num(plan?.cols, 0) > 0 && num(plan?.rows, 0) > 0)) return r;
   let p = plan;

@@ -70,7 +70,7 @@ export const HELD = [
   held('espada-longa', 'Espada longa', 'Armas', ARMA('aco', 'vinho', 'ouro'), {
     rows: ['..4..', '..4..', '.443.', '.443.', '.443.', '.443.', '.443.', '.443.', '.443.', '.332.', 'EDDCB', '.EC..', '..c..', '..b..', '..c..', '.DC..'], grip: [2, 12], s: { side: 0.6 }
   }),
-  held('cimitarra', 'Cimitarra', 'Armas', ARMA('aco', 'couro-escuro', 'ouro'), {
+  held('cimitarra', 'Sabre', 'Armas', ARMA('aco', 'couro-escuro', 'ouro'), {
     rows: ['3...', '43..', '.43.', '.43.', '.432', '..43', '..43', '.DCB', '..c.', '..b.', '..E.'], grip: [2, 8]
   }),
   held('rapieira', 'Rapieira', 'Armas', ARMA('prata', 'couro-escuro', 'ouro'), {
@@ -108,11 +108,11 @@ export const HELD = [
   held('tridente', 'Tridente', 'Armas', ARMA('bronze', 'madeira-escura', 'ouro'), {
     rows: ['4.4.4', '3.3.3', '32322', '.DCB.', '..d..', '..c..', '..d..', '..c..', '..d..', '..c..', '..d..', '..c..', '..b..', '..c..', '..a..'], grip: [2, 12], s: { down: 0.3, side: 0.55, up: 0.3 }
   }),
-  held('foice', 'Foice', 'Armas', ARMA('aco', 'madeira-escura', 'ferro'), {
+  held('foice', 'Gadanha', 'Armas', ARMA('aco', 'madeira-escura', 'ferro'), {
     rows: ['d4443..', 'c.12443', 'd....32', 'c.....1', 'd......', 'c......', 'd......', 'c......', 'd......', 'c......', 'd......', 'c......', 'D......', 'c......', 'b......', 'c......', 'b......', 'a......'], grip: [0, 14],
     s: { down: 0.2, up: 0.2, side: 0.45 }, views: { side: { mirror: true } }
   }),
-  held('arco', 'Arco', 'Armas', C(['Corda', 'osso'], ['Madeira', 'madeira'], ['Empunhadura', 'couro']), {
+  held('arco', 'Arco curto', 'Armas', C(['Corda', 'osso'], ['Madeira', 'madeira'], ['Empunhadura', 'couro']), {
     rows: ['..dD', '.d.z', 'dc.0', 'c..0', 'c..0', 'C..0', 'C..0', 'c..0', 'c..0', 'dc.0', '.d.z', '..dD'], grip: [0, 5], gripChars: 'C', dx: -1,
     s: { down: 0, side: 0.15, up: 0 }
   }),
@@ -123,6 +123,60 @@ export const HELD = [
     // de frente o escudo cobre o antebraco; de lado vira um gomo na frente do peito
     rows: ['CDDDDDC', 'D33b32B', 'D3bbb2B', 'D33b32B', 'C33b21B', '.C3b2B.', '.C321B.', '..CBB..', '...B...'], grip: [3, 5], gripChars: '', s: { down: 0, up: 0 },
     views: { side: { rows: ['.D.', 'D3B', 'D3B', 'Db2', 'D2B', 'D2B', 'D1B', '.B.'], grip: [1, 3], s: { side: 0 }, dx: -2 }, up: { dx: -1 } }
+  }),
+
+  // ---- as 29 armas do livro que faltavam (24/10): nomes iguais aos do banco ('Ataque: ...') ----
+  held('faca-de-caca', 'Faca de caça', 'Armas', ARMA('aco', 'madeira', 'ferro'), {
+    rows: ['.4.', '443', '432', '.32', 'DCB', '.c.', '.b.'], grip: [1, 5], s: { down: 0.5, side: 0.6 }
+  }),
+  held('espada-curta', 'Espada curta', 'Armas', ARMA('ferro', 'couro', 'bronze'), {
+    rows: ['.4.', '.43', '.43', '.43', '.32', 'DCB', '.c.', '.b.', '.D.'], grip: [1, 6]
+  }),
+  held('montante', 'Montante', 'Armas', ARMA('aco', 'couro-escuro', 'ferro'), {
+    rows: ['..4..', '.443.', '.443.', '.443.', '.443.', '.443.', '.443.', '.443.', '.443.', '.443.', '.332.', 'EDDDC', '..c..', '..b..', '..c..', '..b..', '..D..'], grip: [2, 13], s: { down: 0.3, side: 0.55, up: 0.3 }
+  }),
+  held('machadinha', 'Machadinha', 'Armas', ARMA('ferro', 'madeira', 'ferro'), {
+    rows: ['.43d', '432c', '.21c', '...c', '...b', '...a'], grip: [3, 4]
+  }),
+  held('machado-de-guerra', 'Machado de guerra', 'Armas', ARMA('aco', 'madeira-escura', 'ferro'), {
+    rows: ['..4.d', '.443d', '4443c', '4432D', '4321c', '.321d', '..1.c', '....d', '....c', '....d', '....c', '....b', '....a'], grip: [4, 10], s: { down: 0.3, side: 0.5, up: 0.3 }
+  }),
+  held('alabarda', 'Alabarda', 'Armas', ARMA('aco', 'madeira', 'ferro'), {
+    rows: ['..4..', '..4..', '.443.', '4443d', '4432c', '.21.d', '...Cc', '...d.', '...c.', '...d.', '...c.', '...d.', '...c.', '...d.', '...c.', '...b.', '...c.', '...a.'], grip: [3, 14], s: { down: 0.25, side: 0.5, up: 0.25 }
+  }),
+  held('foice-curta', 'Foice', 'Armas', ARMA('aco', 'madeira', 'ferro'), {
+    rows: ['.443', '4..2', '3...', '43..', '.d..', '.c..', '.b..', '.a..'], grip: [1, 6]
+  }),
+  held('chicote', 'Chicote', 'Armas', C(['Tira', 'couro-escuro'], ['Cabo', 'couro'], ['Ponta', 'ferro']), {
+    // a tira cai enrolada ao lado do corpo
+    rows: ['..222.', '.2...2', '2.....', '2...2.', '.2.2..', '..c...', '..b...', '..a...'], grip: [2, 6], gripChars: 'abc', s: { down: 0.1, side: 0.2, up: 0.1 }
+  }),
+  held('bordao', 'Bordão', 'Armas', C(['Ponteira', 'ferro'], ['Madeira', 'madeira'], ['Faixa', 'couro']), {
+    rows: ['.A.', '.d.', '.c.', '.d.', '.c.', '.d.', '.C.', '.c.', '.d.', '.c.', '.d.', '.c.', '.C.', '.c.', '.d.', '.c.', '.d.', '.A.'], grip: [1, 12], s: { down: 0.15, side: 0.35, up: 0.15 }
+  }),
+  held('manoplas', 'Manoplas', 'Armas', C(['Placas', 'aco'], ['Couro', 'couro-escuro'], ['Cravos', 'ferro']), {
+    // cobre o punho inteiro: pega com zero pixels de "cabo" para a mao nao aparecer por cima
+    rows: ['C4C', '433', '321', 'bab'], grip: [1, 1], gripChars: '', s: { down: 0, side: 0, up: 0 }
+  }),
+  held('garras-de-ferro', 'Garras de ferro', 'Armas', C(['Lâminas', 'ferro'], ['Couro', 'couro-escuro'], ['Fivela', 'bronze']), {
+    rows: ['4.4.4', '4.4.4', '3.3.3', '2.2.2', 'bCbbb', '.bab.'], grip: [2, 4], gripChars: '', s: { down: 0.2, side: 0.3, up: 0.2 }
+  }),
+  held('arco-longo', 'Arco longo', 'Armas', C(['Corda', 'osso'], ['Madeira', 'madeira-escura'], ['Empunhadura', 'couro']), {
+    rows: ['...dD', '..d.z', '.d..0', 'dc..0', 'c...0', 'c...0', 'c...0', 'C...0', 'C...0', 'c...0', 'c...0', 'c...0', 'dc..0', '.d..0', '..d.z', '...dD'], grip: [0, 7], gripChars: 'C', dx: -1,
+    s: { down: 0, side: 0.12, up: 0 }
+  }),
+  held('besta-leve', 'Besta leve', 'Armas', C(['Virote', 'ferro'], ['Coronha', 'madeira'], ['Metal', 'ferro']), {
+    rows: ['B...B', 'CzDzC', '..4..', '..d..', '.dcb.', '..b..', '..a..'], grip: [2, 5], s: { down: 0.2, side: 0.3, up: 0.2 }
+  }),
+  held('funda', 'Funda', 'Armas', C(['Pedra', 'pedra'], ['Tira', 'couro'], ['Bolsa', 'couro-escuro']), {
+    // tira pendurada com a bolsinha e a pedra embaixo da mao
+    rows: ['.a.', '.b.', '.c.', 'b.c', 'b.c', 'CDC', '343', '.2.'], grip: [1, 0], gripChars: 'a', s: { down: 0, side: 0, up: 0 }, dy: 1
+  }),
+  held('dardos', 'Dardos', 'Armas', C(['Pontas', 'aco'], ['Hastes', 'madeira'], ['Penas', 'carmesim']), {
+    rows: ['4.4.4', '3.3.3', 'd.d.d', '.ddd.', '..c..', '.EDE.', '..E..'], grip: [2, 4], s: { down: 0.4, side: 0.5, up: 0.4 }
+  }),
+  held('azagaia', 'Azagaia', 'Armas', ARMA('ferro', 'madeira', 'couro'), {
+    rows: ['.4.', '.4.', '432', '.2.', '.d.', '.c.', '.d.', '.C.', '.c.', '.d.', '.c.', '.d.', '.b.', '.a.'], grip: [1, 9], s: { down: 0.35, side: 0.6, up: 0.35 }
   }),
 
   // ---- cajados e magia ----

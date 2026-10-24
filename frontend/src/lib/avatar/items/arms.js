@@ -9,14 +9,14 @@
 //
 // Legenda: a/b/c = canal com relevo automatico; A/B/C = brilho (tom 4);
 // x/y/z = tom 1 (vinco); X/Y/Z = tom 0 (sombra funda); m/n = b/c no tom 3;
-// k = pele; K = pele no tom 1 (cicatriz); w/W = branco 3/4; r = gema vermelha;
+// k = pele; K = pele no tom 0 (cicatriz: escura para ler na pele); w/W = branco 3/4; r = gema vermelha;
 // t = gema turquesa; o/O = ouro fixo (filete gravado).
 
 const LG = {
   A: ['a', 4], B: ['b', 4], C: ['c', 4],
   x: ['a', 1], y: ['b', 1], z: ['c', 1],
   X: ['a', 0], Y: ['b', 0], Z: ['c', 0],
-  m: ['b', 3], n: ['c', 3], k: ['skin', null], K: ['skin', 1],
+  m: ['b', 3], n: ['c', 3], k: ['skin', null], K: ['skin', 0],
   w: ['w', 3], W: ['w', 4],
   r: ['#d6455d', 3], R: ['#f08a8a', 4], t: ['#5ad1c8', 3], o: ['#e8b84a', 3], O: ['#e8b84a', 4],
   a: ['a', null], b: ['b', null], c: ['c', null]
@@ -149,8 +149,8 @@ export const ARMS = [
   mk('bracadeira-longa', 'Braçadeira longa de couro', S2, ['vinho', 'ocre', 'ouro'], [['b', -4, ['mmm', 'aaa', 'aCa', 'aaa', 'mmm'], 1, 'L']]),
 
   // ---- Pulseiras e braceletes ----
-  mk('pulseira-ouro', 'Pulseira de ouro', S3, ['couro', 'couro', 'ouro'], [['b', 0, ['cCc'], 1, 'L']]),
-  mk('pulseiras-contas', 'Pulseiras de contas', S3, ['couro', 'carmesim', 'ouro'], [['b', -1, ['mnm', 'nmn'], 1, 'both']]),
+  mk('pulseira-ouro', 'Pulseira de ouro', S3, ['couro', 'couro', 'ouro'], [['b', -1, ['WnZ', 'nzZ'], 1, 'L']]),
+  mk('pulseiras-contas', 'Pulseiras de contas', S3, ['couro', 'carmesim', 'ouro'], [['b', -1, ['Bnm', 'nYn'], 1, 'both']]),
   mk('braceletes-varios', 'Braceletes empilhados', S3, ['couro', 'couro', 'ouro'], [['b', -3, ['.Cc', '...', 'nCc', '.cC'], 1, 'L']]),
   mk('corrente-pulso', 'Corrente no pulso', S3, ['couro', 'couro', 'aco'], [['b', 0, ['ncz', 'n..', 'z..'], 1, 'R']]),
   mk('bracelete-serpente', 'Bracelete de serpente', S3, ['couro', 'couro', 'ouro'], [['t', 2, ['r..', 'cnc', '.zc', 'ncz'], 1, 'L']]),
@@ -160,14 +160,14 @@ export const ARMS = [
   mk('bracelete-gemas', 'Bracelete de gemas', S3, ['couro', 'couro', 'prata'], [['t', 3, ['nnn', 'tnr'], 1, 'R']]),
 
   // ---- Faixas e marcas ----
-  mk('bandagens-bracos', 'Bandagens nos braços', S4, ['linho', 'osso', 'ferro'], [['b', -3, ['aa', 'xa', 'ax', 'aa'], 0, 'both']]),
+  mk('bandagens-bracos', 'Bandagens nos braços', S4, ['branco-gasto', 'osso', 'ferro'], [['b', -3, ['Aaa', 'XxX', 'aAa', 'xXx'], 1, 'both']]),
   mk('braco-enfaixado', 'Braço enfaixado', S4, ['branco-gasto', 'sangue', 'ferro'], [['t', 0, ['aa', 'xa', 'aa', 'ax', 'ab', 'xa', 'aa'], 0, 'L']]),
   mk('fita-braco', 'Fita amarrada no braço', S4, ['couro', 'carmesim', 'ouro'], [['t', 3, ['mbb', 'b..', 'm..'], 1, 'L']]),
   mk('grilhoes', 'Grilhões', S4, ['couro', 'couro', 'ferro'], [['b', -1, ['ncc', 'zCz', '.n.'], 1, 'both']]),
-  mk('tatuagem-tribal', 'Tatuagem tribal', S4, ['anil', 'anil', 'ferro'], [['t', 3, ['.x', 'xx', 'x.', '.x'], 0, 'L', { up: [['x.', 'xx', '.x', 'x.'], 0] }]]),
-  mk('tatuagens-faixas', 'Tatuagens de faixas', S4, ['carvao', 'carvao', 'ferro'], [['t', 3, ['xx', '..', 'xx'], 0, 'both']]),
-  mk('runas-brilhantes', 'Runas brilhantes', S4, ['arcano', 'jade', 'ferro'], [['b', -3, ['B.', '.m', 'B.', '.B'], 0, 'L']]),
+  mk('tatuagem-tribal', 'Tatuagem tribal', S4, ['anil', 'anil', 'ferro'], [['t', 2, ['.X', 'Xx', 'x.', 'XX', '.X'], 0, 'L', { up: [['X.', 'xX', '.x', 'XX', 'X.'], 0] }]]),
+  mk('tatuagens-faixas', 'Tatuagens de faixas', S4, ['carvao', 'carvao', 'ferro'], [['t', 2, ['XX', '..', 'XX', '..', 'xx'], 0, 'both']]),
+  mk('runas-brilhantes', 'Runas brilhantes', S4, ['arcano', 'jade', 'ferro'], [['b', -3, ['B.', 'Wm', 'B.', 'yB'], 0, 'L']]),
   mk('fitas-pulsos', 'Fitas nos pulsos', S4, ['couro', 'rosa-seco', 'ouro'], [['b', -1, ['m..', 'bbb'], 1, 'both']]),
   mk('cicatriz-costurada', 'Cicatriz costurada', S4, ['couro', 'couro', 'ferro'], [['b', -3, ['wK', 'Kw', 'wK'], 0, 'R']]),
-  mk('marca-sangue', 'Marca de sangue', S4, ['sangue', 'sangue', 'ferro'], [['t', 4, ['xx', 'x.', 'xx'], 0, 'R']])
+  mk('marca-sangue', 'Marca de sangue', S4, ['sangue', 'sangue', 'ferro'], [['t', 3, ['xX', 'X.', 'xX', '.X'], 0, 'R']])
 ];

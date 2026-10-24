@@ -145,65 +145,88 @@ export const HANDS = [
   it('luvas-garras', 'Luvas com garras', GM, C3('couro-escuro', 'couro', 'osso'), glove({ len: 2, cuff: 'band', claws: 'short' })),
   it('garras-fera', 'Garras de fera', GM, C3('terra', 'camurca', 'osso'), glove({ len: 3, cuff: 'fur', claws: 'long' })),
   it('garras-metal', 'Garras de metal', GM, C3('ferro', 'ferro-negro', 'aco'), glove({ len: 1, cuff: 'plate', claws: 'talon', knuckle: 'plate' })),
-  it('tatuagem-mao', 'Tatuagem na mão', GM, ch(['Tinta', 'azul-noite']), mark('both', ({ hy, b, px, ox, ix }) => {
-    px(ox(hy), hy, 'a', 2); px(ix(b), b, 'a', 1); px(ox(b - 1), b - 1, 'a', 2);
+  // Marcas: cor saturada e varios px no antebraco (1 px de tinta sumia na pele).
+  it('tatuagem-mao', 'Tatuagem na mão', GM, ch(['Tinta', 'anil']), mark('both', ({ hy, b, px, ox, ix }) => {
+    px(ox(hy), hy, 'a', 1); px(ix(hy), hy, 'a', 2);
+    px(ix(b), b, 'a', 1); px(ox(b - 1), b - 1, 'a', 1); px(ix(b - 2), b - 2, 'a', 2);
   })),
-  it('tatuagem-tribal', 'Tatuagem tribal', GM, ch(['Tinta', 'carvao']), mark('both', ({ a, b, row, px, ox }) => {
+  it('tatuagem-tribal', 'Tatuagem tribal', GM, ch(['Tinta', 'carvao']), mark('both', ({ a, b, row, px, ox, ix }) => {
     for (const y of [b - 4, b - 2, b]) if (y >= a.top) row(y, 'a', 1);
-    px(ox(b - 3), b - 3, 'a', 1);
+    px(ox(b - 3), b - 3, 'a', 0); px(ix(b - 1), b - 1, 'a', 0);
   })),
-  it('henna', 'Henna', GM, ch(['Tinta', 'ferrugem']), mark('both', ({ hy, b, px, ox, ix }) => {
-    px(ix(hy), hy, 'a', 2); px(ox(hy + 1), hy + 1, 'a', 3); px(ox(b), b, 'a', 2); px(ix(b - 1), b - 1, 'a', 2); px(ox(b - 2), b - 2, 'a', 3);
+  it('henna', 'Henna', GM, ch(['Tinta', 'sangue']), mark('both', ({ hy, b, px, ox, ix }) => {
+    px(ix(hy), hy, 'a', 1); px(ox(hy + 1), hy + 1, 'a', 2); px(ox(b), b, 'a', 1); px(ix(b - 1), b - 1, 'a', 2); px(ox(b - 2), b - 2, 'a', 1); px(ix(b - 3), b - 3, 'a', 2);
   })),
-  it('unhas-pintadas', 'Unhas pintadas', GM, ch(['Esmalte', 'carmesim']), mark('both', ({ hy, row }) => row(hy + 1, 'a', 3))),
+  // unhas: a ponta dos dedos inteira + 1 px saindo da mao (ganha contorno)
+  it('unhas-pintadas', 'Unhas pintadas', GM, ch(['Esmalte', 'carvao']), mark('both', ({ hy, px, ox, ix }) => { px(ox(hy + 1), hy + 1, 'a', 3); px(ix(hy + 1), hy + 1, 'a', 1); })),
   it('unhas-longas', 'Unhas longas', GM, ch(['Esmalte', 'arcano']), mark('both', ({ hy, px, ox, ix }) => {
-    px(ox(hy + 1), hy + 1, 'a', 3); px(ix(hy + 1), hy + 1, 'a', 2); px(ox(hy + 1), hy + 2, 'a', 4); px(ix(hy + 1), hy + 2, 'a', 3);
+    px(ox(hy + 1), hy + 1, 'a', 3); px(ix(hy + 1), hy + 1, 'a', 1); px(ox(hy + 1), hy + 2, 'a', 4); px(ix(hy + 1), hy + 2, 'a', 2);
   })),
-  it('marca-runica', 'Marca rúnica', GM, ch(['Brilho', 'jade']), mark('both', ({ hy, b, px, ox, ix }) => {
-    px(ox(hy), hy, 'a', 4); px(ix(hy), hy, 'a', 3); px(ox(b), b, 'a', 3); px(ix(b - 1), b - 1, 'a', 2); px(ox(b - 2), b - 2, 'a', 3);
+  // runa que brilha: tons altos + branco no centro, numa cor fria (le sobre pele quente)
+  it('marca-runica', 'Marca rúnica brilhante', GM, ch(['Brilho', 'jade']), mark('both', ({ hy, b, px, ox, ix }) => {
+    px(ox(hy), hy, 'a', 3); px(ix(hy), hy, 'a', 1);
+    px(ox(b), b, 'a', 3); px(ix(b - 1), b - 1, 'w', 4); px(ox(b - 1), b - 1, 'a', 4); px(ix(b - 2), b - 2, 'a', 3); px(ox(b - 2), b - 2, 'a', 1);
   })),
   it('maos-pintadas', 'Mãos de guerra', GM, ch(['Tinta', 'sangue']), mark('both', ({ hy, b, row, px, ix }) => {
-    row(hy, 'a', 2); row(hy + 1, 'a', 2); px(ix(b), b, 'a', 1); px(ix(b - 2), b - 2, 'a', 1);
+    row(hy, 'a', 2); row(hy + 1, 'a', 1); px(ix(b), b, 'a', 1); px(ix(b - 2), b - 2, 'a', 1);
   })),
-  it('cicatrizes', 'Cicatrizes', GM, ch(['Cicatriz', 'rosa-seco']), mark('both', ({ b, px, ox, ix }) => {
-    px(ox(b - 1), b - 1, 'a', 3); px(ix(b - 2), b - 2, 'a', 2); px(ox(b - 3), b - 3, 'a', 3); px(ix(b - 4), b - 4, 'a', 2);
+  // cicatriz: tom 0 (bem escuro) e 3 px em diagonal, com um ponto de costura claro
+  it('cicatrizes', 'Cicatrizes', GM, ch(['Cicatriz', 'sangue']), mark('both', ({ b, px, ox, ix }) => {
+    px(ox(b - 1), b - 1, 'a', 0); px(ix(b - 2), b - 2, 'a', 0); px(ox(b - 3), b - 3, 'a', 0); px(ox(b - 2), b - 2, 'skin', 4);
   })),
   // ---- Faixas ----
-  it('faixas-mao', 'Faixas nas mãos', FX, ch(['Pano', 'linho'], ['Sombra', 'osso']), mark('both', ({ hy, b, row, px, ox, ix, d }) => {
+  it('faixas-mao', 'Faixas nas mãos', FX, ch(['Pano', 'linho'], ['Sombra', 'couro']), mark('both', ({ hy, b, row, px, ox, ix, d }) => {
     row(hy, 'a', 3); row(b, 'a', 2); row(b - 1, 'a', 3);
-    px(ix(b), b, 'b', 2); px(ox(hy), hy, 'b', 4);
-    px(ox(b) + d, b, 'a', 2); px(ox(b) + d, b + 1, 'a', 1); // ponta solta
+    px(ix(b), b, 'b', 1); px(ix(hy), hy, 'b', 1);
+    px(ox(b) + d, b, 'a', 3); px(ox(b) + d, b + 1, 'a', 1); // ponta solta
   })),
   it('bandagens', 'Bandagens', FX, ch(['Pano', 'branco-gasto'], ['Mancha', 'sangue']), mark('both', ({ a, hy, b, row, px, ox, ix }) => {
-    for (let y = Math.max(a.top, b - 4); y <= hy; y++) row(y, 'a', (y % 2) ? 3 : 2);
+    for (let y = Math.max(a.top, b - 4); y <= hy; y++) row(y, 'a', (y % 2) ? 3 : 1);
     px(ix(b - 2), b - 2, 'b', 2); px(ox(hy), hy, 'b', 1);
   })),
   it('faixas-lutador', 'Faixas de lutador', FX, ch(['Pano', 'carmesim'], ['Cruzado', 'osso']), mark('both', ({ hy, b, row, px, ox, ix }) => {
-    row(hy, 'a', 3); row(b, 'a', 3); row(b - 1, 'a', 2);
+    row(hy, 'a', 3); row(b, 'a', 3); row(b - 1, 'a', 1);
     px(ox(hy), hy, 'b', 4); px(ix(b), b, 'b', 3); px(ox(b - 1), b - 1, 'b', 3);
   })),
-  it('pulseira-couro', 'Pulseira de couro', FX, ch(['Couro', 'couro-escuro'], ['Rebites', 'prata']), mark('both', ({ b, row, px, ox }) => {
-    row(b, 'a', 2); row(b - 1, 'a', 3); px(ox(b - 1), b - 1, 'b', 4); px(ox(b), b, 'b', 3);
+  // pulseira grossa de couro: 3 linhas e 1 px para fora do braco (sai da silhueta)
+  it('pulseira-couro', 'Pulseira grossa de couro', FX, ch(['Couro', 'couro'], ['Rebites', 'prata']), mark('both', ({ b, row, px, ox, d }) => {
+    row(b, 'a', 1); row(b - 1, 'a', 3); row(b - 2, 'a', 2);
+    for (const y of [b - 2, b - 1, b]) px(ox(y) + d, y, 'a', y === b ? 0 : 2);
+    px(ox(b - 1), b - 1, 'w', 4); px(ox(b - 1) + d, b - 1, 'b', 3);
   })),
-  it('braceletes-finos', 'Braceletes finos', FX, ch(['Metal', 'ouro']), mark('both', ({ b, row }) => { row(b, 'a', 3); row(b - 2, 'a', 3); row(b - 4, 'a', 2); })),
-  it('pulseira-contas', 'Pulseira de contas', FX, ch(['Fio', 'couro'], ['Contas', 'jade']), mark('both', ({ b, px, ox, ix }) => {
-    px(ox(b), b, 'b', 4); px(ix(b), b, 'a', 2); px(ox(b - 1), b - 1, 'a', 3); px(ix(b - 1), b - 1, 'b', 2);
+  // braceletes: aro de metal com brilho branco de um lado e tom 0 do outro
+  it('braceletes-finos', 'Braceletes', FX, ch(['Metal', 'ouro']), mark('both', ({ b, px, ox, ix }) => {
+    for (const y of [b, b - 2]) { px(ox(y), y, 'w', 4); px(ix(y), y, 'a', 1); }
+    px(ox(b - 1), b - 1, 'a', 0); px(ix(b - 1), b - 1, 'a', 0);
   })),
-  it('corrente-mao', 'Corrente de mão', FX, ch(['Metal', 'prata'], ['Gema', 'carmesim']), mark('both', ({ hy, b, row, px, ox, ix }) => {
-    row(b, 'a', 3); px(ix(hy), hy, 'b', 4); px(ox(hy + 1), hy + 1, 'a', 4);
+  it('pulseira-contas', 'Pulseira de contas', FX, ch(['Fio', 'couro-escuro'], ['Contas', 'jade']), mark('both', ({ b, px, ox, ix, d }) => {
+    px(ox(b), b, 'b', 4); px(ix(b), b, 'b', 1); px(ox(b) + d, b, 'b', 2); px(ox(b - 1), b - 1, 'a', 0); px(ix(b - 1), b - 1, 'b', 3);
   })),
-  it('munhequeira', 'Munhequeira de pano', FX, ch(['Pano', 'azul-aco'], ['Listra', 'branco-gasto']), mark('both', ({ b, row }) => { row(b, 'a', 2); row(b - 1, 'b', 3); row(b - 2, 'a', 3); })),
+  it('corrente-mao', 'Corrente de mão', FX, ch(['Metal', 'prata'], ['Gema', 'carmesim']), mark('both', ({ hy, b, px, ox, ix }) => {
+    px(ox(b), b, 'a', 4); px(ix(b), b, 'a', 0); px(ix(hy), hy, 'b', 3); px(ox(hy), hy, 'a', 0); px(ox(hy + 1), hy + 1, 'a', 4);
+  })),
+  it('munhequeira', 'Munhequeira de pano', FX, ch(['Pano', 'azul-aco'], ['Listra', 'branco-gasto']), mark('both', ({ b, row }) => { row(b, 'a', 1); row(b - 1, 'b', 3); row(b - 2, 'a', 2); })),
   it('bracadeira-osso', 'Pulseira de ossos', FX, ch(['Cordão', 'couro-escuro'], ['Ossos', 'osso']), mark('both', ({ b, row, px, ox, d }) => {
-    row(b, 'a', 2); px(ox(b) + d, b, 'b', 4); px(ox(b) + d, b + 1, 'b', 2);
+    row(b, 'a', 1); px(ox(b) + d, b - 1, 'b', 4); px(ox(b) + d, b, 'b', 3); px(ox(b) + d, b + 1, 'b', 1);
   })),
   // ---- Anéis ----
-  it('anel-simples', 'Anel simples', AN, ch(['Metal', 'ouro']), mark('main', ({ hy, px, ix }) => { px(ix(hy), hy, 'a', 4); px(ix(hy + 1), hy + 1, 'a', 1); })),
-  it('anel-gema', 'Anel de gema', AN, ch(['Metal', 'ouro'], ['Gema', 'carmesim']), mark('main', ({ hy, px, ox }) => { px(ox(hy + 1), hy + 1, 'a', 3); px(ox(hy), hy, 'b', 4); })),
-  it('anel-sinete', 'Anel de sinete', AN, ch(['Metal', 'ouro'], ['Brasão', 'vinho']), mark('main', ({ hy, px, ox, ix }) => { px(ix(hy), hy, 'a', 4); px(ix(hy + 1), hy + 1, 'b', 1); px(ox(hy + 1), hy + 1, 'a', 2); })),
-  it('aneis-varios', 'Vários anéis', AN, ch(['Metal', 'ouro'], ['Gemas', 'jade']), mark('both', ({ hy, px, ox, ix }) => { px(ox(hy + 1), hy + 1, 'a', 4); px(ix(hy + 1), hy + 1, 'b', 3); px(ix(hy), hy, 'a', 3); })),
-  it('aneis-pares', 'Um anel em cada mão', AN, ch(['Metal', 'prata']), mark('both', ({ hy, px, ox }) => { px(ox(hy), hy, 'a', 4); px(ox(hy + 1), hy + 1, 'a', 2); })),
-  it('anel-polegar', 'Anel no polegar', AN, ch(['Metal', 'bronze']), mark('main', ({ hy, px, ox, d }) => { px(ox(hy) + d, hy, 'skin', 2); px(ox(hy) + d, hy + 1, 'a', 4); })),
-  it('anel-garra', 'Anel de garra', AN, ch(['Metal', 'prata']), mark('main', ({ hy, px, ox }) => { px(ox(hy + 1), hy + 1, 'a', 3); px(ox(hy + 1), hy + 2, 'a', 4); })),
-  it('soco-ingles', 'Soqueira', AN, ch(['Metal', 'ferro']), mark('main', ({ hy, row, px, ox, d }) => { row(hy, 'a', 3); px(ox(hy) + d, hy, 'a', 2); })),
-  it('aneis-cheios', 'Mão cheia de anéis', AN, ch(['Metal', 'ouro'], ['Gemas', 'carmesim']), mark('main', ({ hy, row, px, ox }) => { row(hy + 1, 'a', 3); px(ox(hy), hy, 'b', 3); }))
+  // A mao tem 2x2: o anel e uma faixa clara atravessando a linha dos dedos
+  // (brilho branco + tom 0); os maiores saem da mao para ganhar contorno.
+  it('anel-simples', 'Anel simples', AN, ch(['Metal', 'ouro']), mark('main', ({ hy, px, ox, ix }) => { px(ox(hy + 1), hy + 1, 'w', 4); px(ix(hy + 1), hy + 1, 'a', 1); })),
+  it('anel-gema', 'Anel de gema grande', AN, ch(['Metal', 'ouro'], ['Gema', 'carmesim']), mark('main', ({ hy, px, ox, ix, d }) => {
+    px(ix(hy + 1), hy + 1, 'a', 1); px(ox(hy + 1), hy + 1, 'a', 3);
+    px(ox(hy) + d, hy, 'b', 3); px(ox(hy) + d, hy + 1, 'b', 0); px(ox(hy) + d, hy - 1, 'w', 4); // gema 2 px + faisca
+  })),
+  it('anel-sinete', 'Anel de sinete', AN, ch(['Metal', 'ouro'], ['Brasão', 'vinho']), mark('main', ({ hy, px, ox, ix }) => { px(ox(hy), hy, 'b', 1); px(ix(hy), hy, 'a', 4); px(ox(hy + 1), hy + 1, 'a', 0); })),
+  it('aneis-varios', 'Vários anéis', AN, ch(['Metal', 'ouro'], ['Gemas', 'jade']), mark('both', ({ hy, px, ox, ix }) => { px(ox(hy + 1), hy + 1, 'w', 4); px(ix(hy + 1), hy + 1, 'b', 3); px(ix(hy), hy, 'a', 0); px(ox(hy), hy, 'a', 3); })),
+  it('aneis-pares', 'Um anel em cada mão', AN, ch(['Metal', 'prata']), mark('both', ({ hy, px, ox, ix }) => { px(ox(hy), hy, 'w', 4); px(ix(hy), hy, 'a', 0); })),
+  it('anel-polegar', 'Anel no polegar', AN, ch(['Metal', 'bronze']), mark('main', ({ hy, px, ox, d }) => { px(ox(hy) + d, hy, 'skin', 2); px(ox(hy) + d, hy + 1, 'a', 4); px(ox(hy) + d, hy + 2, 'a', 0); })),
+  it('anel-garra', 'Anel de garra', AN, ch(['Metal', 'prata']), mark('main', ({ hy, px, ox, ix }) => { px(ix(hy + 1), hy + 1, 'a', 0); px(ox(hy + 1), hy + 1, 'a', 3); px(ox(hy + 1), hy + 2, 'w', 4); px(ox(hy + 1), hy + 3, 'a', 1); })),
+  it('soco-ingles', 'Soqueira', AN, ch(['Metal', 'ferro']), mark('main', ({ hy, px, ox, ix, d }) => { px(ox(hy), hy, 'a', 4); px(ix(hy), hy, 'a', 2); px(ox(hy) + d, hy, 'a', 3); px(ox(hy) + d, hy + 1, 'a', 0); px(ix(hy) - d, hy, 'a', 1); })),
+  it('aneis-cheios', 'Mão cheia de anéis', AN, ch(['Metal', 'ouro'], ['Gemas', 'carmesim']), mark('main', ({ hy, px, ox, ix }) => { px(ox(hy + 1), hy + 1, 'w', 4); px(ix(hy + 1), hy + 1, 'a', 1); px(ox(hy), hy, 'b', 3); px(ix(hy), hy, 'a', 0); })),
+  // anel de pedra que brilha: gema alta saindo do dorso + faisca em cruz
+  it('anel-faisca', 'Anel cintilante', AN, ch(['Metal', 'prata'], ['Gema', 'azul-aco']), mark('main', ({ hy, px, ox, ix, d }) => {
+    px(ix(hy + 1), hy + 1, 'a', 0); px(ox(hy + 1), hy + 1, 'a', 4);
+    px(ox(hy) + d, hy, 'b', 4); px(ox(hy) + d, hy + 1, 'b', 1); px(ox(hy) + 2 * d, hy - 1, 'w', 4); px(ox(hy) + d, hy - 2, 'w', 3);
+  }))
 ];

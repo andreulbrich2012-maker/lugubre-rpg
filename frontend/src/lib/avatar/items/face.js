@@ -279,71 +279,82 @@ export const FACE_ACC = [
     views(L, P, [0, 5, ['221111111122', '21..1111..11', '11..1111..11', '.1........1.']], [0, 5, ['1111111', '1..1111', '1..111', '.1']]);
   }),
   mk('pintura-ritual', 'Pintura ritual', 'Marcas e cicatrizes', ch3('branco-gasto', 'Tinta', 'carmesim', 'Pontos', 'carmesim', 'Detalhe'), (L, P) => {
-    // linha na testa e riscos descendo do labio ao queixo
-    views(L, P, [3, 3, ['..32..', '..21..', '......', '......', '......', 'b....b', '......', '.3.2..']], [0, 3, ['32', '21', '', '', '', '.b', '', '3.2']]);
+    // linha na testa e riscos descendo do labio ao queixo; tinta clara no tom 4
+    // com borda no tom 1 (branco puro sobre pele clara nao lia)
+    views(L, P, [3, 3, ['..43..', '..31..', '......', '......', '......', 'c....c', '......', '.4.3..']], [0, 3, ['43', '31', '', '', '', '.c', '', '4.3']]);
   }),
   mk('pintura-meia-face', 'Pintura de meia-face', 'Marcas e cicatrizes', ch3('azul-aco', 'Tinta', 'azul-aco', 'Detalhe', 'azul-aco', 'Detalhe'), (L, P) => {
     // metade do rosto (o lado visivel no perfil) pintada, contornando o olho
     if (P.view === 'down') art(L, P, 6, 3, ['32222', '322221', '32..21', '32..21', '322221', '32221', '3221', '21']);
     if (P.view === 'side') art(L, P, 0, 3, ['.3222', '33222', '3..22', '3..22', '32222', '3222', '.221', '..21']);
   }),
-  mk('cicatriz-olho', 'Cicatriz no olho', 'Marcas e cicatrizes', ch3('rosa-seco', 'Cicatriz', 'rosa-seco', 'Detalhe', 'rosa-seco', 'Detalhe'), (L, P) => {
-    // risco vertical atravessando a sobrancelha e a bochecha, com pontos
-    views(L, P, [8, 3, ['.3', '.2', '31', '', '', '.2', '31', '.1']], [2, 3, ['.3', '.2', '31', '', '', '.2', '31', '.1']]);
+  // Cicatrizes: tom 0/1 (bem escuro) e 2-3 px seguidos; rosa claro sumia na pele.
+  mk('cicatriz-olho', 'Cicatriz no olho', 'Marcas e cicatrizes', ch3('sangue', 'Cicatriz', 'sangue', 'Detalhe', 'sangue', 'Detalhe'), (L, P) => {
+    // risco vertical atravessando a sobrancelha e a bochecha
+    views(L, P, [8, 3, ['.1', '.0', '0.', '', '', '.0', '01', '.1']], [2, 3, ['.1', '.0', '0.', '', '', '.0', '01', '.1']]);
   }),
-  mk('cicatriz-x', 'Cicatriz em X', 'Marcas e cicatrizes', ch3('rosa-seco', 'Cicatriz', 'rosa-seco', 'Detalhe', 'rosa-seco', 'Detalhe'), (L, P) => {
-    views(L, P, [8, 8, ['3.2', '.2.', '2.1']], [3, 8, ['3.2', '.2.', '2.1']]);
+  mk('cicatriz-x', 'Cicatriz em X', 'Marcas e cicatrizes', ch3('sangue', 'Cicatriz', 'sangue', 'Detalhe', 'sangue', 'Detalhe'), (L, P) => {
+    views(L, P, [8, 8, ['0.1', '.0.', '1.0']], [3, 8, ['0.1', '.0.', '1.0']]);
   }),
-  mk('cicatriz-nariz', 'Cicatriz no nariz', 'Marcas e cicatrizes', ch3('rosa-seco', 'Cicatriz', 'rosa-seco', 'Detalhe', 'rosa-seco', 'Detalhe'), (L, P) => {
+  mk('cicatriz-nariz', 'Cicatriz no nariz', 'Marcas e cicatrizes', ch3('sangue', 'Cicatriz', 'sangue', 'Detalhe', 'sangue', 'Detalhe'), (L, P) => {
     // corte atravessado na ponte do nariz, de bochecha a bochecha
-    views(L, P, [2, 8, ['3.....', '.3332', '.....21']], [-1, 8, ['3332', '....21']]);
+    views(L, P, [2, 8, ['1.....', '.0010', '.....01']], [-1, 8, ['0010', '....01']]);
   }),
   mk('cicatriz-garras', 'Marcas de garras', 'Marcas e cicatrizes', ch3('sangue', 'Cicatriz', 'sangue', 'Detalhe', 'sangue', 'Detalhe'), (L, P) => {
     // tres riscos paralelos em diagonal, como de um bicho grande
-    views(L, P, [7, 4, ['3.3.3', '.2.2.', '..2.2', '...1.', '....1']], [2, 4, ['3.3.3', '.2.2.2', '..2.2.2', '...1.1.1', '....1']]);
+    views(L, P, [7, 4, ['1.1.1', '.0.0.', '..0.0', '...0.', '....1']], [2, 4, ['1.1.1', '.0.0.0', '..0.0.0', '...0.0.1', '....1']]);
   }),
   mk('sardas', 'Sardas', 'Marcas e cicatrizes', ch3('terra', 'Sardas', 'terra', 'Detalhe', 'terra', 'Detalhe'), (L, P) => {
-    views(L, P, [1, 8, ['1.1....1.1', '.1..1....1']], [1, 8, ['1.1', '.1.1']]);
+    views(L, P, [1, 8, ['0.1....1.0', '.1..0....1']], [1, 8, ['0.1', '.1.0']]);
   }),
   mk('pinta', 'Pinta', 'Marcas e cicatrizes', ch3('couro-escuro', 'Pinta', 'couro-escuro', 'Detalhe', 'couro-escuro', 'Detalhe'), (L, P) => {
     views(L, P, [8, 9, ['0']], [2, 9, ['0']]);
   }),
-  mk('lagrima-tatuada', 'Lágrima tatuada', 'Marcas e cicatrizes', ch3('azul-noite', 'Tinta', 'azul-noite', 'Detalhe', 'azul-noite', 'Detalhe'), (L, P) => {
-    views(L, P, [9, 8, ['3', '1']], [3, 8, ['3', '1']]);
+  mk('lagrima-tatuada', 'Lágrima tatuada', 'Marcas e cicatrizes', ch3('anil', 'Tinta', 'anil', 'Detalhe', 'anil', 'Detalhe'), (L, P) => {
+    views(L, P, [9, 8, ['2', '0']], [3, 8, ['2', '0']]);
   }),
   mk('runas-testa', 'Runas na testa', 'Marcas e cicatrizes', ch3('arcano', 'Runas', 'arcano', 'Brilho', 'arcano', 'Detalhe'), (L, P) => {
     // runas que brilham (tons altos) logo acima das sobrancelhas
-    views(L, P, [2, 3, ['4.43.34.', '3.3..3.3', '.4.44.4.']], [0, 3, ['43.4', '3..3', '.44.']]);
+    views(L, P, [2, 3, ['4.43.34.', '2.2..2.2', '.4.44.4.']], [0, 3, ['43.4', '2..2', '.44.']]);
+  }),
+  // runa que brilha na bochecha: miolo branco, cor fria e saturada em volta
+  mk('runa-bochecha', 'Runa brilhante na bochecha', 'Marcas e cicatrizes', ch3('jade', 'Brilho', 'jade', 'Detalhe', 'jade', 'Detalhe'), (L, P) => {
+    views(L, P, [8, 7, ['.3.', '3w4', '.1.', '.2.']], [2, 7, ['.3.', '3w4', '.1.', '.2.']]);
   }),
   mk('terceiro-olho', 'Terceiro olho pintado', 'Marcas e cicatrizes', ch3('ouro', 'Tinta', 'jade', 'Íris', 'ouro', 'Detalhe'), (L, P) => {
-    views(L, P, [4, 2, ['.33.', '3dc2', '.21.']], [0, 2, ['3', 'd', '2']]);
+    views(L, P, [4, 2, ['.11.', '1da1', '.10.']], [0, 2, ['1', 'd', '0']]);
   }),
-  mk('pontos-tribais', 'Pontos tribais', 'Marcas e cicatrizes', ch3('ocre', 'Tinta', 'ocre', 'Detalhe', 'ocre', 'Detalhe'), (L, P) => {
+  mk('pontos-tribais', 'Pontos tribais', 'Marcas e cicatrizes', ch3('carmesim', 'Tinta', 'carmesim', 'Detalhe', 'carmesim', 'Detalhe'), (L, P) => {
     // fileiras de pontos nas macas do rosto e um no queixo
-    views(L, P, [0, 8, ['3.3....3.3', '.2......2.', '', '.....2']], [1, 8, ['3.3', '.2.', '', '2']]);
+    views(L, P, [0, 8, ['2.2....2.2', '.1......1.', '', '.....1']], [1, 8, ['2.2', '.1.', '', '1']]);
   }),
 
   // ================= Piercings =================
+  // Metal com brilho branco (w) e o tom 0 do metal ao lado: 2+ px que leem na pele.
   mk('argola-nariz', 'Argola no nariz', 'Piercings', ch3('ouro', 'Metal', 'ouro', 'Detalhe', 'ouro', 'Detalhe'), (L, P) => {
-    views(L, P, [6, 8, ['4', '21']], [-1, 7, ['3', '21']]);
+    views(L, P, [6, 8, ['w', '20']], [-1, 7, ['w', '20']]);
   }),
   mk('argola-septo', 'Argola no septo', 'Piercings', ch3('prata', 'Metal', 'prata', 'Detalhe', 'prata', 'Detalhe'), (L, P) => {
-    views(L, P, [4, 8, ['3..2', '.32.']], [-1, 8, ['32']]);
+    views(L, P, [4, 8, ['2..1', '.w0.']], [-1, 8, ['w0']]);
+  }),
+  // septo ornamentado: argola larga com gema pendurada por cima da boca
+  mk('septo-ornado', 'Septo ornamentado', 'Piercings', ch3('ouro', 'Metal', 'carmesim', 'Gema', 'ouro', 'Detalhe'), (L, P) => {
+    views(L, P, [4, 8, ['2..1', '3wd0', '.cb.']], [-1, 8, ['w', 'd', 'b']]);
   }),
   mk('piercing-sobrancelha', 'Piercing na sobrancelha', 'Piercings', ch3('prata', 'Metal', 'prata', 'Detalhe', 'prata', 'Detalhe'), (L, P) => {
-    views(L, P, [9, 4, ['4', '.', '2']], [3, 4, ['4', '.', '2']]);
+    views(L, P, [9, 4, ['w', '.', '0']], [3, 4, ['w', '.', '0']]);
   }),
   mk('piercing-labio', 'Piercing no lábio', 'Piercings', ch3('aco', 'Metal', 'aco', 'Detalhe', 'aco', 'Detalhe'), (L, P) => {
-    views(L, P, [6, 10, ['32']], [1, 10, ['3']]);
+    views(L, P, [6, 10, ['w0']], [1, 10, ['w', '0']]);
   }),
   mk('piercing-ponte', 'Piercing na ponte do nariz', 'Piercings', ch3('aco', 'Metal', 'aco', 'Detalhe', 'aco', 'Detalhe'), (L, P) => {
-    views(L, P, [5, 6, ['42']], [0, 5, ['4', '2']]);
+    views(L, P, [5, 6, ['w0']], [0, 5, ['w', '0']]);
   }),
   mk('corrente-nariz', 'Corrente do nariz à orelha', 'Piercings', ch3('ouro', 'Corrente', 'sangue', 'Gema', 'ouro', 'Detalhe'), (L, P) => {
-    // brinco no nariz ligado por uma correntinha ate a orelha
-    views(L, P, [6, 8, ['4....', '.3.2.2', '..2.2.1', '......1']], [-1, 7, ['b', '.3.2.2.2']]);
+    // brinco no nariz ligado por uma correntinha ate a orelha (alterna claro/escuro)
+    views(L, P, [6, 8, ['w....', '.0.3.0', '..3.0.3', '......0']], [-1, 7, ['w', '.0.3.0.3']]);
   }),
   mk('piercing-bochechas', 'Piercings nas bochechas', 'Piercings', ch3('ouro', 'Metal', 'jade', 'Gema', 'ouro', 'Detalhe'), (L, P) => {
-    views(L, P, [3, 9, ['c....c']], [3, 9, ['c']]);
+    views(L, P, [3, 9, ['e....e', 'a....a']], [3, 9, ['e', 'a']]);
   })
 ];

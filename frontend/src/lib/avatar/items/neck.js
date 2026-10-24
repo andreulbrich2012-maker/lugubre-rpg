@@ -3,10 +3,16 @@
 // ancora na linha de cima do tronco (P.torso.top) e no centro do corpo (11.5).
 // Colar = caminho em "U" (de frente), diagonal da nuca ao peito (perfil) ou
 // so a volta de tras (costas) + um pingente opcional na ponta do U.
+// Leitura (auditoria 24/10, secao 7): fio de 1 px em tons medios sumia sobre
+// roupa clara (linho/osso) e sobre carvao. Por isso o fio alterna um tom bem
+// escuro (le no claro) com um tom claro (le no escuro), e pingente/penduricalho
+// tem 2x2 ou mais, brilho branco (p) e contorno escuro proprio (ring()).
 // Canais: a = corrente/tecido principal (0-4), b = pingente/detalhe (a-e),
 // c = terceiro material (A-E). Legenda extra: p..s = branco, k = furo escuro.
 const LG = { p: ['w', 4], q: ['w', 3], r: ['w', 2], s: ['w', 1], k: ['#2a1c30', 1] };
 for (let i = 0; i < 5; i++) { LG[i] = ['a', i]; LG['abcde'[i]] = ['b', i]; LG['ABCDE'[i]] = ['c', i]; }
+// contorno sepia bem escuro (mesma familia do contorno do compositor)
+const OUT = ['#3a2230', 1];
 const CX = 11.5;
 
 function span(P, y) { return P.torso.rows.get(y) || [P.torso.x0, P.torso.x1]; }
@@ -49,35 +55,69 @@ function path(P, depth, hw = 2.5) {
   return joined(raw);
 }
 
-// Estilos de fio. i = indice no caminho (alterna tons para dar "contas"/elos).
+// Contorno escuro (esquerda, direita e baixo) onde a camada ainda esta vazia: o
+// pingente "descola" da roupa clara; sobre roupa escura o contorno some, mas ai
+// o brilho do pingente ja le sozinho. Em cima nao contorna (e onde entra o fio).
+function ring(L, cells) {
+  const mine = new Set(cells.map(([x, y]) => `${x},${y}`));
+  for (const [x, y] of cells) {
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1]]) {
+      const nx = x + dx, ny = y + dy;
+      if (mine.has(`${nx},${ny}`) || L.has(nx, ny)) continue;
+      L.px(nx, ny, OUT[0], OUT[1]);
+    }
+  }
+}
+// Arte em texto que devolve as celulas pintadas (para o ring()).
+function stamp(L, x0, y0, rows, cells) {
+  rows.forEach((row, dy) => [...row].forEach((ch, dx) => {
+    const v = LG[ch];
+    if (!v) return;
+    L.px(x0 + dx, y0 + dy, v[0], v[1]);
+    cells.push([x0 + dx, y0 + dy]);
+  }));
+}
+
+function stampRing(L, x, y, rows, cells) { stamp(L, x, y, rows, cells); ring(L, cells); }
+
+// Estilos de fio. i = indice no caminho. Todo fio alterna um tom escuro (0-1)
+// com um claro (3-4): um dos dois sempre contrasta com a roupa de baixo.
 function strand(L, P, st, pts) {
   const n = pts.length;
   pts.forEach(({ x, y }, i) => {
     const mid = i > 0 && i < n - 1;
     switch (st) {
-      case 'chain': L.px(x, y, 'a', i % 2 ? 1 : 3); break;
-      case 'cord': L.px(x, y, 'a', i % 2 ? 1 : 2); break;
-      case 'beads': L.px(x, y, i % 2 ? 'a' : 'b', i % 2 ? 1 : 3); break;
-      case 'pearls': L.px(x, y, 'w', i % 2 ? 2 : 4); break;
-      case 'thick': L.px(x, y, 'a', 3); L.px(x, y + 1, 'a', i % 2 ? 1 : 2); break;
-      case 'flowers': L.px(x, y, i % 3 === 1 ? 'c' : 'b', i % 3 === 1 ? 2 : i % 3 === 0 ? 4 : 3); if (i % 3 === 0 && mid && P.view !== 'up') L.px(x, y + 1, 'b', 1); break;
+      case 'chain': L.px(x, y, 'a', i % 2 ? 0 : 4); break;
+      case 'cord': L.px(x, y, 'a', i % 2 ? 0 : 2); break;
+      case 'beads': L.px(x, y, i % 2 ? 'a' : 'b', i % 2 ? 0 : 3); break;
+      case 'pearls': if (i % 2) L.px(x, y, 'a', 0); else L.px(x, y, 'w', 4); break;
+      case 'thick': L.px(x, y, 'a', i % 2 ? 3 : 4); L.px(x, y + 1, 'a', i % 2 ? 0 : 1); break;
+      case 'flowers': L.px(x, y, i % 3 === 1 ? 'c' : 'b', i % 3 === 1 ? 1 : i % 3 === 0 ? 4 : 2); if (i % 3 === 0 && mid && P.view !== 'up') L.px(x, y + 1, 'b', 0); break;
       case 'gold': L.px(x, y, 'a', 3); L.px(x, y - 1, 'a', 4); break;
       default: L.px(x, y, 'a', 2);
     }
   });
+  // fio fino ganha uma sombra escura logo abaixo (de frente): sem ela o fio
+  // claro some na camisa de linho. Sobre roupa escura a sombra nao aparece.
+  if (P.view === 'down' && THIN.has(st)) for (const { x, y } of pts) if (!L.has(x, y + 1)) L.px(x, y + 1, OUT[0], OUT[1]);
 }
+const THIN = new Set(['chain', 'cord', 'beads', 'pearls', 'flowers']);
 
 // Penduricalhos ao longo do fio (dentes, conchas, ossos, penas): so na frente.
+// Cada um tem 2+ px com brilho e ponta escura, e ganha contorno.
 function hangers(L, P, kind, pts) {
   if (P.view === 'up') return;
   const n = pts.length;
+  const cells = [];
   pts.forEach(({ x, y }, i) => {
     if (i === 0 || i === n - 1 || i % 2 !== (P.view === 'side' ? 1 : 0)) return;
-    if (kind === 'teeth') { L.px(x, y + 1, 'b', 4); L.px(x, y + 2, 'b', 2); }
-    if (kind === 'shells') { L.px(x, y + 1, 'b', 3); L.px(x + 1, y + 1, 'b', 2); L.px(x, y + 2, 'b', 1); }
-    if (kind === 'bones') { L.px(x, y + 1, 'b', 4); L.px(x, y + 2, 'b', 3); L.px(x, y + 3, 'b', 2); }
-    if (kind === 'feathers') { L.px(x, y + 1, 'b', 3); L.px(x, y + 2, 'b', 2); L.px(x, y + 3, 'c', 2); L.px(x, y + 4, 'c', 1); }
+    const put = (dx, dy, c, s) => { L.px(x + dx, y + dy, c, s); cells.push([x + dx, y + dy]); };
+    if (kind === 'teeth') { put(0, 1, 'w', 4); put(0, 2, 'b', 2); }
+    if (kind === 'shells') { put(0, 1, 'b', 4); put(1, 1, 'b', 2); put(0, 2, 'b', 1); }
+    if (kind === 'bones') { put(0, 1, 'w', 4); put(0, 2, 'b', 3); put(0, 3, 'b', 1); }
+    if (kind === 'feathers') { put(0, 1, 'b', 4); put(0, 2, 'b', 2); put(0, 3, 'c', 2); put(0, 4, 'c', 0); }
   });
+  ring(L, cells);
 }
 
 // Pingente na ponta do U. De perfil mostra so a metade da frente (fica fino).
@@ -85,32 +125,37 @@ function pendant(L, P, pts, rows) {
   if (P.view === 'up') return;
   const yb = Math.max(...pts.map((p) => p.y)) + 1;
   const w = rows[0].length;
+  const cells = [];
   if (P.view === 'side') {
-    const cw = Math.ceil(w / 2), fx = pts[pts.length - 1].x;
-    rows.forEach((row, dy) => [...row.slice(0, cw)].forEach((ch, dx) => { const v = LG[ch]; if (v) L.px(fx - cw + 1 + dx, yb + dy, v[0], v[1]); }));
-    return;
-  }
-  L.art(12 - Math.ceil(w / 2), yb, rows, LG);
+    const cw = Math.max(2, Math.ceil(w / 2)), fx = pts[pts.length - 1].x;
+    stamp(L, fx - cw + 1, yb, rows.map((r) => r.slice(0, cw)), cells);
+  } else stamp(L, 12 - Math.ceil(w / 2), yb, rows, cells);
+  ring(L, cells);
 }
 
+// Pingentes: todos com 2x2 ou mais, brilho branco (p) e o tom 0 da gema (a)
+// embaixo; os maiores (medalhao, sol, olho) tem silhueta propria.
 const PEND = {
-  gem: ['ed', 'dc', 'cb', '.b'],
-  cross: ['.e.', 'ddc', '.c.', '.b.'],
-  sun: ['d.c', '.e.', 'c.b'],
-  medal: ['.dc.', 'decb', 'dccb', '.bb.'],
-  key: ['.d.', 'd.c', '.c.', '.c.', '.cb'],
-  whistle: ['dcc', 'cbb'],
-  fang: ['ed', 'dc', 'c.'],
-  skull: ['ede', 'kdk', '.c.'],
-  moon: ['.d', 'c.', 'c.', '.b'],
-  eye: ['.dd.', 'dpAc', '.cb.'],
-  vial: ['.A', 'dq', 'eb', 'cb'],
-  rune: ['dcc', 'cEb', 'cbb'],
-  coin: ['.e.', 'dkc', '.b.'],
-  heart: ['e.d', 'dcb', '.b.'],
-  hourglass: ['ddd', '.q.', '.C.', 'ccb'],
-  crossSmall: ['.d.', 'dcb', '.b.', '.b.'],
-  ring: ['.d.', 'd.b', '.b.']
+  gem: ['.d.', 'pcb', 'dcb', '.a.'],
+  cross: ['.d.', 'pdb', '.c.', '.a.'],
+  sun: ['d.c', '.p.', 'cdb', 'b.a'],
+  medal: ['.dc.', 'pcCb', 'cCDa', '.ba.'],
+  key: ['pc', 'ba', '.c', '.b', 'ca'],
+  whistle: ['pck', 'cba'],
+  fang: ['pd', 'dc', 'cb', 'a.'],
+  skull: ['pde', 'kck', 'cbc', '.a.'],
+  moon: ['.pd', 'c..', 'c..', '.ba'],
+  eye: ['.dd.', 'dqAb', '.ba.'],
+  vial: ['.C', 'pd', 'dc', 'ba'],
+  rune: ['pcb', 'cEb', 'bba'],
+  coin: ['pdc', 'dkb', 'cba'],
+  heart: ['p.d', 'dcb', '.a.'],
+  hourglass: ['ddb', '.p.', '.C.', 'cba'],
+  crossSmall: ['.d.', 'pcb', '.b.', '.a.'],
+  ring: ['.d.', 'p.b', '.a.'],
+  drop: ['p', 'b'],
+  bigSun: ['..d..', '.pdc.', 'ddcba', '.cba.', '..a..'],
+  shield: ['pddc', 'dEEb', 'cEEa', '.ba.']
 };
 
 // ---- golas e faixas em volta do pescoco ----
@@ -191,14 +236,16 @@ export const NECK = [
   it('colar-ossos', 'Colar de ossos', CO, ch(['Cordão', 'couro-escuro'], ['Ossos', 'osso']), necklace({ strands: [['cord', 3, 3]], hang: 'bones' })),
   it('colar-penas', 'Colar de penas', CO, ch(['Cordão', 'couro'], ['Penas', 'ocre'], ['Pontas', 'carmesim']), necklace({ strands: [['cord', 2, 3]], hang: 'feathers' })),
   it('colar-camadas', 'Colares em camadas', CO, ch(['Metal', 'ouro'], ['Contas', 'carmesim']), necklace({ strands: [['chain', 1, 2], ['beads', 3, 3]] })),
-  it('guirlanda', 'Guirlanda de flores', CO, ch(['Fio', 'musgo'], ['Flores', 'rosa-seco'], ['Folhas', 'musgo']), necklace({ strands: [['flowers', 2, 3]], back: false })),
+  it('guirlanda', 'Guirlanda de flores', CO, ch(['Fio', 'musgo'], ['Flores', 'carmesim'], ['Folhas', 'musgo']), necklace({ strands: [['flowers', 2, 3]], back: false })),
   it('rosario', 'Rosário', CO, ch(['Contas', 'madeira'], ['Cruz', 'prata']), necklace({ strands: [['beads', 3]], pend: 'crossSmall' })),
-  it('corrente-longa', 'Corrente longa', CO, ch(['Metal', 'prata'], ['Gema', 'arcano']), necklace({ strands: [['chain', 5, 3]], pend: ['e', 'b'] })),
+  it('corrente-longa', 'Corrente longa', CO, ch(['Metal', 'prata'], ['Gema', 'arcano']), necklace({ strands: [['chain', 5, 3]], pend: ['pd', 'ba'] })),
   // ---- Amuletos ----
   it('pingente-gema', 'Pingente de gema', AM, ch(['Corrente', 'ouro'], ['Gema', 'carmesim']), necklace({ strands: [['chain', 2]], pend: 'gem' })),
   it('simbolo-sagrado', 'Símbolo sagrado', AM, ch(['Corrente', 'ouro'], ['Símbolo', 'ouro']), necklace({ strands: [['chain', 2]], pend: 'cross' })),
-  it('sol-radiante', 'Sol radiante', AM, ch(['Corrente', 'ouro'], ['Sol', 'abobora']), necklace({ strands: [['chain', 2]], pend: 'sun' })),
-  it('medalhao', 'Medalhão', AM, ch(['Corrente', 'ouro'], ['Medalhão', 'ouro']), necklace({ strands: [['chain', 3, 3]], pend: 'medal' })),
+  it('sol-radiante', 'Sol radiante', AM, ch(['Corrente', 'ouro'], ['Sol', 'abobora']), necklace({ strands: [['chain', 2]], pend: 'bigSun' })),
+  it('medalhao', 'Medalhão', AM, ch(['Corrente', 'ouro'], ['Medalhão', 'ouro'], ['Pedra', 'carmesim']), necklace({ strands: [['chain', 3, 3]], pend: 'medal' })),
+  it('brasao-pingente', 'Brasão de família', AM, ch(['Corrente', 'prata'], ['Moldura', 'prata'], ['Brasão', 'azul-aco']), necklace({ strands: [['chain', 2, 3]], pend: 'shield' })),
+  it('sol-pequeno', 'Sol pequeno', AM, ch(['Cordão', 'couro'], ['Sol', 'ouro']), necklace({ strands: [['cord', 2]], pend: 'sun' })),
   it('chave-pescoco', 'Chave no pescoço', AM, ch(['Cordão', 'couro'], ['Chave', 'bronze']), necklace({ strands: [['cord', 3]], pend: 'key' })),
   it('apito', 'Apito', AM, ch(['Cordão', 'linho'], ['Apito', 'prata']), necklace({ strands: [['cord', 2]], pend: 'whistle' })),
   it('presa-fera', 'Presa de fera', AM, ch(['Cordão', 'couro-escuro'], ['Presa', 'osso']), necklace({ strands: [['cord', 2]], pend: 'fang' })),
@@ -213,8 +260,11 @@ export const NECK = [
   // ---- Gargantilhas ----
   it('gargantilha-veludo', 'Gargantilha de veludo', GA, ch(['Fita', 'carvao'], ['Gema', 'carmesim']), (L, P) => {
     band(L, P, { h: 1, inset: 1 });
-    if (P.view === 'down') { L.px(11, P.torso.top + 1, 'b', 4); L.px(12, P.torso.top + 1, 'b', 2); }
-    if (P.view === 'side') L.px(P.torso.x0 + 1, P.torso.top + 1, 'b', 3);
+    // camafeu 2x2 com brilho e contorno: a fita escura some na roupa escura, a gema nao
+    const cells = [];
+    if (P.view === 'down') stamp(L, 11, P.torso.top + 1, ['pd', 'ba'], cells);
+    if (P.view === 'side') stamp(L, P.torso.x0, P.torso.top + 1, ['p', 'a'], cells);
+    ring(L, cells);
   }),
   it('coleira-espinhos', 'Coleira de espinhos', GA, ch(['Couro', 'couro-escuro'], ['Espinhos', 'aco']), (L, P) => {
     band(L, P, { h: 2 });
@@ -233,8 +283,12 @@ export const NECK = [
     if (P.view === 'side') { const fx = P.torso.x0 + 1; L.hline(fx, fx + 3, top, 'a', 3); L.px(fx - 1, top, 'a', 4); L.px(fx - 1, top + 1, 'a', 2); return; }
     const [a, b] = span(P, top);
     for (let x = a; x <= b; x++) L.px(x, top, 'a', x === a ? 4 : x === b ? 1 : 3);
-    if (P.view === 'down') { L.erase(11, top); L.erase(12, top); L.px(10, top + 1, 'a', 4); L.px(13, top + 1, 'a', 2); L.px(10, top, 'a', 3); L.px(13, top, 'a', 2); }
-    else L.px(12, top + 1, 'a', 1);
+    if (P.view === 'down') {
+      L.erase(11, top); L.erase(12, top);
+      // pontas do torque: bolotas 2 px com brilho branco e sombra escura embaixo
+      stampRing(L, 9, top, ['.3', 'p1'], []); stampRing(L, 13, top, ['3.', '10'], []);
+      for (let x = a; x <= b; x++) if (!L.has(x, top + 1)) L.px(x, top + 1, OUT[0], OUT[1]);
+    } else L.px(12, top + 1, 'a', 1);
   }),
   it('gorjal', 'Gorjal de placas', GA, ch(['Placas', 'aco'], ['Rebites', 'bronze']), (L, P) => {
     band(L, P, { dy0: -1, h: 4, grow: 1, tex: 'plate' });
@@ -244,8 +298,10 @@ export const NECK = [
   }),
   it('gargantilha-argola', 'Gargantilha de argola', GA, ch(['Couro', 'couro'], ['Argola', 'ferro']), (L, P) => {
     band(L, P, { h: 2, inset: 1 });
-    if (P.view === 'down') L.art(10, P.torso.top + 1, ['.dc.', 'd..b', '.cb.'], LG);
-    if (P.view === 'side') L.art(P.torso.x0, P.torso.top + 1, ['d.', '.c', 'b.'], LG);
+    const cells = [];
+    if (P.view === 'down') stamp(L, 10, P.torso.top + 1, ['.pd.', 'd..b', '.ba.'], cells);
+    if (P.view === 'side') stamp(L, P.torso.x0, P.torso.top + 1, ['p.', '.b', 'a.'], cells);
+    ring(L, cells);
   }),
   it('gargantilha-perolas', 'Gargantilha de pérolas', GA, ch(['Fecho', 'prata'], ['Gema', 'jade']), (L, P) => {
     band(L, P, { h: 2, inset: 1, tex: 'pearl' });

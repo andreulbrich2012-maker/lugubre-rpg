@@ -100,4 +100,9 @@ describe('plano de mapa', () => {
     const y = o.findIndex((row) => row.includes('Ù'));
     expect(r.map.layers.ground[y][o[y].indexOf('Ù')]).toMatch(/[ó~]/);
   });
+  it('mapa de neve: campo da vila continua branco e a mata vira pinheiro', () => {
+    const r = planToMap({ areas: [{ type: 'neve', rect: [0, 0, 1000, 1000] }, { type: 'campo', rect: [300, 300, 400, 400] }, { type: 'floresta', circle: [100, 100, 100] }] }, { cols: 80, rows: 60 });
+    expect(r.map.layers.ground[30].slice(36, 44)).toMatch(/^[*]+$/);
+    expect(r.map.layers.objects.join('')).not.toContain('T');
+  });
 });

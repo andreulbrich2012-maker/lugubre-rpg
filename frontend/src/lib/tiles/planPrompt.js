@@ -97,17 +97,18 @@ ${monsters ? '- "monsters": [{"name","x","y","hp"}] (até 12), em lugares onde d
 
 ${fromImage ? `PASSO A PASSO (faça nesta ordem)
 1. NOMES: leia a legenda (1, 2, 3...) e todo nome escrito no mapa → "pois".
-2. VILA: siga com o dedo a borda da vila (onde a mata termina) e faça uma "palicada" com esses pontos (repita o 1º no fim).
-3. CHÃO: mata fechada em volta de tudo → uma "floresta" do mapa inteiro [[0,0],[1000,0],[1000,1000],[0,1000]]. Se fora da vila há grama aberta, a "floresta" é só o contorno da mata fechada e árvores soltas = "bosque". "campo"/"clareira" para descampados; "rocha"/"montanha" onde houver; costa = "mar" até a borda + "areia" na praia.
+2. VILA: siga com o dedo a borda da vila e faça a cerca com esses pontos (repita o 1º no fim): muralha de pedra cinza = "muro"; troncos = "palicada"; sem cerca na imagem = nenhuma.
+3. CHÃO: olhe entre a vila e a borda da imagem. Árvores grudadas cobrindo tudo → uma "floresta" do mapa inteiro [[0,0],[1000,0],[1000,1000],[0,1000]]. Grama verde aberta → NADA de floresta do mapa inteiro: uma "floresta" (points) para CADA mancha de mata, "bosque" para árvores soltas. "campo"/"clareira" para descampados; "rocha"/"montanha" onde houver; costa = "mar" até a borda + "areia" na praia.
 4. ÁGUA: o rio principal é o mais largo. Ache ANTES onde as duas pontas dele tocam a moldura da imagem (ex.: sai pela direita → x=1000) e siga-o na MESMA direção até lá. Riacho/afluente = outro item que começa na borda ou na nascente e TERMINA num ponto do rio principal. Píer = "cais" da praia para dentro do mar.
 5. CAMINHOS: cada estrada até a borda (0 ou 1000); a estrada que contorna a vila também; ruas de "terra" da praça até cada grupo de casas.
 6. CASAS: um "bairro" para CADA amontoado de telhados, até os de 3–4 casas, do tamanho do amontoado (não junte dois). Vila pintada e apertada: "size":"pequena", "density":1.5.
-7. ESPECIAIS: em "buildings" cada prédio com nome e cada telhado diferente (templo, taverna junto à praça, capela, celeiro, estábulo, serraria...). Quadrado cercado com lápides = "cemiterio" (plantação tem fileiras de terra).
+7. ESPECIAIS: em "buildings" cada prédio com nome e cada telhado diferente (castelo = pedra cinza com torre, templo, taverna junto à praça, capela, celeiro, estábulo, serraria...). Quadrado cercado com lápides = "cemiterio" (plantação tem fileiras de terra).
 8. DETALHES: praça com fogueira grande, bancos e tochas em volta; mercado: área "terra" com barracas, tendas e carroça; placas nas saídas; troncos na serraria.
 9. CLIMA: igual ao da imagem (noite escura → "light": "noite"; tons sombrios → "style": "obscuro").
 
 CONFIRA ANTES DE RESPONDER
-[ ] a "palicada" contorna a vila
+[ ] a cerca/muro contorna a vila
+[ ] "floresta" do mapa inteiro só se fora da vila a imagem é mata fechada
 [ ] toda estrada e todo rio que saem do mapa terminam em 0 ou 1000, na MESMA borda da imagem
 [ ] 7+ bairros pequenos ou 30–60 construções no total
 [ ] pois = legenda + nomes escritos fora dela; nenhum nome do EXEMPLO
@@ -120,7 +121,7 @@ O pedido costuma ser curto e informal: complete com o que combina com ele (nomes
 4. Praça com fonte ou fogueira grande; mercado = área "terra" ao lado da praça com 4–6 barracas/tendas, caixotes e sacos.
 5. Estradas saem das bordas (0 ou 1000) até a praça; ruas de "terra" da praça a cada bairro; trilhas aos lugares afastados.
 6. Vila: "palicada" em volta das casas; cidade: "muro". Porto fica fora dela, ligado por estrada. Plantação com "cerca" e o celeiro AO LADO dela, nunca dentro.
-7. Como desenhar: morro = "montanha" circle raio 110 + "clareira" raio 60 no topo, a construção no centro; ponta de pedra = "rocha" entrando no mar; costa = "mar" numa borda (a praia é automática); porto = 3 "cais" de 120 da terra para dentro do mar (barcos automáticos); castelo = "castelo" grande dentro de um "muro" quadrado ~160x150, "torre" nos 4 cantos por dentro, "quartel" e "estabulo" no pátio, "praca" na frente; "em volta" = nos 4 lados; mina = "montanha" + "cabana" + carroça e trilha; acampamento = tendas, fogueira e caixotes numa "clareira".
+7. Como desenhar: morro = "montanha" circle raio 110 + "clareira" raio 60 no topo, a construção no centro; ponta de pedra = "rocha" entrando no mar; costa = "mar" numa borda (a praia é automática); porto = 3 "cais" de 120 da terra para dentro do mar (barcos automáticos); castelo = "castelo" grande dentro de um "muro" quadrado ~160x150, "torre" nos 4 cantos por dentro, "quartel" e "estabulo" no pátio, "praca" na frente; "em volta" = nos 4 lados; mina = "montanha" + "cabana" + carroça e trilha; acampamento = "clareira" raio 150 com 6–10 "tenda" em "buildings" em roda, "fogueira_grande" no meio, caixotes, barris, carroça e "palicada" em volta; mapa de mata: varie com 2–3 clareiras, "rocha" e "bosque".
 8. Clima do pedido (sombrio/assombrado → "style":"gotico" ou "obscuro", "light":"entardecer" ou "noite").
 9. Região grande (várias vilas): cada vila com praça, 5–8 bairros, prédios e cerca, ligadas por estradas curvas; vilas de tamanhos e formas diferentes (nada simétrico); o resto é floresta, campo, rio, lago ou montanha.
 

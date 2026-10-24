@@ -196,9 +196,13 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
       switch (a.type) {
         case 'floresta': forest[y * C + x] = 2; break;
         case 'bosque': forest[y * C + x] = 1; break; // mancha rala, ate dentro da floresta
-        case 'montanha': G[y][x] = 'é'; forest[y * C + x] = 3; if (rnd() < 0.05) setO(x, y, 'Þ'); break;
-        case 'rocha': G[y][x] = 'é'; forest[y * C + x] = 3; if (rnd() < 0.08) setO(x, y, 'o'); break;
-        case 'campo': G[y][x] = rnd() < 0.5 ? 'g' : 'á'; forest[y * C + x] = 0; if (rnd() < 0.05) setO(x, y, 'f'); break;
+        case 'montanha': if (G[y][x] !== '*' || d < 0.45) G[y][x] = 'é'; // na neve: pico de pedra, encosta branca forest[y * C + x] = 3; if (rnd() < 0.05) setO(x, y, 'Þ'); break;
+        case 'rocha': if (G[y][x] !== '*') G[y][x] = 'é'; forest[y * C + x] = 3; if (rnd() < 0.08) setO(x, y, 'o'); break;
+        case 'campo':
+          forest[y * C + x] = 0;
+          if (G[y][x] === '*') break; // campo no mapa de neve: chao aberto mas continua branco
+          G[y][x] = rnd() < 0.5 ? 'g' : 'á'; if (rnd() < 0.05) setO(x, y, 'f');
+          break;
         case 'neve': G[y][x] = '*'; break;
         case 'areia': G[y][x] = ':'; forest[y * C + x] = 0; break;
         case 'terra': G[y][x] = ','; forest[y * C + x] = 0; break;
@@ -576,8 +580,9 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     if (lock[i] || O[y][x] !== ' ' || !GRASSY.has(G[y][x])) continue;
     const f = forest[i];
     const p = f === 2 ? 0.62 : f === 1 ? 0.22 : f === 3 ? 0.35 : 0.02;
-    if (rnd() < p) O[y][x] = f === 3 ? (rnd() < 0.75 ? 'A' : 'o') : rnd() < (G[y][x] === '*' ? 0.8 : 0.4) ? 'A' : rnd() < 0.9 ? 'T' : 'b';
-    else if (f !== 2 && rnd() < 0.025) O[y][x] = rnd() < 0.5 ? 'f' : 'b';
+    const snow = G[y][x] === '*'; // na neve so pinheiro e arbusto (nada de flor nem arvore de folha)
+    if (rnd() < p) O[y][x] = f === 3 ? (rnd() < 0.75 ? 'A' : 'o') : snow || rnd() < 0.4 ? 'A' : rnd() < 0.9 ? 'T' : 'b';
+    else if (f !== 2 && rnd() < 0.025) O[y][x] = !snow && rnd() < 0.5 ? 'f' : 'b';
   }
 
   const style = STYLE_IDS.includes(strip(plan.style).replace(/_/g, '-')) ? strip(plan.style).replace(/_/g, '-') : undefined;

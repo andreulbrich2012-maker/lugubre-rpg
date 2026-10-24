@@ -534,6 +534,18 @@ export function registerCampaignV2Routes(router) {
     res.json(rows.filter((scene) => master || allowed.has(scene.id)).map((scene) => sceneView(scene, master)));
   });
 
+  // Cena onde esta o personagem do jogador (interior ou a cena no ar): a tela dele segue o token.
+  router.get('/:id/scenes/mine', async (req, res) => {
+    await requireCampaignMember(req.params.id, req.user);
+    const allowed = await playerSceneIds(req.params.id);
+    const { rows } = await query(
+      `${TOKEN_SELECT} where t.campaign_id = $1 and t.kind = 'character' and (ch.owner_id = $2 or t.controlled_by = $2) order by t.updated_at desc`,
+      [req.params.id, req.user.id]
+    );
+    const token = rows.find((row) => allowed.has(row.scene_id));
+    res.json({ sceneId: token?.scene_id || null });
+  });
+
   router.get('/:id/scenes/:sceneId', async (req, res) => {
     const { master } = await requireCampaignMember(req.params.id, req.user);
     res.json(sceneView(await loadScene(req.params.id, req.params.sceneId, master), master));

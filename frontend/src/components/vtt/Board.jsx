@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Crosshair, Eye, EyeOff, Footprints, Hand, LocateFixed, Minus, Plus, X } from 'lucide-react';
+import { Crosshair, DoorOpen, Eye, EyeOff, Footprints, Hand, Lock, LockOpen, LocateFixed, Minus, Plus, X } from 'lucide-react';
 import TileMapCanvas from './TileMapCanvas';
 import Crack from '../glass/Crack';
 import { buildingAt, isSolid, PICKUP_RANGE, tokenBuilding, tokenItemDistance } from '../../lib/tiles/format';
-import { roofCanvas } from '../../lib/tiles/render';
 import { detectBuildings } from '../../lib/tiles/compose';
-import { EAVE_SHADOW, roofRows } from '../../lib/tiles/roofs';
+import { ROOFS, ROOF_LABEL } from '../../lib/tiles/roofs';
+import { housePixels, doorColumn, WALLS, WALL_LABEL, wallOf } from '../../lib/tiles/house3d';
 import { getTile } from '../../lib/tiles/catalog';
 import AvatarSprite from '../avatar/AvatarSprite';
 import FxLayer from '../fx/FxLayer';
@@ -13,19 +13,25 @@ import ItemIcon from '../icons/ItemIcon';
 import MonsterSprite from '../monsters/MonsterSprite';
 import { monsterLook } from '../../lib/monsters/classify';
 
-// Telhado de uma construcao: canvas no tamanho nativo (16 px/celula), o CSS escala nitido.
-function Roof({ building, open, cell, onToggle }) {
+// Construcao 3D (estilo Stardew): fachada + telhado em perspectiva, desenhada uma vez no tamanho
+// nativo (16 px/celula) e ampliada nitida pelo CSS. z-index pela linha de baixo da pegada:
+// token atras (ao norte) fica escondido pela casa, token na frente passa por cima.
+function House({ building, tiles, light, open, cell }) {
   const ref = useRef(null);
-  useEffect(() => { if (ref.current) roofCanvas(building, ref.current); }, [building.w, building.h, building.roof]);
+  const img = useMemo(() => housePixels(building, tiles, { light }), [building, tiles, light]);
+  useEffect(() => {
+    const c = ref.current;
+    if (!c) return;
+    c.width = img.width;
+    c.height = img.height;
+    c.getContext('2d').putImageData(new ImageData(img.data, img.width, img.height), 0, 0);
+  }, [img]);
+  const k = cell / 16;
   return (
     <div
-      className={`vtt-roof ${open ? 'is-open' : ''}`}
-      style={{ left: building.x * cell, top: building.y * cell, width: building.w * cell, height: (roofRows(building.h) + EAVE_SHADOW / 16) * cell }}
-      role="button"
-      tabIndex={0}
-      aria-pressed={open}
-      aria-label={`${building.name || 'Construção'}: ${open ? 'interior à mostra' : 'telhado fechado'}. Enter alterna.`}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
+      className={`vtt-house ${open ? 'is-open' : ''}`}
+      style={{ left: building.x * cell, top: building.y * cell + img.offsetY * k, width: img.width * k, height: img.height * k, zIndex: 10 + (building.y + building.h) * 2 }}
+      aria-label={`${building.name || 'Construção'}${building.locked ? ' (trancada)' : ''}`}
     >
       <canvas ref={ref} aria-hidden="true" />
     </div>
@@ -55,7 +61,13 @@ export default function Board({
   myTokenId,
   onPickup,
   pickupBlock,
-  fxRef
+  fxRef,
+  onEnterBuilding,
+  onExitScene,
+  onPatchBuilding,
+  onCreateInterior,
+  onViewScene,
+  onPatchItem
 }) {
   const cell = scene?.grid_size || 70;
   const isTiles = scene?.map_kind === 'tiles' && scene?.tiles;
@@ -141,7 +153,9 @@ export default function Board({
   const myToken = tokens.find((t) => t.id === myTokenId);
   const myPos = myToken && (local[myToken.id] || { x: myToken.x, y: myToken.y });
   const myBuildingId = isTiles && myPos ? tokenBuilding(tilesWithRoofs, { ...myToken, ...myPos }, cell)?.id : null;
-  const roofOpen = useCallback((b) => roofToggle[b.id] ?? (b.id === myBuildingId || (isMaster && interiors)), [roofToggle, myBuildingId, isMaster, interiors]);
+  const roofOpen = useCallback((b) => (b.interior ? false : roofToggle[b.id] ?? (b.id === myBuildingId || (isMaster && interiors))), [roofToggle, myBuildingId, isMaster, interiors]);
+  const [housePop, setHousePop] = useState(null); // mestre: construcao clicada (painel)
+  const isInterior = Boolean(isTiles && scene?.parent_scene_id);
   const toggleRoof = useCallback((b) => setRoofToggle((cur) => ({ ...cur, [b.id]: !roofOpen(b) })), [roofOpen]);
   const underRoof = useCallback((x, y) => {
     const b = isTiles ? buildingAt(tilesWithRoofs, x, y) : null;
@@ -165,6 +179,17 @@ export default function Board({
       const half = ((myToken.size || 1) * cell) / 2;
       const cx = (pos.x + half) / cell;
       const cy = (pos.y + half) / cell;
+      // porta de uma construcao com interior: entra na outra cena (o servidor confere tranca e regras)
+      for (const b of buildings) {
+        if (!b.interior) continue;
+        const dx = b.x + doorColumn(b, scene.tiles);
+        const dy = b.y + b.h - 1;
+        if (Math.hypot(dx + 0.5 - cx, dy + 0.5 - cy) > 1.6) continue;
+        e.preventDefault();
+        if (b.locked && !isMaster) { setNotice(`${b.name || 'Construção'}: a porta está trancada.`); return; }
+        onEnterBuilding?.(b, isMaster ? myToken.id : undefined);
+        return;
+      }
       const g = scene.tiles.layers.ground;
       let door = null;
       for (let y = Math.floor(cy - 1.5); y <= Math.floor(cy + 1.5); y++) {
@@ -174,6 +199,12 @@ export default function Board({
           const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
           if (d <= PICKUP_RANGE && (!door || d < door.d)) door = { x, y, code, d };
         }
+      }
+      if (door && isInterior && (door.y === scene.tiles.rows - 1 || door.y === 0 || door.x === 0 || door.x === scene.tiles.cols - 1)) {
+        // porta da parede de fora do interior: volta para o mapa de fora
+        e.preventDefault();
+        onExitScene?.(isMaster ? myToken.id : undefined);
+        return;
       }
       if (door) {
         e.preventDefault();
@@ -188,7 +219,7 @@ export default function Board({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [myToken, visibleItems, cell, isTiles, scene?.tiles, toggleRoof, roofOpen]);
+  }, [myToken, visibleItems, cell, isTiles, scene?.tiles, toggleRoof, roofOpen, buildings, isMaster, isInterior, onEnterBuilding, onExitScene]);
 
   // Toque/clique sem arrastar: item abre o popover; construcao alterna o telhado.
   function onTap(p) {
@@ -196,8 +227,9 @@ export default function Board({
     const y = Math.floor(p.y / cell);
     if (itemsAt(x, y).length) { setPopover({ x, y }); return; }
     setPopover(null);
-    const b = isTiles ? buildingAt(tilesWithRoofs, x, y) : null;
-    if (b) toggleRoof(b);
+    const b = isTiles ? (buildingAt(tilesWithRoofs, x, y) || buildings.find((d) => x >= d.x && x < d.x + d.w && y >= d.y - 2 && y < d.y)) : null;
+    if (b && isMaster && scene.tiles.buildings?.some((d) => d.id === b.id)) { setHousePop(b.id); return; }
+    if (b && !b.interior) toggleRoof(b);
   }
 
   function onHover(event) {
@@ -271,10 +303,11 @@ export default function Board({
         const cy = Math.floor((y + 1) / cell) + dy;
         if (cx < 0 || cy < 0 || cx >= scene.tiles.cols || cy >= scene.tiles.rows) return true;
         if (isSolid(scene.tiles, cx, cy)) return true;
+        if (buildings.some((b) => b.interior && cx >= b.x && cy >= b.y && cx < b.x + b.w && cy < b.y + b.h)) return true;
       }
     }
     return false;
-  }, [isTiles, cell, scene]);
+  }, [isTiles, cell, scene, buildings]);
 
   // WASD / setas: anda com o token selecionado.
   const selected = tokens.find((t) => t.id === selectedId);
@@ -515,7 +548,7 @@ export default function Board({
                 aria-label={`${t.name}${t.hidden ? ' (oculto dos jogadores)' : ''}${active ? ', turno atual' : ''}`}
                 aria-pressed={t.id === selectedId}
                 className={`vtt-token absolute ${sprite || mlook ? 'is-sprite' : ''} ${t.id === selectedId ? 'is-selected' : ''} ${active ? 'is-active' : ''} ${t.hidden ? 'is-hidden' : ''} ${down ? 'is-down' : ''} ${targeting ? 'is-targetable' : ''}`}
-                style={{ left: pos.x, top: pos.y, width: size, height: size, '--tc': t.color || '#a4781a', transition: local[t.id] ? 'none' : 'left .25s cubic-bezier(.16,1,.3,1), top .25s cubic-bezier(.16,1,.3,1)' }}
+                style={{ left: pos.x, top: pos.y, width: size, height: size, zIndex: 11 + Math.floor((pos.y + size - 1) / cell) * 2, '--tc': t.color || '#a4781a', transition: local[t.id] ? 'none' : 'left .25s cubic-bezier(.16,1,.3,1), top .25s cubic-bezier(.16,1,.3,1)' }}
               >
                 {mlook ? (
                   <span key={fx?.n} className={`vtt-sprite ${fx?.n && fx?.hit ? 'hit-shake' : ''}`} style={{ width: size * (mlook.size / 16) * 0.9, height: size * (mlook.size / 16) * 0.9 }}>
@@ -541,10 +574,10 @@ export default function Board({
           })}
 
           {buildings.map((b) => (
-            <Roof key={b.id} building={b} cell={cell} open={roofOpen(b)} onToggle={() => toggleRoof(b)} />
+            <House key={b.id} building={b} tiles={scene.tiles} light={scene.tiles.light || 'dia'} cell={cell} open={roofOpen(b)} />
           ))}
 
-          <FxLayer ref={fxRef} width={width} height={height} cell={cell} onFrame={onFxFrame} className="pointer-events-none absolute left-0 top-0 z-[5]" />
+          <FxLayer ref={fxRef} width={width} height={height} cell={cell} onFrame={onFxFrame} className="pointer-events-none absolute left-0 top-0" style={{ zIndex: 900 }} />
 
           {fogOn && (
             <svg className="pointer-events-none absolute inset-0" width={width} height={height} aria-hidden="true">
@@ -565,6 +598,45 @@ export default function Board({
         </div>
       </div>
 
+      {housePop && isMaster && (() => {
+        const b = (scene.tiles.buildings || []).find((d) => d.id === housePop);
+        if (!b) return null;
+        return (
+          <div role="dialog" aria-label={`Construção: ${b.name}`} className="gothic-panel absolute right-16 top-3 z-20 w-72 max-w-[calc(100%-5rem)] rounded-md border-[3px] border-lead p-3 text-sm text-bone">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <p className="font-display text-lg">{b.name || 'Construção'}</p>
+              <button type="button" className="btn btn-glass !min-h-8 !w-8 !p-0" onClick={() => setHousePop(null)} aria-label="Fechar"><X size={15} /></button>
+            </div>
+            <button type="button" className={`btn w-full ${b.locked ? 'btn-lit' : 'btn-glass'}`} onClick={() => onPatchBuilding?.(b, { locked: !b.locked })}>
+              {b.locked ? <><Lock size={16} /> Trancada: clique para abrir</> : <><LockOpen size={16} /> Aberta: clique para trancar</>}
+            </button>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <label className="text-xs text-mist">Parede
+                <select className="field !mt-1 py-1 text-sm" value={wallOf(b)} onChange={(e) => onPatchBuilding?.(b, { wall: e.target.value })}>
+                  {WALLS.map((w) => <option key={w} value={w}>{WALL_LABEL[w]}</option>)}
+                </select>
+              </label>
+              <label className="text-xs text-mist">Telhado
+                <select className="field !mt-1 py-1 text-sm" value={b.roof} onChange={(e) => onPatchBuilding?.(b, { roof: e.target.value })}>
+                  {ROOFS.map((r) => <option key={r} value={r}>{ROOF_LABEL[r]}</option>)}
+                </select>
+              </label>
+            </div>
+            {b.interior ? (
+              <button type="button" className="btn btn-glass mt-2 w-full" onClick={() => { setHousePop(null); onViewScene?.(b.interior); }}><DoorOpen size={16} /> Ver o interior</button>
+            ) : (
+              <button type="button" className="btn btn-glass mt-2 w-full" onClick={() => onCreateInterior?.(b)}><DoorOpen size={16} /> Criar interior (outro mapa)</button>
+            )}
+            <p className="mt-2 text-xs text-mist">Jogadores entram chegando na porta e apertando E. Trancada, ninguém entra.</p>
+          </div>
+        );
+      })()}
+      {isMaster && isInterior && (
+        <button type="button" className="btn btn-glass absolute left-3 top-3 z-20 !min-h-9 text-sm" onClick={() => onViewScene?.(scene.parent_scene_id)}><DoorOpen size={16} /> Voltar para fora</button>
+      )}
+      {!isMaster && isInterior && !notice && (
+        <p className="pointer-events-none absolute left-3 top-3 z-10 border-2 border-lead bg-abyss/85 px-2 py-1 text-xs text-mist">Para sair, vá até a porta e aperte E</p>
+      )}
       {popover && (() => {
         const here = itemsAt(popover.x, popover.y);
         if (!here.length) return null;
@@ -595,6 +667,13 @@ export default function Board({
                         </button>
                         {reason && <p className="mt-1 text-xs text-ember">{reason}</p>}
                       </>
+                    )}
+                    {isMaster && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        <button type="button" className={`btn !min-h-8 text-xs ${it.pickable === false ? 'btn-glass' : 'btn-lit'}`} onClick={() => onPatchItem?.(it, { pickable: it.pickable === false })} aria-pressed={it.pickable !== false}>{it.pickable === false ? 'Não pegável' : 'Pegável'}</button>
+                        <button type="button" className={`btn !min-h-8 text-xs ${it.hidden ? 'btn-lit' : 'btn-glass'}`} onClick={() => onPatchItem?.(it, { hidden: !it.hidden })} aria-pressed={Boolean(it.hidden)}>{it.hidden ? 'Escondido' : 'Visível'}</button>
+                        {it.note && <p className="w-full text-xs text-ember">Nota: {it.note}</p>}
+                      </div>
                     )}
                     {isMaster && (nearChars.length ? (
                       <div className="mt-1 flex flex-wrap gap-1">

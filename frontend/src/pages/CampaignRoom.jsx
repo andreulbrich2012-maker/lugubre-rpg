@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fxFromRoll, fxFromHit } from '../lib/fx/sync';
+import { normalizeRules, playerRights } from '../lib/tableRules';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Copy, Crown, Swords, X } from 'lucide-react';
 import Alert from '../components/Alert';
@@ -50,6 +51,7 @@ export default function CampaignRoom() {
   const [sheet, setSheet] = useState(null);
   const [scenes, setScenes] = useState([]);
   const [viewSceneId, setViewSceneId] = useState(null);
+  const [rules, setRules] = useState(() => normalizeRules({}));
   const [scene, setScene] = useState(null);
   const [tokens, setTokens] = useState([]);
   const [npcs, setNpcs] = useState([]);
@@ -95,7 +97,10 @@ export default function CampaignRoom() {
   const loadScenes = useCallback(async (keepView) => {
     const { data } = await api.get(`/campaigns/${id}/scenes`);
     setScenes(data);
+    // jogador: a tela segue o mapa onde esta o personagem dele (pode ser o interior de uma casa)
+    const mine = stateRef.current.isMaster ? null : await api.get(`/campaigns/${id}/scenes/mine`).then((r) => r.data.sceneId).catch(() => null);
     setViewSceneId((cur) => {
+      if (mine && data.some((s) => s.id === mine)) return mine;
       if (keepView && cur && data.some((s) => s.id === cur)) return cur;
       return (data.find((s) => s.is_active) || data[0])?.id || null;
     });
@@ -132,6 +137,7 @@ export default function CampaignRoom() {
           loadNotes(),
           loadScenes(false),
           loadSheet(me),
+          api.get(`/campaigns/${id}/rules`).then(({ data: r }) => !cancelled && setRules(normalizeRules(r))).catch(() => null),
           data.isMaster ? loadNpcs() : null
         ]);
       } catch (err) {
@@ -152,7 +158,7 @@ export default function CampaignRoom() {
   }, []);
 
   const stateRef = useRef({});
-  stateRef.current = { isMaster, viewSceneId, myMember, sheet, sceneIds: scenes.map((s) => s.id), tokens, cell: scene?.grid_size || 70 };
+  stateRef.current = { isMaster, viewSceneId, myMember, sheet, sceneIds: scenes.map((s) => s.id), tokens, cell: scene?.grid_size || 70, userId: user?.id };
   // Animacoes de golpe/magia (lib/fx): o evento roll toca o ataque, o token:hit do mestre
   // toca o impacto; a semente e o rollId, entao todos veem as mesmas particulas.
   const fxRef = useRef(null);
@@ -195,6 +201,12 @@ export default function CampaignRoom() {
           else if (p.token?.scene_id === sid) setTokens((cur) => upsert(cur, p.token));
           break;
         case 'token:removed': setTokens((cur) => cur.filter((t) => t.id !== p.tokenId)); break;
+        case 'token:scene':
+          // meu personagem passou por uma porta: a tela vai junto para o outro mapa
+          if (!master && p.ownerId === stateRef.current.userId) setViewSceneId(p.to);
+          reload.scenes = true;
+          break;
+        case 'rules:updated': setRules(normalizeRules(p.rules)); break;
         case 'token:hit':
           if (p.view === 'owner') {
             if (mySheet) setSheet((s) => ({ ...s, life_current: p.life_current }));
@@ -255,13 +267,14 @@ export default function CampaignRoom() {
   const myToken = tokens.find((t) => t.kind === 'character' && sheet && t.character_id === sheet.id);
   const isMyTurn = Boolean(myToken && turnTokenId === myToken.id);
 
+  const rights = useMemo(() => playerRights(rules, user?.id), [rules, user?.id]);
   const canMove = useCallback((t) => {
     if (isMaster) return true;
     const mine = t.owner_id === user?.id || t.controlled_by === user?.id || (sheet && t.character_id === sheet.id);
-    if (!mine) return false;
-    if (scene?.mode === 'exploration') return true;
+    if (!mine || !rights.move) return false;
+    if (scene?.mode === 'exploration') return !rights.turn || rights.turn === t.id;
     return scene?.mode === 'combat' && t.id === turnTokenId;
-  }, [isMaster, user?.id, sheet, scene?.mode, turnTokenId]);
+  }, [isMaster, user?.id, sheet, scene?.mode, turnTokenId, rights]);
 
   const budget = useCallback((t, pos) => {
     if (isMaster || scene?.mode !== 'combat') return true;
@@ -273,6 +286,9 @@ export default function CampaignRoom() {
   // Mesmas regras do servidor, so para explicar no botao por que nao da para pegar.
   const pickupBlock = useCallback((item) => {
     if (!scene || scene.mode === 'prep') return 'A mesa está em preparação.';
+    if (item.pickable === false) return 'Este item não pode ser pego.';
+    if (!rights.pickup) return 'O mestre não liberou pegar itens agora.';
+    if (scene.mode !== 'combat' && rights.turn && rights.turn !== myToken?.id) return 'Agora é a vez de outro personagem.';
     if (!myToken) return 'Coloque seu personagem no mapa primeiro.';
     if (scene.mode === 'combat') {
       if (!isMyTurn) return 'Não é o seu turno.';
@@ -280,7 +296,42 @@ export default function CampaignRoom() {
     }
     if (tokenItemDistance(myToken, item, scene.grid_size || 70) > PICKUP_RANGE) return 'Chegue mais perto para pegar.';
     return null;
-  }, [scene, myToken, isMyTurn]);
+  }, [scene, myToken, isMyTurn, rights]);
+
+  // ---- portas, construcoes e itens (casas 3D com interior em outra cena) ----
+  const enterBuilding = useCallback(async (b, tokenId) => {
+    try {
+      const { data } = await api.post(`/campaigns/${id}/scenes/${viewSceneId}/buildings/${b.id}/enter`, tokenId ? { tokenId } : {});
+      setViewSceneId(data.sceneId);
+      loadScenes(true).catch(() => null);
+    } catch (err) { notify(err.response?.data?.message || 'Não deu para entrar.', 'error'); }
+  }, [id, viewSceneId, loadScenes, notify]);
+  const exitScene = useCallback(async (tokenId) => {
+    try {
+      const { data } = await api.post(`/campaigns/${id}/scenes/${viewSceneId}/exit`, tokenId ? { tokenId } : {});
+      setViewSceneId(data.sceneId);
+    } catch (err) { notify(err.response?.data?.message || 'Não deu para sair.', 'error'); }
+  }, [id, viewSceneId, notify]);
+  const patchBuilding = useCallback(async (b, patch) => {
+    try {
+      const { data } = await api.patch(`/campaigns/${id}/scenes/${viewSceneId}/buildings/${b.id}`, patch);
+      setScene((cur) => (cur && cur.id === data.id ? { ...cur, tiles: data.tiles } : cur));
+    } catch (err) { notify(err.response?.data?.message || 'Não deu para mudar a construção.', 'error'); }
+  }, [id, viewSceneId, notify]);
+  const createInterior = useCallback(async (b) => {
+    try {
+      const { data } = await api.post(`/campaigns/${id}/scenes/${viewSceneId}/buildings/${b.id}/interior`);
+      notify(`Interior criado: ${data.name}. Decore no editor de mapa.`);
+      await loadScenes(true);
+      loadScene(viewSceneId).catch(() => null);
+    } catch (err) { notify(err.response?.data?.message || 'Não deu para criar o interior.', 'error'); }
+  }, [id, viewSceneId, loadScenes, loadScene, notify]);
+  const patchMapItem = useCallback(async (it, patch) => {
+    try {
+      const { data } = await api.patch(`/campaigns/${id}/scenes/${viewSceneId}/items/${it.id}`, patch);
+      setScene((cur) => (cur && cur.id === data.id ? { ...cur, tiles: data.tiles } : cur));
+    } catch (err) { notify(err.response?.data?.message || 'Não deu para mudar o item.', 'error'); }
+  }, [id, viewSceneId, notify]);
 
   const pickup = useCallback(async (item, characterId) => {
     try {
@@ -496,6 +547,13 @@ export default function CampaignRoom() {
                 onPickup={pickup}
                 pickupBlock={pickupBlock}
                 fxRef={fxRef}
+                onEnterBuilding={enterBuilding}
+                onExitScene={exitScene}
+                onPatchBuilding={patchBuilding}
+                onCreateInterior={createInterior}
+                onViewScene={setViewSceneId}
+                onPatchItem={patchMapItem}
+                rights={rights}
               />
             ) : (
               <div className="grid h-full min-h-[50svh] place-items-center bg-[#050407] p-6 text-center">

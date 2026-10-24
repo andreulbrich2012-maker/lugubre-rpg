@@ -112,3 +112,7 @@ export function roofPixels({ w, h, roof }) {
   }
   return { width, height, data };
 }
+
+// Para a casa 3D (house3d.js): mesmas cores e o mesmo desenho de fiadas do telhado.
+export const ROOF_RGB = RGB;
+export const roofShade = (roof, x, y, ty) => shade(MATERIAL(PAL[roof] ? roof : 'telha'), x, y, ty);

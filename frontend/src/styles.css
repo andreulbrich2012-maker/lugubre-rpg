@@ -400,6 +400,11 @@ button.d20:not(:disabled):hover { filter: drop-shadow(0 0 22px rgb(var(--light) 
 @media (prefers-reduced-motion: reduce) { .vtt-loot.has-icon img { animation: none; } }
 .vtt-loot:focus-visible { outline: 3px double var(--color-ember); outline-offset: -4px; }
 @keyframes lootGlint { 0%, 100% { opacity: .7; box-shadow: 0 0 6px 1px rgba(240,176,74,.35); } 50% { opacity: 1; box-shadow: 0 0 14px 5px rgba(240,176,74,.7); } }
+/* Construcao 3D: o clique passa para o mapa (o Board decide pelo lugar clicado). */
+.vtt-house { position: absolute; pointer-events: none; }
+.vtt-house canvas { width: 100%; height: 100%; image-rendering: pixelated; transition: opacity .25s cubic-bezier(.16,1,.3,1); }
+.vtt-house.is-open canvas { opacity: .12; }
+@media (prefers-reduced-motion: reduce) { .vtt-house canvas { transition: none; } }
 /* Telhados: some/volta em 250 ms quando o interior abre. */
 .vtt-roof { position: absolute; pointer-events: none; }
 .vtt-roof canvas { width: 100%; height: 100%; image-rendering: pixelated; transition: opacity .25s cubic-bezier(.16,1,.3,1); filter: drop-shadow(0 5px 6px rgba(20,10,30,.55)); }

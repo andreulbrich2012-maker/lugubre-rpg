@@ -8,6 +8,7 @@ import { detectBuildings } from '../../lib/tiles/compose';
 import { EAVE_SHADOW, roofRows } from '../../lib/tiles/roofs';
 import { getTile } from '../../lib/tiles/catalog';
 import AvatarSprite from '../avatar/AvatarSprite';
+import FxLayer from '../fx/FxLayer';
 
 // Telhado de uma construcao: canvas no tamanho nativo (16 px/celula), o CSS escala nitido.
 function Roof({ building, open, cell, onToggle }) {
@@ -50,13 +51,27 @@ export default function Board({
   budget,
   myTokenId,
   onPickup,
-  pickupBlock
+  pickupBlock,
+  fxRef
 }) {
   const cell = scene?.grid_size || 70;
   const isTiles = scene?.map_kind === 'tiles' && scene?.tiles;
   const width = isTiles ? scene.tiles.cols * cell : scene?.width || cell * 24;
   const height = isTiles ? scene.tiles.rows * cell : scene?.height || cell * 16;
   const viewportRef = useRef(null);
+  const shakeRef = useRef(null);
+  const tokenEls = useRef({});
+  // Animacoes (lib/fx): tremida do mapa e empurrao/piscada dos tokens direto no estilo,
+  // sem setState a 60 fps.
+  const onFxFrame = useCallback(({ shake, tokens: moves }) => {
+    if (shakeRef.current) shakeRef.current.style.transform = shake && (shake.x || shake.y) ? `translate(${shake.x}px, ${shake.y}px)` : '';
+    for (const [id, el] of Object.entries(tokenEls.current)) {
+      if (!el) continue;
+      const m = moves?.[id];
+      el.style.translate = m && (m.x || m.y) ? `${m.x}px ${m.y}px` : '';
+      el.style.filter = m && m.flash > 0.5 ? 'brightness(3) saturate(0)' : '';
+    }
+  }, []);
   const [view, setView] = useState({ x: 0, y: 0, z: 1 });
   const [local, setLocal] = useState({});
   const localRef = useRef(local);
@@ -439,6 +454,7 @@ export default function Board({
         role="application"
         aria-label="Mesa virtual. Arraste para mover o mapa, roda do mouse para zoom, WASD para andar com o token selecionado, Alt+clique para marcar um ponto."
       >
+        <div ref={shakeRef} className="absolute inset-0">
         <div className="absolute left-0 top-0 origin-top-left" style={{ width, height, transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}>
           {isTiles ? (
             <TileMapCanvas map={scene.tiles} cellSize={cell} showGrid={Boolean(scene.show_grid)} className="absolute inset-0" />
@@ -484,6 +500,7 @@ export default function Board({
             return (
               <button
                 key={t.id}
+                ref={(el) => { tokenEls.current[t.id] = el; }}
                 type="button"
                 onPointerDown={(e) => onPointerDownToken(e, t)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && targeting) onTarget?.(t); }}
@@ -515,6 +532,8 @@ export default function Board({
             <Roof key={b.id} building={b} cell={cell} open={roofOpen(b)} onToggle={() => toggleRoof(b)} />
           ))}
 
+          <FxLayer ref={fxRef} width={width} height={height} cell={cell} onFrame={onFxFrame} className="pointer-events-none absolute left-0 top-0 z-[5]" />
+
           {fogOn && (
             <svg className="pointer-events-none absolute inset-0" width={width} height={height} aria-hidden="true">
               <defs>
@@ -530,6 +549,7 @@ export default function Board({
           {pings.map((p) => (
             <span key={p.id} className="vtt-ping" style={{ left: p.x, top: p.y, '--pc': p.color || 'var(--color-ember)' }} />
           ))}
+        </div>
         </div>
       </div>
 

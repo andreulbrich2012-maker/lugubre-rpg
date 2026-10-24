@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { fxFromRoll, fxFromHit } from '../lib/fx/sync';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Copy, Crown, Swords, X } from 'lucide-react';
 import Alert from '../components/Alert';
@@ -151,7 +152,11 @@ export default function CampaignRoom() {
   }, []);
 
   const stateRef = useRef({});
-  stateRef.current = { isMaster, viewSceneId, myMember, sheet, sceneIds: scenes.map((s) => s.id) };
+  stateRef.current = { isMaster, viewSceneId, myMember, sheet, sceneIds: scenes.map((s) => s.id), tokens, cell: scene?.grid_size || 70 };
+  // Animacoes de golpe/magia (lib/fx): o evento roll toca o ataque, o token:hit do mestre
+  // toca o impacto; a semente e o rollId, entao todos veem as mesmas particulas.
+  const fxRef = useRef(null);
+  const fxAttacks = useRef(new Map());
 
   const applyEvents = useCallback((events) => {
     const { isMaster: master, viewSceneId: sid, myMember: me, sheet: mySheet, sceneIds } = stateRef.current;
@@ -197,11 +202,25 @@ export default function CampaignRoom() {
           }
           if (p.sceneId === sid) {
             showHit(p);
+            {
+              const { tokens: toks, cell: c } = stateRef.current;
+              const imp = fxFromHit(p, { tokens: toks, cell: c, attack: fxAttacks.current.get(p.rollId) });
+              if (imp) fxRef.current?.impact(imp);
+            }
             setTokens((cur) => cur.map((t) => (t.id === p.tokenId ? { ...t, down: p.down, ...(p.hp_current != null ? { hp_current: p.hp_current } : {}) } : t)));
           }
           break;
         case 'roll':
           setRollQueue((q) => [...q, p]);
+          if (p.kind === 'attack' && p.targetTokenId) {
+            const { tokens: toks, cell: c } = stateRef.current;
+            const atk = fxFromRoll(p, { tokens: toks, cell: c, powers: [...(mySheet?.attacks || []), ...(mySheet?.spells || [])] });
+            if (atk) {
+              fxAttacks.current.set(p.rollId, atk);
+              if (fxAttacks.current.size > 20) fxAttacks.current.delete(fxAttacks.current.keys().next().value);
+              if (atk.phase === 'full') fxRef.current?.play(atk); else fxRef.current?.attack(atk);
+            }
+          }
           if (p.messageId && !p.secret) {
             setMessages((cur) => (cur.some((m) => m.id === p.messageId) ? cur : [...cur, { id: p.messageId, message_type: 'roll', meta: p, user_id: p.userId, user_name: p.userName, color: p.color, created_at: p.created_at }]));
           }
@@ -476,6 +495,7 @@ export default function CampaignRoom() {
                 myTokenId={myToken?.id}
                 onPickup={pickup}
                 pickupBlock={pickupBlock}
+                fxRef={fxRef}
               />
             ) : (
               <div className="grid h-full min-h-[50svh] place-items-center bg-[#050407] p-6 text-center">

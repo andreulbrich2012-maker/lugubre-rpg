@@ -66,21 +66,39 @@ export function shadeHex(hex, level) {
   return rgbToHex(hslToRgb([hh, ss, ll]));
 }
 
+// Pele (estilo Stardew): a sombra puxa para rosa/vinho quente e a luz para pessego,
+// nunca para azul-cinza como nos tecidos; senao o rosto parece doente.
+const SKIN_SHADOW = 345;
+export function skinShadeHex(hex, level) {
+  const [h, s, l] = rgbToHsl(hexToRgb(hex));
+  const steps = {
+    0: [towards(h, SKIN_SHADOW, 22), Math.min(1, s * 1.05 + 0.08), l * 0.55],
+    1: [towards(h, SKIN_SHADOW, 10), Math.min(1, s * 1.02 + 0.05), l * 0.8],
+    2: [h, s, l],
+    3: [towards(h, 40, 5), s * 0.95, l + (1 - l) * 0.22],
+    4: [towards(h, 45, 9), s * 0.85, l + (1 - l) * 0.45]
+  };
+  return rgbToHex(hslToRgb(steps[level] ?? steps[2]));
+}
+
 const rampCache = new Map();
 export function ramp(hex) {
   let r = rampCache.get(hex);
   if (!r) {
-    r = [0, 1, 2, 3, 4].map((lv) => shadeHex(hex, lv));
+    const skin = SKIN_HEXES.has(hex);
+    r = [0, 1, 2, 3, 4].map((lv) => (skin ? skinShadeHex(hex, lv) : shadeHex(hex, lv)));
     rampCache.set(hex, r);
   }
   return r;
 }
 
-// Contorno colorido: a cor vizinha bem escura e puxada para roxo (nunca preto puro).
+// Contorno no estilo Stardew: marrom-sepia quente misturado com um pouco da cor vizinha
+// (cabelo azul ganha contorno sepia-azulado, nunca preto puro nem roxo frio).
+const SEPIA = [52, 30, 34];
 export function outlineOf(rgb) {
   const [h, s, l] = rgbToHsl(rgb);
-  const [r, g, b] = hslToRgb([towards(h, 280, 40), Math.min(1, s * 0.7 + 0.18), Math.min(0.17, l * 0.3 + 0.04)]);
-  return [Math.round(r), Math.round(g), Math.round(b)];
+  const dark = hslToRgb([towards(h, 15, 25), Math.min(1, s * 0.6 + 0.2), Math.min(0.2, l * 0.3 + 0.06)]);
+  return dark.map((v, k) => Math.round(v * 0.4 + SEPIA[k] * 0.6));
 }
 
 export { hexToRgb, rgbToHex };
@@ -188,6 +206,9 @@ export const COLORS = [
   ['madeira', 'Madeira', '#8a5e3a'],
   ['madeira-escura', 'Madeira escura', '#4f3424']
 ].map(([id, name, hex]) => ({ id, name, hex }));
+
+// so as peles "de carne" ganham a rampa quente; pedra, penas e escamas ficam com a comum
+const SKIN_HEXES = new Set(SKINS.filter((c) => !['cinza-cinza', 'pedra', 'pena-negra', 'pena-parda', 'azul-palido', 'azul-profundo', 'marinha', 'lilas-noite', 'verde-gorak', 'musgo'].includes(c.id)).map((c) => c.hex));
 
 const byId = (list) => Object.fromEntries(list.map((c) => [c.id, c]));
 export const SKIN_BY_ID = byId(SKINS);

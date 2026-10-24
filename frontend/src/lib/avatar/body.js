@@ -55,8 +55,13 @@ function eyeFront(L, x, y, kind) {
       L.px(x, y, 'w', 4); L.px(x + 1, y, 'eye', 1); L.px(x, y + 1, 'eye', 2); L.px(x + 1, y + 1, 'eye', 0); break;
     case 'pequeno':
       L.px(x + (x < 12 ? 1 : 0), y + 1, 'eye', 0); L.px(x + (x < 12 ? 1 : 0), y, 'eye', 1); break;
-    default:
-      L.px(x, y, 'w', 4); L.px(x + 1, y, 'eye', 0); L.px(x, y + 1, 'eye', 2); L.px(x + 1, y + 1, 'eye', 0);
+    default: {
+      // estilo Stardew: pupila escura 1x2 do lado de dentro e o branco do lado de fora
+      const inner = x < 12 ? x + 1 : x;
+      const outer = x < 12 ? x : x + 1;
+      L.px(inner, y, 'eye', 0); L.px(inner, y + 1, 'eye', 2);
+      L.px(outer, y, 'w', 4); L.px(outer, y + 1, 'w', 2);
+    }
   }
 }
 function eyeSide(L, x, y, kind) {

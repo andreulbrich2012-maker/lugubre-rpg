@@ -61,6 +61,8 @@ if (mode === 'races') {
     if (slot === 'hair') app.hair = { style: it.id, color: ['castanho', 'loiro', 'ruivo', 'preto', 'grisalho', 'roxo'][n % 6] };
     else app.layers[slot] = { id: it.id };
     if (slot === 'torso' || slot === 'legs') app.hair.style = 'curto';
+    // calcas/saias: camisa por dentro e sapato baixo, senao a tunica e a bota escondem a peca
+    if (slot === 'legs') { app.layers.torso = { id: 'camisa-manga-curta' }; app.layers.feet = { id: 'sapatos-couro' }; }
     const ox = (n % per) * 3 * (W + 1), oy = Math.floor(n / per) * (H + 2);
     ['down', 'left', 'up'].forEach((d, k) => blit(c, renderPixels(app, d, 'idle', 0), ox + k * (W + 1) - (k ? 0 : 0), oy));
   });

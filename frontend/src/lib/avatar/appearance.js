@@ -28,6 +28,26 @@ export const RACES = [
 ];
 export const RACE_BY_ID = Object.fromEntries(RACES.map((r) => [r.id, r]));
 
+// Personagem base de cada raca (pedido do Andre, 24/10): cabelo, cores e roupa que combinam
+// com a cultura descrita no livro. E o ponto de partida do criador; tudo continua editavel.
+// layers: slot -> [id, [cores]] (cores omitidas = padrao da peca).
+export const RACE_BASE = {
+  humano: { hair: ['curto-lateral', 'castanho'], eyes: 'atento', layers: { torso: ['tunica-viajante'], legs: ['calca-cos'], feet: ['botas-viagem'], waist: ['cinto-bolsa'] } },
+  abissiano: { hair: ['longo-tras', 'preto'], layers: { torso: ['casaco-longo', ['carvao', 'sangue', 'ouro']], legs: ['calca-couro'], feet: ['botas-cano-alto'] } },
+  celestiano: { hair: ['longo-ondulado', 'loiro'], layers: { torso: ['tunica-sacerdote', ['branco-gasto', 'azul-aco', 'ouro']], legs: ['calca-nobre', ['osso', 'ouro', 'ouro']], feet: ['sandalias-gladiador', ['osso', 'ouro', 'ouro']] } },
+  centauro: { hair: ['rabo-de-cavalo', 'castanho-escuro'], layers: { torso: ['tunica-faixa', ['linho', 'ferrugem', 'bronze']] } },
+  durkar: { hair: ['curto', 'ruivo-escuro'], beardColor: 'ruivo-escuro', layers: { torso: ['colete-ferreiro'], legs: ['calca-acolchoada'], feet: ['botas-bico-ferro'], waist: ['cinto-ferramentas'] } },
+  gorak: { hair: ['moicano', 'preto'], layers: { torso: ['colete-tribal'], legs: ['pano-guerreiro'], feet: ['sandalias-cruzadas'], waist: ['cinto-ossos'] } },
+  kenku: { hair: ['careca', 'preto'], layers: { torso: ['casaco-capinha', ['carvao', 'vinho', 'prata']], legs: ['calca-amarrada'], waist: ['cinto-duas-bolsas'] } },
+  lumerin: { hair: ['coquinhos', 'loiro-palido'], eyes: 'sorridente', layers: { torso: ['blusa-camponesa', ['osso', 'mostarda', 'bronze']], legs: ['bermuda-dobrada'], feet: ['sapatos-la'] } },
+  minotauro: { hair: ['curto-rente', 'castanho-escuro'], layers: { torso: ['peitoral-ombreiras'], legs: ['escarcelas'], feet: ['grevas-metal'], waist: ['cinturao-fivela-grande'] } },
+  nocthar: { hair: ['longo-franja-olho', 'prata-lunar'], layers: { torso: ['jaqueta-couro', ['carvao', 'ameixa', 'prata']], legs: ['calca-couro'], feet: ['botas-ladino'], waist: ['duas-adagas'] } },
+  primordiano: { hair: ['espetado', 'acobreado'], layers: { torso: ['tunica-ritual', ['carvao', 'abobora', 'bronze']], legs: ['calca-larga'], feet: ['botas-curtas'] } },
+  sylvar: { hair: ['longo-liso', 'loiro'], layers: { torso: ['tunica-cacador'], legs: ['calca-amarrada'], feet: ['botas-cano-alto'], waist: ['bolsa-ervas'] } },
+  satiro: { hair: ['cacheado-curto', 'castanho'], layers: { torso: ['colete-bardo'] } },
+  tritao: { hair: ['longo-ondulado', 'verde-musgo'], layers: { torso: ['bata-pescador', ['petroleo', 'osso', 'bronze']], legs: ['sarongue'], feet: ['sandalias-simples'] } }
+};
+
 // "Sátiro" / "satiro" / "Tritão" -> id
 export function raceIdFromName(name) {
   const key = String(name || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -49,19 +69,25 @@ const STARTER = {
 
 export function defaultAppearance(raceId = 'humano') {
   const race = RACE_BY_ID[raceId] || RACES[0];
+  const base = RACE_BASE[race.id] || {};
+  const [hairStyle, hairColor] = base.hair || [race.hair || 'curto', 'castanho-escuro'];
   const app = {
     v: APPEARANCE_VERSION,
     race: race.id,
     body: race.body || 'medio',
     height: race.height || 'normal',
     skin: race.skins[0],
-    hair: { style: race.hair || 'curto', color: 'castanho-escuro' },
-    beard: { style: race.beard || 'nenhuma', color: 'castanho-escuro' },
-    eyes: { style: race.eyes || 'atento', color: race.eyeColor || 'castanho' },
+    hair: { style: race.hair || hairStyle, color: hairColor },
+    beard: { style: race.beard || 'nenhuma', color: base.beardColor || hairColor },
+    eyes: { style: race.eyes || base.eyes || 'atento', color: race.eyeColor || 'castanho' },
     layers: {},
     traits: defaultTraits(race.id)
   };
-  for (const [slot, sel] of Object.entries(STARTER)) if (getItem(slot, sel.id)) app.layers[slot] = { id: sel.id, colors: defaultColors(getItem(slot, sel.id)) };
+  const layers = base.layers || Object.fromEntries(Object.entries(STARTER).map(([k, v]) => [k, [v.id]]));
+  for (const [slot, [id, colors]] of Object.entries(layers)) {
+    const item = getItem(slot, id);
+    if (item) app.layers[slot] = { id, colors: colors || defaultColors(item) };
+  }
   return app;
 }
 

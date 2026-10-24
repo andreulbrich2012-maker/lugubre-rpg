@@ -362,6 +362,12 @@ button.d20:not(:disabled):hover { filter: drop-shadow(0 0 22px rgb(var(--light) 
   color: var(--color-bone);
   box-shadow: 0 6px 14px rgba(0,0,0,.7);
 }
+/* Modo jogo: personagem vira boneco em pixel art com os pes na base da celula. */
+.vtt-token.is-sprite { background: none; border: 0; overflow: visible; }
+.vtt-sprite { position: absolute; left: 50%; bottom: -6%; transform: translateX(-50%); display: block; pointer-events: none; }
+.vtt-token.is-sprite.is-selected .vtt-sprite { filter: drop-shadow(0 0 2px var(--color-ember)) drop-shadow(0 0 2px var(--color-ember)); }
+.vtt-token.is-sprite.is-active .vtt-sprite { filter: drop-shadow(0 0 6px rgb(var(--light) / .9)); }
+.vtt-token.is-sprite.is-down .vtt-sprite { filter: grayscale(1) brightness(.5); transform: translateX(-50%) rotate(90deg); }
 .vtt-token.is-selected .vtt-token-face { outline: 3px double var(--color-ember); outline-offset: 3px; }
 .vtt-token.is-active .vtt-token-face { box-shadow: 0 0 0 3px var(--color-lead), 0 0 26px 6px rgb(var(--light) / .65); }
 .vtt-token.is-hidden { opacity: .55; }

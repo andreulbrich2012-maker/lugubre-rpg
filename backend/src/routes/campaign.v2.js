@@ -201,7 +201,8 @@ async function playerCombatTurn(campaignId, userId) {
   return { scene, state, token };
 }
 
-const TOKEN_SELECT = `select t.*, ch.owner_id as character_owner_id, ch.life_current as character_life_current, ch.life_max as character_life_max
+const TOKEN_SELECT = `select t.*, ch.owner_id as character_owner_id, ch.life_current as character_life_current, ch.life_max as character_life_max,
+  ch.appearance as character_appearance
   from campaign_tokens t left join characters ch on ch.id = t.character_id`;
 
 // master: tudo; jogador: sem tokens ocultos, sem PV de npc/monstro, PV do proprio personagem.
@@ -234,6 +235,9 @@ export function tokenView(token, { master = false, userId = null } = {}) {
     down: hp.hp_max != null && Number(hp.hp_current) <= 0,
     conditions: parseJson(token.conditions, []),
     controlled_by: token.controlled_by,
+    // boneco em pixel art no modo jogo; so vem quando a consulta trouxe a ficha (senao o
+    // upsert do cliente apagaria a aparencia que ele ja tem)
+    ...('character_appearance' in token ? { appearance: isCharacter ? parseJson(token.character_appearance, null) : null } : {}),
     updated_at: token.updated_at
   };
 }

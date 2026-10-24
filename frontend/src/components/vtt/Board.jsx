@@ -9,6 +9,7 @@ import { EAVE_SHADOW, roofRows } from '../../lib/tiles/roofs';
 import { getTile } from '../../lib/tiles/catalog';
 import AvatarSprite from '../avatar/AvatarSprite';
 import FxLayer from '../fx/FxLayer';
+import ItemIcon from '../icons/ItemIcon';
 
 // Telhado de uma construcao: canvas no tamanho nativo (16 px/celula), o CSS escala nitido.
 function Roof({ building, open, cell, onToggle }) {
@@ -478,11 +479,14 @@ export default function Board({
             <button
               key={it.id}
               type="button"
-              className="vtt-loot"
+              className="vtt-loot has-icon"
               style={{ left: it.x * cell, top: it.y * cell, width: cell, height: cell }}
               aria-label={`Item no mapa: ${it.name}`}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPopover({ x: it.x, y: it.y }); } }}
-            />
+            >
+              {/* o proprio icone do item, brilhando (antes era um losango generico) */}
+              <ItemIcon item={it} size={Math.round(cell / 32) * 16 || 32} />
+            </button>
           ))}
 
           {sortedTokens.map((t) => {
@@ -574,7 +578,7 @@ export default function Board({
                 const reason = isMaster ? null : pickupBlock?.(it);
                 return (
                   <li key={it.id} className="border-t-2 border-lead pt-2 first:border-0 first:pt-0">
-                    <p className="font-bold">{it.name}{it.dracmas ? ` — ${it.dracmas} dracmas` : it.quantity > 1 ? ` ×${it.quantity}` : ''}</p>
+                    <p className="flex items-center gap-2 font-bold"><ItemIcon item={it} size={32} />{it.name}{it.dracmas ? ` — ${it.dracmas} dracmas` : it.quantity > 1 ? ` ×${it.quantity}` : ''}</p>
                     {it.description && <p className="text-xs text-mist">{it.description}</p>}
                     {!isMaster && (
                       <>

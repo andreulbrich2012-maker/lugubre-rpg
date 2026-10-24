@@ -7,6 +7,20 @@ import { primordialByName } from '../components/glass/primordiais';
 import CharacterSheetMobile from '../components/character-sheet/CharacterSheetMobile';
 import CharacterSheetLoading from '../components/character-sheet/CharacterSheetLoading';
 import AppearancePanel from '../components/avatar/AppearancePanel';
+import ItemIcon from '../components/icons/ItemIcon';
+import { ITEM_ICONS } from '../lib/icons/items.js';
+import { WEAPON_ICONS } from '../lib/icons/weapons.js';
+
+// Opcoes do seletor de icone, agrupadas por categoria (montado uma vez so).
+const ICON_GROUPS = (() => {
+  const groups = new Map();
+  for (const [id, spec] of [...Object.entries(ITEM_ICONS), ...Object.entries(WEAPON_ICONS)]) {
+    const cat = spec.cat || 'Armas';
+    if (!groups.has(cat)) groups.set(cat, []);
+    groups.get(cat).push([id, spec.label || id]);
+  }
+  return [...groups.entries()];
+})();
 import { ResourceStepper } from '../components/character-sheet/ResourceStepper';
 import { api } from '../lib/api';
 import { calculateResourceAdjustment, normalizeResourcePair } from '../lib/characterVitals';
@@ -613,11 +627,14 @@ function InventoryPanel({ inventory, wallet, editing, draft, setDraft, onAdd, on
           {visibleInventory.length ? visibleInventory.map((item, index) => (
             <li key={item.id || `${item.name}-${index}`} className="field !mt-0 min-h-11">
               <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+                <div className="flex min-w-0 items-start gap-3">
+                <ItemIcon item={item} size={32} className="mt-0.5" />
                 <div className="min-w-0">
                   <span className="break-words text-bone">{Number(item.quantity ?? 1)}x {item.name}</span>
                   <span className="ml-2 text-xs text-mist">peso {Number(item.weight || 0)}</span>
                   <span className="badge ml-2 text-ember">{item.category || 'Outros'}</span>
                   {item.description && <p className="mt-1 text-xs text-mist">{item.description}</p>}
+                </div>
                 </div>
                 <Button type="button" variant="ghost" className="min-h-11 justify-center" onClick={() => onEdit(item)}><Edit size={16} className="inline" /> Editar</Button>
                 <button type="button" className="inline-flex min-h-11 items-center justify-center gap-2 border-[3px] border-lead px-3 text-bone soft-motion hover:bg-blood" onClick={() => onDelete(item)} aria-label="Excluir item"><Trash2 size={16} /> Excluir</button>
@@ -966,14 +983,31 @@ function ItemModal({ state, onClose, onSave }) {
           <NumberField label="Quantidade" value={form.quantity ?? 1} onChange={(quantity) => setForm({ ...form, quantity })} />
           <NumberField label="Peso" value={form.weight ?? 0} onChange={(weight) => setForm({ ...form, weight })} />
         </div>
-        <label className="block text-sm text-mist">
-          Nome do item
-          <input className="field min-h-11" value={form.name || ''} onChange={(event) => setForm({ ...form, name: event.target.value })} autoFocus />
-        </label>
+        <div className="flex items-end gap-3">
+          {/* icone automatico pelo nome/categoria/descricao, ou o escolhido no seletor abaixo */}
+          <span className="grid h-14 w-14 shrink-0 place-items-center border-[3px] border-lead bg-glass" title={form.icon ? 'Ícone escolhido' : 'Ícone automático'}>
+            <ItemIcon item={form} size={32} />
+          </span>
+          <label className="block min-w-0 flex-1 text-sm text-mist">
+            Nome do item
+            <input className="field min-h-11" value={form.name || ''} onChange={(event) => setForm({ ...form, name: event.target.value })} autoFocus />
+          </label>
+        </div>
         <label className="block text-sm text-mist">
           Categoria
           <select className="field min-h-11" value={form.category || 'Outros'} onChange={(event) => setForm({ ...form, category: event.target.value })}>
             {itemCategories.filter((category) => category !== 'Todos os itens').map((category) => <option key={category} value={category}>{category}</option>)}
+          </select>
+        </label>
+        <label className="block text-sm text-mist">
+          Ícone
+          <select className="field min-h-11" value={form.icon || ''} onChange={(event) => setForm({ ...form, icon: event.target.value || undefined })}>
+            <option value="">Automático (pelo nome)</option>
+            {ICON_GROUPS.map(([cat, list]) => (
+              <optgroup key={cat} label={cat}>
+                {list.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+              </optgroup>
+            ))}
           </select>
         </label>
         <label className="block text-sm text-mist">

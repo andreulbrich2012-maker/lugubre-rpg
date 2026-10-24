@@ -23,7 +23,9 @@ const itemSchema = z.object({
   name: z.string().min(1),
   category: z.string().optional().default('Outros'),
   description: z.string().optional().default(''),
-  defenseBonus: z.coerce.number().default(0)
+  defenseBonus: z.coerce.number().default(0),
+  // icone pixel art escolhido a mao (frontend/src/lib/icons); sem ele o icone sai do nome
+  icon: z.string().regex(/^[a-z0-9_-]{1,60}$/).optional()
 });
 
 const powerSchema = z.object({

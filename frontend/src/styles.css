@@ -394,6 +394,10 @@ button.d20:not(:disabled):hover { filter: drop-shadow(0 0 22px rgb(var(--light) 
   box-shadow: 0 0 10px 3px rgba(240,176,74,.55);
   animation: lootGlint 2.4s ease-in-out infinite;
 }
+.vtt-loot.has-icon::before { content: none; }
+.vtt-loot.has-icon img { filter: drop-shadow(0 0 3px rgba(255,214,120,.95)) drop-shadow(0 0 8px rgba(240,176,74,.6)); animation: lootBob 2.4s ease-in-out infinite; }
+@keyframes lootBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .vtt-loot.has-icon img { animation: none; } }
 .vtt-loot:focus-visible { outline: 3px double var(--color-ember); outline-offset: -4px; }
 @keyframes lootGlint { 0%, 100% { opacity: .7; box-shadow: 0 0 6px 1px rgba(240,176,74,.35); } 50% { opacity: 1; box-shadow: 0 0 14px 5px rgba(240,176,74,.7); } }
 /* Telhados: some/volta em 250 ms quando o interior abre. */

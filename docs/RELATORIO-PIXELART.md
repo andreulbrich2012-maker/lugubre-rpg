@@ -300,3 +300,20 @@ O schema só acrescentou colunas (`campaign_scenes.parent_scene_id`, `parent_bui
 - Ainda não há tela para mover itens para dentro/fora de uma mochila já no inventário.
 - `docs/API-v2.md` não documenta `style`, `cursor`, recipientes e `inventory`.
 - Rio desenhado sempre na horizontal (também em rios verticais); candelabro e armadura merecem outra passada.
+
+# Quarta rodada (mapas por IA, mapa-item, modo jogo, mestre)
+
+## O que entrou
+- **Mapa por plano (IA simples consegue):** a IA descreve áreas, rios, estradas, cercas/paliçada, bairros, construções (com direção da porta) e pontos principais em coordenadas 0–1000; o sistema desenha. Funciona com foto de mapa anexada. Testado com Haiku e Opus (Havershold).
+- **Gerador de vila pronta** (aldeia → metrópole) no editor, sem IA.
+- **Mapas até 1000×1000**, desenhados por pedaços só onde a câmera está.
+- **Portas em 4 direções**, paliçada que emenda, fogueira grande, noite mais clara.
+- **Mapa-item:** o mestre entrega "Mapa de …" (permissão gravada no servidor); abre como foto do mapa (gerada uma vez em segundo plano e guardada no navegador) com pontos clicáveis.
+- **Modo jogo do jogador** (tela cheia): vida/mana/sanidade, barra de 9 itens, painéis Personagem, Perícias, Dados (animação, resultado vai ao mestre), Mapas, Notas, Chat.
+- **Mestre:** visão geral de todos, ficha editável, painel rápido de vida/mana/sanidade, dar/tirar/mover itens, adicionar ataque/magia.
+- **Relógio do mundo** (15 em 15 min) com luz gradual; **visão dos jogadores** em 10 alcances; **peso** deixa o personagem mais lento.
+
+## Atenção: muda o comportamento de campanhas que já existem
+- Sem limite salvo, toda campanha passa a ter **30 kg e 9 itens**.
+- Por padrão **só o mestre** mexe em vida/mana/sanidade e em ataques/magias das fichas mostradas na campanha (Mestre > Regras da mesa > "Quem mexe nas fichas" troca para "Mestre e jogador").
+- Banco: tabelas novas `campaign_map_grants` e `campaign_character_links` e colunas `characters.conditions`/`notes` (só acrescenta). Depois do deploy: backup + "Atualizar banco".

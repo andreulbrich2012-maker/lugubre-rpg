@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   emptyMap, validateMap, repairMap, resizeMap, setCell, floodFill, rectFill, isSolid, canMoveTo, serializeMap, cloneMap,
-  placeBuilding, addItem, updateItem, removeItem, setAmbience
+  placeBuilding, addItem, updateItem, removeItem, setAmbience, repairItems, addContent, updateContent, removeContent
 } from './format.js';
 
 describe('formato do mapa', () => {
@@ -142,5 +142,47 @@ describe('itens pegaveis e construcoes', () => {
     const back = setAmbience(m, { light: 'dia', decor: 'normal' });
     expect('light' in back || 'decor' in back).toBe(false);
     expect(repairMap({ ...emptyMap(4, 4), light: 'meio-dia' }).map.light).toBeUndefined();
+  });
+});
+
+describe('itens: peso e recipientes', () => {
+  it('peso ausente vira o sugerido; 0 digitado fica; config do mestre nao se perde', () => {
+    const { items } = repairItems([
+      { id: 'a', x: 0, y: 0, name: 'Espada longa' },
+      { id: 'b', x: 0, y: 0, name: 'Pena', weight: 0 },
+      { id: 'c', x: 1, y: 1, name: 'Anel', weight: 'x', pickable: false, hidden: true, note: 'segredo', icon: 'anel' }
+    ], 4, 4);
+    expect(items.map((it) => it.weight)).toEqual([1.5, 0, 0.02]);
+    expect(items[2]).toMatchObject({ pickable: false, hidden: true, note: 'segredo', icon: 'anel' });
+  });
+
+  it('recipiente: 1 nivel, no maximo 30 itens dentro, ids unicos e trancado', () => {
+    const inner = Array.from({ length: 35 }, (_, i) => ({ id: i < 2 ? 'dup' : `c${i}`, name: `Moeda ${i}` }));
+    inner.push({ name: '' });
+    inner[3] = { id: 'm', name: 'Saco', container: true, contents: [{ name: 'Pedra' }] };
+    const { items, dropped } = repairItems([{ id: 'bau', x: 1, y: 1, name: 'Baú', container: true, locked: true, hidden: true, contents: inner }], 4, 4);
+    const bau = items[0];
+    expect(bau).toMatchObject({ container: true, locked: true, hidden: true, weight: 15 });
+    expect(bau.contents).toHaveLength(30);
+    expect(new Set(bau.contents.map((c) => c.id)).size).toBe(30);
+    expect(bau.contents[3]).not.toHaveProperty('contents');
+    expect(bau.contents[3]).not.toHaveProperty('container');
+    expect(bau.contents[0]).not.toHaveProperty('x');
+    expect(dropped).toBe(6);
+    // contents sem container: vira recipiente
+    expect(repairItems([{ x: 0, y: 0, name: 'Mochila', contents: [{ name: 'Pão' }] }], 4, 4).items[0].container).toBe(true);
+  });
+
+  it('adiciona, edita e tira itens de dentro do recipiente', () => {
+    let m = addItem(emptyMap(4, 4), 1, 1, { name: 'Mochila', container: true });
+    let bag = m.items[0];
+    expect(bag).toMatchObject({ container: true, contents: [], weight: 1 });
+    bag = addContent(bag, { name: 'Poção de cura' });
+    expect(bag.contents[0]).toMatchObject({ name: 'Poção de cura', weight: 0.3, quantity: 1 });
+    bag = updateContent(bag, bag.contents[0].id, { quantity: 3 });
+    expect(bag.contents[0].quantity).toBe(3);
+    m = updateItem(m, bag.id, bag);
+    expect(m.items[0].contents).toHaveLength(1);
+    expect(removeContent(m.items[0], bag.contents[0].id).contents).toEqual([]);
   });
 });

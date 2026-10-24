@@ -1,5 +1,6 @@
 // Validacao do mapa em tiles (o editor do front conserta; aqui so aceita o que esta certo).
 // Formato: {cols, rows, layers:{ground, objects}, items?, buildings?, light?, decor?, style?} — ver docs/API-v2.md.
+// Item recipiente: {container: true, locked?, contents: [itens sem x/y, max 30, sem recipiente dentro]}.
 import { z } from 'zod';
 import { httpError } from './http.js';
 
@@ -10,22 +11,33 @@ export const ITEM_CATEGORIES = ['Achados', 'Armas', 'Armaduras', 'Poções', 'Te
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, 'Id inválido.');
 const cell = z.number().int().min(0).max(79);
 
-const itemSchema = z.object({
+export const MAX_CONTENTS = 30;
+const baseItem = {
   id,
-  x: cell,
-  y: cell,
   name: z.string().trim().min(1).max(60),
   description: z.string().max(200).optional().default(''),
   quantity: z.number().int().min(1).max(999).optional().default(1),
   weight: z.number().min(0).max(1000).optional().default(0),
   category: z.enum(ITEM_CATEGORIES).optional().default('Achados'),
   dracmas: z.number().int().min(0).max(100000).optional(),
-  // configuracao do mestre: pegavel, escondido dos jogadores, nota secreta e icone pixel art
-  pickable: z.boolean().optional(),
-  hidden: z.boolean().optional(),
+  // nota secreta do mestre e icone pixel art
   note: z.string().max(300).optional(),
   icon: z.string().regex(/^[a-z0-9_-]{1,60}$/).optional()
-});
+};
+// item dentro de um recipiente (mochila, bau, saco): sem posicao e sem outro recipiente dentro (1 nivel)
+export const contentSchema = z.object(baseItem);
+export const itemSchema = z.object({
+  ...baseItem,
+  x: cell,
+  y: cell,
+  // configuracao do mestre: pegavel e escondido dos jogadores
+  pickable: z.boolean().optional(),
+  hidden: z.boolean().optional(),
+  // recipiente: os jogadores perto abrem e tiram itens (ou levam tudo); trancado ninguem abre
+  container: z.boolean().optional(),
+  locked: z.boolean().optional(),
+  contents: z.array(contentSchema).max(MAX_CONTENTS, `No máximo ${MAX_CONTENTS} itens dentro de um recipiente.`).optional()
+}).transform((item) => (item.contents?.length && !item.container ? { ...item, container: true } : item));
 // projeto do catalogo (frontend/src/lib/buildings/designs.js) e trocas do mestre: material principal,
 // estilo do telhado e cores (hex). Sem projeto, a construcao usa a casa generica.
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -63,9 +75,14 @@ const extrasSchema = z.object({
 // Valida o formato {cols, rows, layers:{nome:[linhas]}} com 1 caractere ASCII por celula,
 // mais os itens pegaveis e as construcoes (dentro do mapa, ids unicos).
 // O que o jogador recebe do mapa: sem itens escondidos e sem a nota secreta do mestre.
+// Recipiente trancado: o jogador ve o bau, mas nao o que tem dentro.
+export function playerItem({ note, ...item }) {
+  if (!Array.isArray(item.contents)) return item;
+  return { ...item, contents: item.locked ? [] : item.contents.map(({ note: _note, ...content }) => content) };
+}
 export function playerTiles(tiles) {
   if (!tiles || typeof tiles !== 'object') return tiles;
-  const items = Array.isArray(tiles.items) ? tiles.items.filter((item) => !item.hidden).map(({ note, ...item }) => item) : tiles.items;
+  const items = Array.isArray(tiles.items) ? tiles.items.filter((item) => !item.hidden).map(playerItem) : tiles.items;
   return { ...tiles, items };
 }
 
@@ -108,6 +125,10 @@ export function validateTiles(tiles) {
   const { items, buildings, light, decor, style } = parsed.data;
   for (const list of [items, buildings]) {
     if (new Set(list.map((entry) => entry.id)).size !== list.length) throw httpError('Mapa: ids repetidos em itens ou construções.');
+  }
+  for (const item of items) {
+    const inner = item.contents || [];
+    if (new Set(inner.map((entry) => entry.id)).size !== inner.length) throw httpError(`Mapa: ids repetidos dentro de "${item.name}".`);
   }
   if (items.some((item) => item.x >= cols || item.y >= rows)) throw httpError('Mapa: item fora do mapa.');
   if (buildings.some((b) => b.x + b.w > cols || b.y + b.h > rows)) throw httpError('Mapa: construção fora do mapa.');

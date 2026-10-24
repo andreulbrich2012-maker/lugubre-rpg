@@ -1,12 +1,14 @@
 // Formato do mapa (o backend valida igual):
 // {cols, rows, layers: {ground: [rows de cols chars], objects: [idem]},
-//  items: [{id, x, y, name, description, quantity, weight, category, dracmas?}],   (pegaveis, max 60)
+//  items: [{id, x, y, name, description, quantity, weight, category, dracmas?,     (pegaveis, max 60)
+//           pickable?, hidden?, note?, icon?, container?, locked?, contents?: [itens sem x/y, max 30]}],
 //  buildings: [{id, x, y, w, h, name, roof}],                                     (telhados, max 30)
 //  light: 'dia'|'entardecer'|'noite', decor: 'nenhuma'|'pouca'|'normal'|'muita',   (ambiente da cena)
 //  style: id de STYLES (styles.js), estilo global de cor do mapa}
 // Funcoes puras: sempre devolvem um mapa novo (o desfazer guarda as versoes antigas).
 import { DEFAULT_GROUND, EMPTY_OBJECT, getTile } from './catalog.js';
 import { STYLE_IDS } from './styles.js';
+import { roundKg, suggestWeight } from '../itemWeight.js';
 
 export const MIN_SIZE = 4;
 export const MAX_SIZE = 80;
@@ -18,6 +20,7 @@ const clampSize = (n) => Math.min(MAX_SIZE, Math.max(MIN_SIZE, Math.round(Number
 const PRINTABLE = /^[\x20-\x7e\u00a1-\u00ff]*$/;
 
 export const MAX_ITEMS = 60;
+export const MAX_CONTENTS = 30;
 export const MAX_BUILDINGS = 30;
 export const ITEM_CATEGORIES = ['Achados', 'Armas', 'Armaduras', 'Poções', 'Tesouro', 'Livros', 'Ingredientes', 'Outros'];
 export const ROOF_TYPES = ['telha', 'telha-azul', 'palha', 'palha-escura', 'ardosia', 'ardosia-verde', 'madeira', 'madeira-escura'];
@@ -44,8 +47,28 @@ const num = (v, min, max, dflt) => {
 const text = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 export const shortId = () => Math.random().toString(36).slice(2, 10);
 
+// Campos comuns de item (no mapa ou dentro de um recipiente). Peso ausente vira o sugerido pelo
+// nome/categoria (lib/itemWeight.js); peso 0 digitado pelo mestre fica 0.
+function itemFields(raw, name) {
+  const item = {
+    name,
+    description: text(raw.description, 200),
+    quantity: Math.round(num(raw.quantity, 1, 999, 1)),
+    weight: 0,
+    category: ITEM_CATEGORIES.find((c) => c.toLowerCase() === String(raw.category ?? '').toLowerCase()) || 'Achados'
+  };
+  const missing = raw.weight == null || !Number.isFinite(Number(raw.weight));
+  item.weight = missing ? suggestWeight({ ...item, icon: raw.icon }) : roundKg(num(raw.weight, 0, 1000, 0));
+  const dracmas = Math.round(num(raw.dracmas, 0, 100000, 0));
+  if (dracmas > 0) item.dracmas = dracmas;
+  if (typeof raw.note === 'string' && raw.note.trim()) item.note = raw.note.slice(0, 300);
+  if (typeof raw.icon === 'string' && /^[a-z0-9_-]{1,60}$/.test(raw.icon)) item.icon = raw.icon;
+  return item;
+}
+
 // Itens pegaveis vindos da IA/colagem/editor: descarta o que esta fora do mapa ou sem nome,
-// limita quantidade/peso/textos e garante id unico. Devolve {items, dropped}.
+// limita quantidade/peso/textos e garante id unico. Recipiente (mochila, bau, saco): container,
+// locked e contents (1 nivel so: recipiente dentro de recipiente vira item comum; max 30). Devolve {items, dropped}.
 export function repairItems(list, cols, rows) {
   const items = [];
   const ids = new Set();
@@ -58,19 +81,39 @@ export function repairItems(list, cols, rows) {
     let id = ID_RE.test(String(raw.id ?? '')) ? String(raw.id) : shortId();
     while (ids.has(id)) id = shortId();
     ids.add(id);
-    const item = {
-      id, x, y, name,
-      description: text(raw.description, 200),
-      quantity: Math.round(num(raw.quantity, 1, 999, 1)),
-      weight: Math.round(num(raw.weight, 0, 1000, 0) * 100) / 100,
-      category: ITEM_CATEGORIES.find((c) => c.toLowerCase() === String(raw.category ?? '').toLowerCase()) || 'Achados'
-    };
-    const dracmas = Math.round(num(raw.dracmas, 0, 100000, 0));
-    if (dracmas > 0) item.dracmas = dracmas;
+    const item = { id, x, y, ...itemFields(raw, name) };
+    if (typeof raw.pickable === 'boolean') item.pickable = raw.pickable;
+    if (typeof raw.hidden === 'boolean') item.hidden = raw.hidden;
+    if (raw.container === true || (Array.isArray(raw.contents) && raw.contents.length)) {
+      item.container = true;
+      if (raw.locked === true) item.locked = true;
+      const inner = new Set();
+      item.contents = [];
+      for (const c of Array.isArray(raw.contents) ? raw.contents : []) {
+        const cname = text(c?.name, 60);
+        if (!cname || item.contents.length >= MAX_CONTENTS) { dropped++; continue; }
+        let cid = ID_RE.test(String(c.id ?? '')) ? String(c.id) : shortId();
+        while (inner.has(cid)) cid = shortId();
+        inner.add(cid);
+        item.contents.push({ id: cid, ...itemFields(c, cname) });
+      }
+    }
     items.push(item);
   }
   return { items, dropped };
 }
+
+// Recipientes do mapa: adiciona, edita e tira itens de dentro (o mestre no editor e no popover).
+export function addContent(item, fields = {}) {
+  const [fixed] = repairItems([{ ...item, container: true, contents: [...(item.contents || []), { name: 'Item', ...fields }] }], MAX_SIZE, MAX_SIZE).items;
+  return fixed || item;
+}
+export function updateContent(item, contentId, patch) {
+  const contents = (item.contents || []).map((c) => (c.id === contentId ? { ...c, ...patch } : c));
+  const [fixed] = repairItems([{ ...item, contents }], MAX_SIZE, MAX_SIZE).items;
+  return fixed || item;
+}
+export const removeContent = (item, contentId) => ({ ...item, contents: (item.contents || []).filter((c) => c.id !== contentId) });
 
 // Construcoes (telhados): retangulo inteiro dentro do mapa, minimo 3x3. Devolve {buildings, dropped}.
 export function repairBuildings(list, cols, rows) {

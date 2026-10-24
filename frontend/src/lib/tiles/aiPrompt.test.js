@@ -75,7 +75,9 @@ describe('itens e construcoes no prompt', () => {
     expect(p).toContain('pode guardar itens');
     expect(p).toContain('x = coluna (0 a 15');
     const r = parseMapResponse(p.slice(p.indexOf('EXEMPLO')), 12, 8);
-    expect(r.map.items.length).toBe(3);
+    expect(r.map.items.length).toBe(4);
+    expect(r.map.items.find((it) => it.container)?.contents.map((c) => c.name)).toEqual(['Pão dormido', 'Pederneira']);
+    expect(p).toContain('armadura de placas 20');
     expect(r.map.buildings[0]).toMatchObject({ x: 1, y: 1, w: 10, h: 5, roof: 'palha' });
     expect(r.map.items.find((it) => it.dracmas)?.dracmas).toBe(25);
   });

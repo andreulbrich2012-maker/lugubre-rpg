@@ -24,6 +24,7 @@ const ICON_GROUPS = (() => {
 })();
 import { ResourceStepper } from '../components/character-sheet/ResourceStepper';
 import { api } from '../lib/api';
+import { unitWeight } from '../lib/itemWeight';
 import { calculateResourceAdjustment, normalizeResourcePair } from '../lib/characterVitals';
 
 const attributes = [
@@ -600,7 +601,7 @@ function InventoryPanel({ inventory, wallet, editing, draft, setDraft, onAdd, on
 
   function addItem() {
     if (!item.name.trim()) return;
-    setDraft({ ...draft, inventory: [...draft.inventory, { ...item, id: crypto.randomUUID?.() || `${Date.now()}` }] });
+    setDraft({ ...draft, inventory: [...draft.inventory, { ...item, weight: unitWeight(item), id: crypto.randomUUID?.() || `${Date.now()}` }] });
     setItem(blankItem);
   }
 

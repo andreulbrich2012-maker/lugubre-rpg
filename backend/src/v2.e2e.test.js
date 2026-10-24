@@ -6,7 +6,8 @@ import request from 'supertest';
 import { createApp } from './app.js';
 import { pool } from './db/pool.js';
 import { parseRulebook, seedRules } from './db/seedRules.js';
-import { dracmasToCoins, validateTiles } from './utils/tiles.js';
+import { dracmasToCoins, playerTiles, validateTiles } from './utils/tiles.js';
+import { inventoryLimits, normalizeRules } from './utils/tableRules.js';
 
 const app = createApp();
 const hasDb = Boolean(process.env.DATABASE_URL);
@@ -58,6 +59,27 @@ describe('utilitarios v2 (sem banco)', () => {
     expect(() => validateTiles({ ...base4, buildings: [{ id: 'b', x: 2, y: 0, w: 3, h: 3 }] })).toThrow(/fora do mapa/);
     expect(() => validateTiles({ ...base4, items: [{ id: 'a', x: 0, y: 0, name: 'A', quantity: 0 }] })).toThrow(/quantity/);
     expect(dracmasToCoins(623)).toEqual({ gold: 1, platinum: 1, silver: 2, bronze: 3 });
+  });
+
+  it('recipientes no mapa, regras de inventario e o peso espelhado do front', async () => {
+    const base4 = { cols: 4, rows: 4, layers: { ground: ['....', '....', '....', '....'] } };
+    const bau = { id: 'bau', x: 1, y: 1, name: 'Baú', locked: true, contents: [{ id: 'c1', name: 'Anel', note: 'x', contents: [{ id: 'z', name: 'Nada' }] }] };
+    const ok = validateTiles({ ...base4, items: [bau] });
+    expect(ok.items[0]).toMatchObject({ container: true, locked: true });
+    expect(ok.items[0].contents[0]).not.toHaveProperty('contents'); // 1 nivel so
+    expect(playerTiles(ok).items[0].contents).toEqual([]); // trancado: jogador nao ve o que tem dentro
+    expect(playerTiles({ items: [{ ...ok.items[0], locked: false }] }).items[0].contents[0]).not.toHaveProperty('note');
+    const many = Array.from({ length: 31 }, (_, i) => ({ id: `c${i}`, name: 'Moeda' }));
+    expect(() => validateTiles({ ...base4, items: [{ ...bau, contents: many }] })).toThrow(/30 itens/);
+    expect(() => validateTiles({ ...base4, items: [{ ...bau, contents: [{ id: 'a', name: 'A' }, { id: 'a', name: 'B' }] }] })).toThrow(/repetidos/);
+    const rules = normalizeRules({ inventory: { maxWeight: 32 }, players: { 'e1c8d6a2-0000-4000-8000-000000000000': { inventory: { maxItems: 3 } } } });
+    expect(inventoryLimits(rules, 'e1c8d6a2-0000-4000-8000-000000000000')).toEqual({ maxWeight: 32, maxItems: 3 });
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const [back, front] = await Promise.all([
+      fs.readFile(path.join(here, 'utils/itemWeight.js'), 'utf8'),
+      fs.readFile(path.resolve(here, '../../frontend/src/lib/itemWeight.js'), 'utf8')
+    ]);
+    expect(back).toBe(front);
   });
 
   it('separa o livro em secoes com slugs sem acento e desambigua so os repetidos', async () => {
@@ -298,6 +320,78 @@ describe.skipIf(!hasDb)('API v2 com Postgres', () => {
     await pickup(master.api, 'longe').expect(400);
     await pickup(master.api, 'longe', { characterId: playerCharacter.id }).expect(201);
     await master.api.post(`${base()}/scenes/${scene.id}/combat/end`).expect(200);
+  });
+
+  it('inventario limitado pelo mestre e recipientes (mochila, bau) no mapa', async () => {
+    const { body: scene } = await master.api.post(`${base()}/scenes`, { name: 'Cripta', grid_size: 70 }).expect(201);
+    await master.api.post(`${base()}/scenes/${scene.id}/activate`).expect(200);
+    const ground = ['......', '......', '......', '......', '......', '......'];
+    const items = [
+      { id: 'mochila', x: 1, y: 1, name: 'Mochila', weight: 1, container: true, contents: [
+        { id: 'pao', name: 'Pão', quantity: 2 }, { id: 'moedas', name: 'Moedas', dracmas: 12 }, { id: 'corda', name: 'Corda', weight: 1 }
+      ] },
+      { id: 'bau', x: 1, y: 1, name: 'Baú de ferro', pickable: false, locked: true, contents: [{ id: 'anel', name: 'Anel de prata', note: 'amaldiçoado' }] },
+      { id: 'escondida', x: 1, y: 1, name: 'Bolsa oculta', hidden: true, container: true, contents: [{ id: 'gema', name: 'Rubi' }] },
+      { id: 'placas', x: 0, y: 1, name: 'Armadura de placas' }
+    ];
+    await master.api.patch(`${base()}/scenes/${scene.id}`, { map_kind: 'tiles', tiles: { cols: 6, rows: 6, layers: { ground }, items }, mode: 'exploration' }).expect(200);
+    const seen = (await player.api.get(`${base()}/scenes/${scene.id}`).expect(200)).body.tiles.items;
+    expect(seen.map((it) => it.id)).toEqual(['mochila', 'bau', 'placas']);
+    expect(seen.find((it) => it.id === 'bau').contents).toEqual([]);
+    const { body: tok } = await player.api.post(`${base()}/scenes/${scene.id}/tokens`, { kind: 'character', x: 70, y: 70 }).expect(201);
+    const pick = (body) => player.api.post(`${base()}/scenes/${scene.id}/pickup`, body);
+    const sheet = async () => (await player.api.get(`${base()}/characters/${playerCharacter.id}`).expect(200)).body;
+    const startCount = (await sheet()).inventory.length;
+
+    // trancado e escondido: nada feito
+    expect((await pick({ itemId: 'bau', contentId: 'anel' }).expect(409)).body.message).toBe('Está trancado.');
+    expect((await pick({ itemId: 'escondida', contentId: 'gema' }).expect(409)).body.message).toBe('Já pegaram esse item.');
+
+    // limites do mestre: peso (armadura de placas pesa 20 kg) e quantidade de itens
+    const startWeight = (await sheet()).inventory.reduce((sum, it) => sum + Number(it.weight || 0) * Number(it.quantity ?? 1), 0);
+    await master.api.put(`${base()}/rules`, { inventory: { maxWeight: Math.floor(startWeight) + 5 } }).expect(200);
+    expect((await player.api.get(`${base()}/rules`).expect(200)).body.inventory).toEqual({ maxWeight: Math.floor(startWeight) + 5, maxItems: null });
+    expect((await pick({ itemId: 'placas' }).expect(409)).body.message).toBe(`Mochila cheia: passa do peso máximo (${Math.floor(startWeight) + 5} kg) que o mestre definiu.`);
+    await master.api.put(`${base()}/rules`, { inventory: { maxItems: startCount }, players: { [player.user.id]: { inventory: { maxWeight: 1000 } } } }).expect(200);
+    expect((await pick({ itemId: 'placas' }).expect(409)).body.message).toBe(`Mochila cheia: passa do máximo de ${startCount} itens que o mestre definiu.`);
+    // dinheiro de dentro da mochila nao ocupa espaco: vai para a bolsa
+    const { body: coins } = await pick({ itemId: 'mochila', contentId: 'moedas' }).expect(201);
+    expect(coins.received).toMatchObject({ kind: 'dracmas', dracmas: 12 });
+    // excecao do jogador: sem limite de itens so para ele
+    await master.api.put(`${base()}/rules`, { inventory: { maxItems: startCount }, players: { [player.user.id]: { inventory: { maxItems: null } } } }).expect(200);
+    const { body: armor } = await pick({ itemId: 'placas' }).expect(201);
+    expect(armor.received).toMatchObject({ kind: 'item', name: 'Armadura de placas', weight: 20 });
+
+    // tira um item de dentro: a mochila fica no mapa sem ele
+    const { body: bread } = await pick({ itemId: 'mochila', contentId: 'pao' }).expect(201);
+    expect(bread.received).toMatchObject({ name: 'Pão', quantity: 2, weight: 0.4 });
+    expect((await pick({ itemId: 'mochila', contentId: 'pao' }).expect(409)).body.message).toBe('Já tiraram esse item daí.');
+    const left = (await player.api.get(`${base()}/scenes/${scene.id}`).expect(200)).body.tiles.items.find((it) => it.id === 'mochila');
+    expect(left.contents.map((c) => c.id)).toEqual(['corda']);
+
+    // leva a mochila inteira: vira item da ficha com o que tem dentro
+    const { body: bag } = await pick({ itemId: 'mochila' }).expect(201);
+    expect(bag.received).toMatchObject({ kind: 'item', name: 'Mochila', weight: 1, container: true });
+    expect(bag.received.contents.map((c) => c.name)).toEqual(['Corda']);
+    const after = await sheet();
+    expect(after.inventory.find((it) => it.container)?.contents).toHaveLength(1);
+    // a ficha salva de novo mantem a mochila com o conteudo
+    const { body: saved } = await player.api.patch(`/api/characters/${playerCharacter.id}/play`, { inventory: after.inventory }).expect(200);
+    expect(saved.inventory.find((it) => it.container)?.contents[0]).toMatchObject({ name: 'Corda', weight: 1 });
+
+    // bau nao pegavel: o mestre destranca e o jogador tira o anel (sem a nota do mestre)
+    expect((await pick({ itemId: 'bau' }).expect(409)).body.message).toBe('Este item não pode ser pego.');
+    await master.api.patch(`${base()}/scenes/${scene.id}/items/bau`, { locked: false }).expect(200);
+    const { body: ring } = await pick({ itemId: 'bau', contentId: 'anel' }).expect(201);
+    expect(ring.item).not.toHaveProperty('note');
+    expect(ring.received).toMatchObject({ name: 'Anel de prata', weight: 0.02 });
+    // o mestre poe itens num recipiente pelo popover
+    await master.api.patch(`${base()}/scenes/${scene.id}/items/bau`, { contents: [{ id: 'adaga', name: 'Adaga' }] }).expect(200);
+    const bauNow = (await master.api.get(`${base()}/scenes/${scene.id}`).expect(200)).body.tiles.items.find((it) => it.id === 'bau');
+    expect(bauNow).toMatchObject({ container: true, contents: [{ id: 'adaga', name: 'Adaga' }] });
+    await player.api.patch(`${base()}/tokens/${tok.id}`, { x: 350, y: 350 }).expect(200);
+    expect((await pick({ itemId: 'bau', contentId: 'adaga' }).expect(409)).body.message).toBe('Chegue mais perto para pegar.');
+    await master.api.put(`${base()}/rules`, {}).expect(200);
   });
 
   it('casas com interior, portas trancadas, regras do mestre e itens configuraveis', async () => {

@@ -291,9 +291,11 @@ export default function CampaignRoom() {
   }, [isMaster, scene]);
 
   // Mesmas regras do servidor, so para explicar no botao por que nao da para pegar.
-  const pickupBlock = useCallback((item) => {
+  // opts.content: tirar um item de dentro do recipiente (nao depende de o recipiente ser pegavel).
+  const pickupBlock = useCallback((item, opts = {}) => {
     if (!scene || scene.mode === 'prep') return 'A mesa está em preparação.';
-    if (item.pickable === false) return 'Este item não pode ser pego.';
+    if (!opts.content && item.pickable === false) return 'Este item não pode ser pego.';
+    if (item.locked) return 'Está trancado.';
     if (!rights.pickup) return 'O mestre não liberou pegar itens agora.';
     if (scene.mode !== 'combat' && rights.turn && rights.turn !== myToken?.id) return 'Agora é a vez de outro personagem.';
     if (!myToken) return 'Coloque seu personagem no mapa primeiro.';
@@ -341,12 +343,18 @@ export default function CampaignRoom() {
     } catch (err) { notify(err.response?.data?.message || 'Não deu para mudar o item.', 'error'); }
   }, [id, viewSceneId, notify]);
 
-  const pickup = useCallback(async (item, characterId) => {
+  // content: item de dentro de um recipiente (mochila, bau); sem ele leva o item/recipiente inteiro.
+  const pickup = useCallback(async (item, characterId, content) => {
     try {
-      const { data } = await api.post(`/campaigns/${id}/scenes/${scene.id}/pickup`, { itemId: item.id, ...(characterId ? { characterId } : {}) });
+      const { data } = await api.post(`/campaigns/${id}/scenes/${scene.id}/pickup`, { itemId: item.id, ...(characterId ? { characterId } : {}), ...(content ? { contentId: content.id } : {}) });
       // some na hora para quem pegou; o evento scene:updated confirma para todos
-      setScene((cur) => (cur?.tiles ? { ...cur, tiles: { ...cur.tiles, items: (cur.tiles.items || []).filter((it) => it.id !== item.id) } } : cur));
-      notify(data.received?.kind === 'dracmas' ? `+${data.received.dracmas} dracmas na bolsa.` : `${item.name} foi para o inventário.`);
+      const without = (list) => (content
+        ? list.map((it) => (it.id === item.id ? { ...it, contents: (it.contents || []).filter((c) => c.id !== content.id) } : it))
+        : list.filter((it) => it.id !== item.id));
+      setScene((cur) => (cur?.tiles ? { ...cur, tiles: { ...cur.tiles, items: without(cur.tiles.items || []) } } : cur));
+      const name = (content || item).name;
+      const extra = data.received?.kind === 'item' && data.received.dracmas ? ` +${data.received.dracmas} dracmas na bolsa.` : '';
+      notify(data.received?.kind === 'dracmas' ? `+${data.received.dracmas} dracmas na bolsa.` : `${name} foi para o inventário.${extra}`);
       setSheetReload((n) => n + 1);
     } catch (err) {
       notify(err.response?.data?.message || 'Não deu para pegar.', 'error');
@@ -653,7 +661,7 @@ export default function CampaignRoom() {
               />
             )}
             {tab === 'notes' && <NotesPanel campaignId={id} notes={notes} currentUserId={user?.id} isMaster={isMaster} onChanged={loadNotes} />}
-            {tab === 'sheets' && <SheetsPanel campaignId={id} members={room.members || []} myCharacters={myCharacters} myMember={myMember} isMaster={isMaster} onShare={share} sharing={sharing} reloadKey={sheetReload} />}
+            {tab === 'sheets' && <SheetsPanel rules={rules} campaignId={id} members={room.members || []} myCharacters={myCharacters} myMember={myMember} isMaster={isMaster} onShare={share} sharing={sharing} reloadKey={sheetReload} />}
             {tab === 'gm' && isMaster && (
               <GMPanel
                 campaignId={id}
@@ -670,6 +678,8 @@ export default function CampaignRoom() {
                 onChanged={() => { loadScenes(true).catch(() => null); loadScene(stateRef.current.viewSceneId).catch(() => null); loadNpcs(); }}
                 onOpenTileEditor={setTileEditor}
                 notify={notify}
+                rules={rules}
+                onRulesChange={setRules}
               />
             )}
             {tab === 'diary' && <div className="h-full overflow-y-auto p-3"><CampaignDiaryTab campaignId={id} isMaster={isMaster} currentUserId={user?.id} /></div>}

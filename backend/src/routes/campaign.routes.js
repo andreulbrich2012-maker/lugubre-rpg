@@ -21,6 +21,8 @@ import { requireAuth } from '../middleware/auth.js';
 import { boolish, sendError, uuidParam } from '../utils/http.js';
 import { assertCampaignMaster, dbMember, isMaster, requireCampaignMember } from '../utils/campaignAccess.js';
 import { emitEvent } from '../utils/events.js';
+import { inventoryLimitError, roundKg, unitWeight } from '../utils/itemWeight.js';
+import { inventoryLimits } from '../utils/tableRules.js';
 import { registerCampaignV2Routes } from './campaign.v2.js';
 
 const router = Router();
@@ -903,15 +905,24 @@ async function decidePurchase(req, status) {
         throw error;
       }
       const inventory = parseJsonField(character.rows[0].inventory, []);
-      inventory.push({
+      // peso 0 na loja vira o peso sugerido pelo nome; o limite do mestre vale para compras tambem
+      const bought = {
         id: crypto.randomUUID(),
         quantity: request.quantity,
-        weight: Number(request.weight || 0),
+        weight: roundKg(unitWeight({ name: request.item_name, description: request.item_description, weight: Number(request.weight || 0) })),
         name: request.item_name,
         category: 'Compras',
         description: request.item_description || '',
         defenseBonus: 0
-      });
+      };
+      const rules = await client.query('select table_rules from campaigns where id=$1', [req.params.id]);
+      const full = inventoryLimitError(inventory, [bought], inventoryLimits(parseJsonField(rules.rows[0]?.table_rules, {}), request.user_id));
+      if (full) {
+        const error = new Error(full);
+        error.status = 409;
+        throw error;
+      }
+      inventory.push(bought);
       await client.query(
         'update characters set wallet=$1, inventory=$2, updated_at=now() where id=$3',
         [toJson(walletFromTotal(total - request.total_price)), toJson(inventory), request.character_id]

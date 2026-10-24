@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Check, Eye, EyeOff, Heart, ImageUp, Map as MapIcon, Play, Plus, Skull, SkipForward, Square, Trash2, X } from 'lucide-react';
 import Button from '../../Button';
 import { api } from '../../../lib/api';
+import { normalizeRules } from '../../../lib/tableRules';
 
 // Painel do mestre: tudo que so ele controla. O mestre decide acerto e dano; os jogadores so veem o efeito.
 const CONDITIONS = ['caído', 'envenenado', 'atordoado', 'imobilizado', 'sangrando', 'amedrontado', 'invisível', 'inconsciente'];
@@ -26,6 +27,104 @@ async function compressMap(file) {
   }
 }
 
+// '' = sem limite (null); peso em kg com 2 casas, itens inteiros
+const limitValue = (text, int = false) => {
+  if (String(text ?? '').trim() === '') return null;
+  const n = Number(String(text).replace(',', '.'));
+  if (!Number.isFinite(n) || n < 0) return null;
+  return int ? Math.floor(n) : Math.round(n * 100) / 100;
+};
+const limitText = (value) => (value == null ? '' : String(value).replace('.', ','));
+
+// Regras da mesa: liga/desliga movimento, poderes e pegar itens, e limita o inventario
+// (peso maximo em kg e quantidade de itens), geral ou so para um jogador.
+function TableRules({ campaignId, rules, members, onRulesChange, notify }) {
+  const players = members.filter((m) => m.role !== 'master');
+  const draftFrom = (r) => ({
+    maxWeight: limitText(r.inventory?.maxWeight), maxItems: limitText(r.inventory?.maxItems),
+    players: Object.fromEntries(players.map((m) => {
+      const own = r.players?.[m.user_id]?.inventory || {};
+      return [m.user_id, { maxWeight: 'maxWeight' in own ? limitText(own.maxWeight) : '', maxItems: 'maxItems' in own ? limitText(own.maxItems) : '' }];
+    }))
+  });
+  const [draft, setDraft] = useState(() => draftFrom(rules));
+  const [saving, setSaving] = useState(false);
+  const rulesKey = JSON.stringify(rules);
+  useEffect(() => { setDraft(draftFrom(rules)); }, [rulesKey, players.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function save(next, ok) {
+    setSaving(true);
+    try {
+      const { data } = await api.put(`/campaigns/${campaignId}/rules`, next);
+      onRulesChange?.(normalizeRules(data));
+      if (ok) notify(ok);
+    } catch (err) {
+      notify(err.response?.data?.message || 'Não deu para salvar as regras.', 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function saveLimits() {
+    const nextPlayers = { ...rules.players };
+    for (const m of players) {
+      const d = draft.players[m.user_id] || {};
+      const { inventory: _old, ...rest } = nextPlayers[m.user_id] || {};
+      // campo vazio = vale o limite geral para este jogador
+      const inventory = {};
+      if (String(d.maxWeight ?? '').trim() !== '') inventory.maxWeight = limitValue(d.maxWeight);
+      if (String(d.maxItems ?? '').trim() !== '') inventory.maxItems = limitValue(d.maxItems, true);
+      const entry = Object.keys(inventory).length ? { ...rest, inventory } : rest;
+      if (Object.keys(entry).length) nextPlayers[m.user_id] = entry; else delete nextPlayers[m.user_id];
+    }
+    save({ ...rules, inventory: { maxWeight: limitValue(draft.maxWeight), maxItems: limitValue(draft.maxItems, true) }, players: nextPlayers }, 'Limites do inventário salvos.');
+  }
+
+  const toggles = [['move', 'Movimento'], ['powers', 'Poderes e ataques'], ['pickup', 'Pegar itens']];
+  return (
+    <>
+      <div className="space-y-2 text-sm text-mist">
+        {toggles.map(([key, label]) => (
+          <label key={key} className="flex items-center gap-2">
+            <input type="checkbox" checked={rules[key] !== false} disabled={saving} onChange={(e) => save({ ...rules, [key]: e.target.checked })} className="accent-[var(--color-ember)]" /> {label} liberado
+          </label>
+        ))}
+      </div>
+      <p className="mt-4 font-bold text-bone">Inventário dos jogadores</p>
+      <p className="text-xs text-mist">Vazio = sem limite. Mochilas guardam itens dentro: pesam, mas contam como 1 item.</p>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+        <label className="text-mist">Peso máximo (kg)
+          <input inputMode="decimal" className="field" placeholder="sem limite" value={draft.maxWeight} onChange={(e) => setDraft({ ...draft, maxWeight: e.target.value })} />
+        </label>
+        <label className="text-mist">Máximo de itens
+          <input inputMode="numeric" className="field" placeholder="sem limite" value={draft.maxItems} onChange={(e) => setDraft({ ...draft, maxItems: e.target.value })} />
+        </label>
+      </div>
+      {players.length > 0 && (
+        <details className="mt-2 text-sm">
+          <summary className="cursor-pointer text-mist">Limite diferente para um jogador</summary>
+          <p className="mt-1 text-xs text-mist">Vazio = vale o limite geral.</p>
+          <ul className="mt-1 space-y-1">
+            {players.map((m) => {
+              const d = draft.players[m.user_id] || { maxWeight: '', maxItems: '' };
+              const set = (patch) => setDraft({ ...draft, players: { ...draft.players, [m.user_id]: { ...d, ...patch } } });
+              const name = m.shared_character?.character_name || m.display_name || m.name;
+              return (
+                <li key={m.user_id} className="grid grid-cols-[1fr_5rem_5rem] items-center gap-1">
+                  <span className="truncate text-bone">{name}</span>
+                  <input inputMode="decimal" className="field !mt-0 !min-h-9 !py-1" placeholder="kg" value={d.maxWeight} onChange={(e) => set({ maxWeight: e.target.value })} aria-label={`Peso máximo de ${name}`} />
+                  <input inputMode="numeric" className="field !mt-0 !min-h-9 !py-1" placeholder="itens" value={d.maxItems} onChange={(e) => set({ maxItems: e.target.value })} aria-label={`Máximo de itens de ${name}`} />
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      )}
+      <Button className="mt-3 !min-h-10 text-sm" disabled={saving} onClick={saveLimits}>Salvar limites</Button>
+    </>
+  );
+}
+
 function Section({ title, children, open = true }) {
   return (
     <details open={open} className="border-b-[3px] border-lead">
@@ -35,7 +134,7 @@ function Section({ title, children, open = true }) {
   );
 }
 
-export default function GMPanel({ campaignId, scenes, scene, viewSceneId, onViewScene, tokens, members, npcs, pending, onResolve, onDismiss, onChanged, onOpenTileEditor, notify }) {
+export default function GMPanel({ campaignId, scenes, scene, viewSceneId, onViewScene, tokens, members, npcs, pending, onResolve, onDismiss, onChanged, onOpenTileEditor, notify, rules, onRulesChange }) {
   const [monsters, setMonsters] = useState([]);
   const [newNpc, setNewNpc] = useState(null);
   const [amounts, setAmounts] = useState({});
@@ -290,6 +389,9 @@ export default function GMPanel({ campaignId, scenes, scene, viewSceneId, onView
           )}
         </Section>
       )}
+      <Section title="Regras da mesa" open={false}>
+        <TableRules campaignId={campaignId} rules={normalizeRules(rules)} members={members} onRulesChange={onRulesChange} notify={notify} />
+      </Section>
     </div>
   );
 }

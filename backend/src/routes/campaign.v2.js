@@ -7,8 +7,9 @@ import { pool, query } from '../db/pool.js';
 import { assertCampaignMaster, requireCampaignMember } from '../utils/campaignAccess.js';
 import { emitEvent, emitSplit, latestEventId, listEvents } from '../utils/events.js';
 import { boolish, httpError, parseJson, requireDatabase } from '../utils/http.js';
-import { buildingDoor, buildingLook, dracmasToCoins, playerTiles, validateTiles } from '../utils/tiles.js';
-import { assertRight, normalizeRules, tableRulesSchema } from '../utils/tableRules.js';
+import { buildingDoor, buildingLook, contentSchema, dracmasToCoins, MAX_CONTENTS, playerItem, playerTiles, validateTiles } from '../utils/tiles.js';
+import { assertRight, inventoryLimits, normalizeRules, tableRulesSchema } from '../utils/tableRules.js';
+import { inventoryLimitError, roundKg, unitWeight } from '../utils/itemWeight.js';
 import { parseDiceFormula, rollDiceFormula, SKILL_DEFINITIONS } from '../utils/rules.js';
 import { enrich } from './character.routes.js';
 
@@ -119,6 +120,8 @@ const vitalsSchema = z.object({
 });
 const pickupSchema = z.object({
   itemId: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/),
+  // recipiente: contentId tira so aquele item de dentro; sem ele leva o recipiente inteiro
+  contentId: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/).optional(),
   characterId: z.string().uuid().optional()
 });
 const PICKUP_RANGE = 1.5; // passos (centro do token ate o centro da celula do item)
@@ -989,7 +992,10 @@ export function registerCampaignV2Routes(router) {
     pickable: z.boolean().optional(),
     hidden: z.boolean().optional(),
     note: z.string().max(300).optional(),
-    icon: z.string().regex(/^[a-z0-9_-]{1,60}$/).nullable().optional()
+    icon: z.string().regex(/^[a-z0-9_-]{1,60}$/).nullable().optional(),
+    container: z.boolean().optional(),
+    locked: z.boolean().optional(),
+    contents: z.array(contentSchema).max(MAX_CONTENTS, `No máximo ${MAX_CONTENTS} itens dentro de um recipiente.`).optional()
   });
   router.patch('/:id/scenes/:sceneId/items/:mapItemId', async (req, res) => {
     await assertCampaignMaster(req.params.id, req.user);
@@ -1158,7 +1164,19 @@ export function registerCampaignV2Routes(router) {
       const items = Array.isArray(tiles?.items) ? tiles.items : [];
       const item = items.find((entry) => entry.id === body.itemId);
       if (!item || (!master && item.hidden)) throw httpError('Já pegaram esse item.', 409);
-      if (item.pickable === false && !master) throw httpError('Este item não pode ser pego.', 409);
+      // recipiente (mochila, bau): da para tirar um item de dentro mesmo se o recipiente nao for pegavel
+      const isContainer = Boolean(item.container || item.contents?.length);
+      let content = null;
+      if (body.contentId) {
+        if (!isContainer) throw httpError('Este item não é um recipiente.', 409);
+        if (item.locked && !master) throw httpError('Está trancado.', 409);
+        content = (item.contents || []).find((entry) => entry.id === body.contentId);
+        if (!content) throw httpError('Já tiraram esse item daí.', 409);
+      } else {
+        if (item.pickable === false && !master) throw httpError('Este item não pode ser pego.', 409);
+        if (isContainer && item.locked && !master) throw httpError('Está trancado.', 409);
+      }
+      const rules = await loadRules(req.params.id);
 
       let characterId = body.characterId;
       let combatState = null;
@@ -1174,7 +1192,7 @@ export function registerCampaignV2Routes(router) {
           (Number(token.y) + (Number(token.size || 1) * grid) / 2) / grid - (item.y + 0.5)
         );
         const token = mine.sort((a, b) => distance(a) - distance(b))[0];
-        assertRight(await loadRules(req.params.id), req.user.id, 'pickup', { turnTokenIds: [token.id], inCombat: scene.mode === 'combat' });
+        assertRight(rules, req.user.id, 'pickup', { turnTokenIds: [token.id], inCombat: scene.mode === 'combat' });
         if (scene.mode === 'combat') {
           const state = parseJson(scene.turn_state, {});
           if (state.tokenId !== token.id) throw httpError('Não é o seu turno.', 409);
@@ -1187,41 +1205,59 @@ export function registerCampaignV2Routes(router) {
         throw httpError('Esse personagem não está nesta campanha.', 404);
       }
 
-      const character = (await client.query('select id, character_name, inventory, wallet from characters where id = $1 for update', [characterId])).rows[0];
+      const character = (await client.query('select id, owner_id, character_name, inventory, wallet from characters where id = $1 for update', [characterId])).rows[0];
       if (!character) throw httpError('Ficha não encontrada.', 404);
       let inventory = parseJson(character.inventory, []);
       const wallet = { bronze: 0, silver: 0, platinum: 0, gold: 0, ...parseJson(character.wallet, {}) };
-      let received;
-      if (item.dracmas > 0) {
-        // dinheiro vai para a bolsa, ja trocado nas moedas maiores
-        const coins = dracmasToCoins(item.dracmas);
-        for (const [coin, amount] of Object.entries(coins)) wallet[coin] = Number(wallet[coin] || 0) + amount;
-        received = { kind: 'dracmas', dracmas: item.dracmas, name: item.name };
+      // mesmo formato de item da ficha (character.routes.js normalizeItem); peso 0 vira o sugerido
+      const toEntry = (it) => ({
+        id: crypto.randomUUID(), name: it.name, quantity: it.quantity || 1, weight: roundKg(unitWeight(it)),
+        category: it.category || 'Achados', description: it.description || '', defenseBonus: 0, ...(it.icon ? { icon: it.icon } : {})
+      });
+      // dinheiro vai para a bolsa (ja trocado nas moedas maiores); o resto vira item da ficha
+      let dracmas = 0;
+      const entries = [];
+      if (content) {
+        if (content.dracmas > 0) dracmas += content.dracmas;
+        else entries.push(toEntry(content));
+      } else if (isContainer) {
+        const inner = item.contents || [];
+        dracmas += Number(item.dracmas || 0) + inner.reduce((sum, entry) => sum + Number(entry.dracmas || 0), 0);
+        entries.push({ ...toEntry(item), container: true, contents: inner.filter((entry) => !(entry.dracmas > 0)).map(toEntry) });
+      } else if (item.dracmas > 0) {
+        dracmas += item.dracmas;
       } else {
-        // mesmo formato de item da ficha (character.routes.js normalizeItem)
-        const entry = {
-          id: crypto.randomUUID(), name: item.name, quantity: item.quantity || 1, weight: Number(item.weight || 0),
-          category: item.category || 'Achados', description: item.description || '', defenseBonus: 0
-        };
-        inventory = [...inventory, entry];
-        received = { kind: 'item', ...entry };
+        entries.push(toEntry(item));
       }
+      // limite de peso e de itens que o mestre definiu (vale tambem quando o mestre entrega)
+      const full = inventoryLimitError(inventory, entries, inventoryLimits(rules, character.owner_id));
+      if (full) throw httpError(full, 409);
+      if (dracmas > 0) {
+        for (const [coin, amount] of Object.entries(dracmasToCoins(dracmas))) wallet[coin] = Number(wallet[coin] || 0) + amount;
+      }
+      inventory = [...inventory, ...entries];
+      const received = entries.length ? { kind: 'item', ...entries[0], ...(dracmas ? { dracmas } : {}) } : { kind: 'dracmas', dracmas, name: (content || item).name };
       await client.query('update characters set inventory = $1, wallet = $2, updated_at = now() where id = $3', [JSON.stringify(inventory), JSON.stringify(wallet), character.id]);
-      const nextItems = items.filter((entry) => entry.id !== item.id);
+      const nextItems = content
+        ? items.map((entry) => (entry.id === item.id ? { ...entry, contents: (entry.contents || []).filter((c) => c.id !== content.id) } : entry))
+        : items.filter((entry) => entry.id !== item.id);
       const sceneFieldsUpdate = combatState ? ', turn_state = $3' : '';
       const updatedScene = (await client.query(
         `update campaign_scenes set tiles = $1${sceneFieldsUpdate}, updated_at = now() where id = $2 returning *`,
         combatState ? [JSON.stringify({ ...tiles, items: nextItems }), scene.id, JSON.stringify(combatState)] : [JSON.stringify({ ...tiles, items: nextItems }), scene.id]
       )).rows[0];
-      const what = item.dracmas > 0 ? `${item.dracmas} dracmas (${item.name})` : `${item.name}${item.quantity > 1 ? ` ×${item.quantity}` : ''}`;
-      const content = `${character.character_name} pegou ${what}`;
+      const label = (it) => (it.dracmas > 0 ? `${it.dracmas} dracmas (${it.name})` : `${it.name}${it.quantity > 1 ? ` ×${it.quantity}` : ''}`);
+      const what = content ? `${label(content)} de ${item.name}`
+        : isContainer ? `${item.name}${item.contents?.length ? ` com ${item.contents.length} ${item.contents.length === 1 ? 'item' : 'itens'} dentro` : ''}`
+          : label(item);
+      const messageText = `${character.character_name} pegou ${what}`;
       const message = (await client.query(
         `insert into messages (campaign_id, user_id, character_id, content, message_type, meta)
          values ($1,$2,$3,$4,'event',$5) returning id, message_type, meta, campaign_id, user_id, character_id, content, created_at, updated_at`,
-        [req.params.id, req.user.id, character.id, content, JSON.stringify({ event: 'pickup', sceneId: scene.id, itemId: item.id })]
+        [req.params.id, req.user.id, character.id, messageText, JSON.stringify({ event: 'pickup', sceneId: scene.id, itemId: item.id, ...(content ? { contentId: content.id } : {}) })]
       )).rows[0];
       await client.query('commit');
-      result = { item, received, character, inventory, wallet, updatedScene, combatState, message };
+      result = { item: content || item, received, character, inventory, wallet, updatedScene, combatState, message };
     } catch (error) {
       await client.query('rollback');
       throw error;
@@ -1241,7 +1277,7 @@ export function registerCampaignV2Routes(router) {
     await emitEvent(req.params.id, 'character:updated', { characterId: result.character.id }, 'all', req.user.id);
     if (result.combatState) await emitCombat(req.params.id, updatedScene, req.user.id);
     res.status(201).json({
-      item: result.item,
+      item: master ? result.item : playerItem(result.item),
       received: result.received,
       character: { id: result.character.id, inventory: result.inventory, wallet: result.wallet }
     });

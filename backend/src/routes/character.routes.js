@@ -12,11 +12,12 @@ import {
 import { requireAuth } from '../middleware/auth.js';
 import { applyRaceModifiers, baseAttributes, baseSkills, calculateDefense, calculateDodge, rollDiceFormula } from '../utils/rules.js';
 import { imageReferenceSchema } from '../utils/images.js';
+import { roundKg, unitWeight } from '../utils/itemWeight.js';
 
 const router = Router();
 router.use(requireAuth);
 
-const itemSchema = z.object({
+const itemShape = {
   id: z.string().optional(),
   quantity: z.coerce.number().min(0).default(1),
   weight: z.coerce.number().min(0).default(0),
@@ -26,6 +27,12 @@ const itemSchema = z.object({
   defenseBonus: z.coerce.number().default(0),
   // icone pixel art escolhido a mao (frontend/src/lib/icons); sem ele o icone sai do nome
   icon: z.string().regex(/^[a-z0-9_-]{1,60}$/).optional()
+};
+// mochila/bau no inventario: guarda itens dentro (1 nivel so, max 30)
+const itemSchema = z.object({
+  ...itemShape,
+  container: z.boolean().optional(),
+  contents: z.array(z.object(itemShape)).max(30, 'No máximo 30 itens dentro de um recipiente.').optional()
 });
 
 const powerSchema = z.object({
@@ -117,17 +124,27 @@ function normalizeSkillTraining(skills = {}, keys = []) {
   }));
 }
 
+// Peso 0 ou ausente vira o peso sugerido pelo nome/categoria (utils/itemWeight.js).
 function normalizeItem(item) {
   const parsed = itemSchema.parse(item);
-  return {
-    ...parsed,
+  const { contents, container, ...rest } = parsed;
+  const normalized = {
+    ...rest,
     id: parsed.id || crypto.randomUUID(),
     quantity: Number(parsed.quantity ?? 1),
-    weight: Number(parsed.weight ?? 0),
+    weight: roundKg(unitWeight(parsed)),
     category: parsed.category || 'Outros',
     description: parsed.description || '',
     defenseBonus: Number(parsed.defenseBonus ?? 0)
   };
+  if (container || contents?.length) {
+    normalized.container = true;
+    normalized.contents = (contents || []).map((inner) => {
+      const { contents: _c, container: _k, ...flat } = normalizeItem(inner);
+      return flat;
+    });
+  }
+  return normalized;
 }
 
 function normalizePower(power) {

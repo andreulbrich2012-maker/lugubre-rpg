@@ -1,15 +1,37 @@
 // Regras da mesa que o mestre controla (campaigns.table_rules):
 // { move, powers, pickup: liga/desliga para todos; turn: tokenId da vez fora do combate (null = livre);
-//   players: { [userId]: { move?, powers?, pickup? } } excecoes por jogador (false trava so ele) }
+//   inventory: { maxWeight (kg), maxItems } limites do inventario (null = sem limite);
+//   players: { [userId]: { move?, powers?, pickup?, inventory? } } excecoes por jogador (false trava so ele;
+//   inventory do jogador troca o limite geral so para ele, campo ausente = vale o geral) }
 import { z } from 'zod';
 import { httpError } from './http.js';
 
 const flags = { move: z.boolean().optional(), powers: z.boolean().optional(), pickup: z.boolean().optional() };
+const limit = (max) => z.coerce.number().min(0).max(max).nullable().optional();
+const inventorySchema = z.object({ maxWeight: limit(100000), maxItems: limit(10000) });
 export const tableRulesSchema = z.object({
   ...flags,
   turn: z.string().uuid().nullable().optional(),
-  players: z.record(z.string().uuid(), z.object(flags)).optional()
+  inventory: inventorySchema.optional(),
+  players: z.record(z.string().uuid(), z.object({ ...flags, inventory: inventorySchema.optional() })).optional()
 });
+
+// null/ausente = sem limite; peso com 2 casas, itens inteiros.
+const cleanLimit = (value, int = false) => {
+  if (value === null || value === undefined || value === '') return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return int ? Math.floor(n) : Math.round(n * 100) / 100;
+};
+function normalizeInventory(raw, keepMissing = false) {
+  const r = raw && typeof raw === 'object' ? raw : {};
+  const out = {};
+  for (const [key, int] of [['maxWeight', false], ['maxItems', true]]) {
+    if (keepMissing && !(key in r)) continue;
+    out[key] = cleanLimit(r[key], int);
+  }
+  return out;
+}
 
 export function normalizeRules(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
@@ -18,7 +40,24 @@ export function normalizeRules(raw) {
     powers: r.powers !== false,
     pickup: r.pickup !== false,
     turn: r.turn || null,
-    players: r.players && typeof r.players === 'object' ? r.players : {}
+    inventory: normalizeInventory(r.inventory),
+    players: r.players && typeof r.players === 'object'
+      ? Object.fromEntries(Object.entries(r.players).map(([id, own]) => {
+        const { inventory, ...rest } = own && typeof own === 'object' ? own : {};
+        const inv = normalizeInventory(inventory, true);
+        return [id, Object.keys(inv).length ? { ...rest, inventory: inv } : rest];
+      }))
+      : {}
+  };
+}
+
+// Limites do inventario de um jogador: a excecao dele (se tiver) ou o limite geral da mesa.
+export function inventoryLimits(rules, userId) {
+  const r = normalizeRules(rules);
+  const own = r.players[userId]?.inventory || {};
+  return {
+    maxWeight: 'maxWeight' in own ? own.maxWeight : r.inventory.maxWeight,
+    maxItems: 'maxItems' in own ? own.maxItems : r.inventory.maxItems
   };
 }
 

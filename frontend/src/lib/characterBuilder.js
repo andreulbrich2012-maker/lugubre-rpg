@@ -1,3 +1,5 @@
+import { unitWeight } from './itemWeight.js';
+
 const requiredNumbers = [
   'level',
   'lifeCurrent',
@@ -48,7 +50,8 @@ export function buildCharacterPayload(form, { includeSkills = false } = {}) {
     inventory: (form.inventory || []).map((item) => ({
       ...item,
       quantity: Number(item.quantity ?? 1),
-      weight: Number(item.weight || 0),
+      // peso 0 ou vazio vira o peso sugerido pelo nome (lib/itemWeight.js)
+      weight: unitWeight(item),
       defenseBonus: Number(item.defenseBonus || 0)
     }))
   };

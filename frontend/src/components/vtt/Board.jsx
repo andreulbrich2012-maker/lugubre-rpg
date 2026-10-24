@@ -9,6 +9,7 @@ import { getTile } from '../../lib/tiles/catalog';
 import AvatarSprite from '../avatar/AvatarSprite';
 import FxLayer from '../fx/FxLayer';
 import ItemIcon from '../icons/ItemIcon';
+import ContainerContents from './ContainerContents';
 import MonsterSprite from '../monsters/MonsterSprite';
 import { monsterLook } from '../../lib/monsters/classify';
 
@@ -677,14 +678,19 @@ export default function Board({
             <ul className="space-y-2">
               {here.map((it) => {
                 const reason = isMaster ? null : pickupBlock?.(it);
+                // recipiente: tirar de dentro nao depende de o recipiente ser pegavel
+                const isBox = Boolean(it.container || it.contents?.length);
+                const innerReason = isMaster || !isBox ? null : pickupBlock?.(it, { content: true });
                 return (
                   <li key={it.id} className="border-t-2 border-lead pt-2 first:border-0 first:pt-0">
                     <p className="flex items-center gap-2 font-bold"><ItemIcon item={it} size={32} />{it.name}{it.dracmas ? ` — ${it.dracmas} dracmas` : it.quantity > 1 ? ` ×${it.quantity}` : ''}</p>
                     {it.description && <p className="text-xs text-mist">{it.description}</p>}
+                    {isBox && <ContainerContents item={it} isMaster={isMaster} reason={innerReason} onTake={(c) => onPickup?.(it, undefined, c)} onPatch={(patch) => onPatchItem?.(it, patch)} />}
+                    {isBox && innerReason && innerReason !== reason && <p className="mt-1 text-xs text-ember">{innerReason}</p>}
                     {!isMaster && (
                       <>
                         <button type="button" autoFocus className="btn btn-lit mt-1 !min-h-9 w-full text-sm" disabled={Boolean(reason)} onClick={() => onPickup?.(it)}>
-                          <Hand size={15} /> Pegar
+                          <Hand size={15} /> {isBox ? 'Levar tudo' : 'Pegar'}
                         </button>
                         {reason && <p className="mt-1 text-xs text-ember">{reason}</p>}
                       </>
@@ -693,6 +699,8 @@ export default function Board({
                       <div className="mt-1 flex flex-wrap gap-1">
                         <button type="button" className={`btn !min-h-8 text-xs ${it.pickable === false ? 'btn-glass' : 'btn-lit'}`} onClick={() => onPatchItem?.(it, { pickable: it.pickable === false })} aria-pressed={it.pickable !== false}>{it.pickable === false ? 'Não pegável' : 'Pegável'}</button>
                         <button type="button" className={`btn !min-h-8 text-xs ${it.hidden ? 'btn-lit' : 'btn-glass'}`} onClick={() => onPatchItem?.(it, { hidden: !it.hidden })} aria-pressed={Boolean(it.hidden)}>{it.hidden ? 'Escondido' : 'Visível'}</button>
+                        <button type="button" className={`btn !min-h-8 text-xs ${isBox ? 'btn-lit' : 'btn-glass'}`} onClick={() => onPatchItem?.(it, isBox ? { container: false, contents: [], locked: false } : { container: true, contents: [] })} aria-pressed={isBox} disabled={isBox && it.contents?.length > 0} title={isBox && it.contents?.length ? 'Esvazie antes de deixar de ser recipiente.' : undefined}>{isBox ? 'Recipiente' : 'Não é recipiente'}</button>
+                        {isBox && <button type="button" className={`btn !min-h-8 text-xs ${it.locked ? 'btn-lit' : 'btn-glass'}`} onClick={() => onPatchItem?.(it, { locked: !it.locked })} aria-pressed={Boolean(it.locked)}>{it.locked ? 'Trancado' : 'Destrancado'}</button>}
                         {it.note && <p className="w-full text-xs text-ember">Nota: {it.note}</p>}
                       </div>
                     )}

@@ -3,6 +3,9 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, ExternalLink, Minus, Plus } from 'lucide-react';
 import Button from '../../Button';
 import { api } from '../../../lib/api';
+import ItemIcon from '../../icons/ItemIcon';
+import { formatKg, inventoryLoad, itemLoad } from '../../../lib/itemWeight';
+import { inventoryLimits } from '../../../lib/tableRules';
 
 // Fichas na campanha: o jogador escolhe qual ficha o mestre ve; o mestre abre a ficha inteira e mexe nos vitais.
 const VITALS = [
@@ -35,7 +38,26 @@ export function vitalOf(sheet, kind) {
   return { current: Number(current ?? 0), max: Number(sheet?.[`${kind}_max`] ?? 0) };
 }
 
-function FullSheet({ campaignId, characterId, isMaster, onBack, reloadKey }) {
+// Carga do inventario contra o limite do mestre (peso e quantidade de itens; sem limite = so o total).
+export function InventoryLoad({ inventory, limits }) {
+  const load = inventoryLoad(inventory);
+  const rows = [
+    ['Peso', formatKg(load.weight), limits.maxWeight != null ? formatKg(limits.maxWeight) : null, limits.maxWeight ? load.weight / limits.maxWeight : 0],
+    ['Itens', String(load.count), limits.maxItems != null ? String(limits.maxItems) : null, limits.maxItems ? load.count / limits.maxItems : 0]
+  ];
+  return (
+    <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+      {rows.map(([label, value, max, pct]) => (
+        <div key={label} className="border-2 border-lead bg-black/40 px-2 py-1">
+          <p className="flex justify-between gap-1"><span className="text-mist">{label}</span><span className={`tabular ${pct > 1 ? 'text-ember' : 'text-bone'}`}>{value}{max ? <span className="text-mist"> / {max}</span> : <span className="text-mist"> · sem limite</span>}</span></p>
+          {max && <div className="mt-1 h-1.5 border border-lead bg-black/60"><div className="h-full" style={{ width: `${Math.min(100, pct * 100)}%`, background: pct > 0.9 ? '#a3182f' : 'var(--color-ember)' }} /></div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FullSheet({ campaignId, characterId, isMaster, onBack, reloadKey, rules }) {
   const [sheet, setSheet] = useState(null);
   const [error, setError] = useState('');
 
@@ -107,25 +129,34 @@ function FullSheet({ campaignId, characterId, isMaster, onBack, reloadKey }) {
           </ul>
         </section>
       ) : null))}
-      {sheet.inventory?.length > 0 && (
-        <section>
-          <h4 className="font-display text-xl text-bone">Inventário</h4>
-          <ul className="mt-2 space-y-1 text-sm">
-            {sheet.inventory.map((it) => <li key={it.id || it.name} className="flex justify-between border-b border-lead py-1"><span className="text-bone">{it.name}</span><span className="tabular text-mist">×{it.quantity ?? 1}</span></li>)}
-          </ul>
-        </section>
-      )}
+      <section>
+        <h4 className="font-display text-xl text-bone">Inventário</h4>
+        <InventoryLoad inventory={sheet.inventory || []} limits={inventoryLimits(rules, sheet.owner_id)} />
+        <ul className="mt-2 space-y-1 text-sm">
+          {(sheet.inventory || []).map((it) => (
+            <li key={it.id || it.name} className="border-b border-lead py-1">
+              <p className="flex items-center gap-2"><ItemIcon item={it} size={16} /><span className="min-w-0 flex-1 truncate text-bone">{it.name}</span><span className="tabular text-mist">×{it.quantity ?? 1} · {formatKg(itemLoad(it))}</span></p>
+              {it.contents?.length > 0 && (
+                <ul className="ml-6 mt-1 space-y-0.5 border-l-2 border-lead pl-2 text-xs">
+                  {it.contents.map((c) => <li key={c.id || c.name} className="flex justify-between gap-2"><span className="truncate text-mist">{c.name}</span><span className="tabular text-mist">×{c.quantity ?? 1} · {formatKg(itemLoad(c))}</span></li>)}
+                </ul>
+              )}
+            </li>
+          ))}
+          {!sheet.inventory?.length && <li className="py-1 text-mist">Inventário vazio.</li>}
+        </ul>
+      </section>
       {!isMaster && <Link to={`/characters/${characterId}`} className="inline-flex items-center gap-1 text-ember underline">Abrir ficha completa <ExternalLink size={14} /></Link>}
     </div>
   );
 }
 
-export default function SheetsPanel({ campaignId, members, myCharacters, myMember, isMaster, onShare, sharing, reloadKey }) {
+export default function SheetsPanel({ campaignId, members, myCharacters, myMember, isMaster, onShare, sharing, reloadKey, rules }) {
   const [open, setOpen] = useState(null);
   const [choice, setChoice] = useState(myMember?.shared_character_id || '');
   useEffect(() => { setChoice(myMember?.shared_character_id || ''); }, [myMember?.shared_character_id]);
 
-  if (open) return <div className="h-full overflow-y-auto"><FullSheet campaignId={campaignId} characterId={open} isMaster={isMaster} onBack={() => setOpen(null)} reloadKey={reloadKey} /></div>;
+  if (open) return <div className="h-full overflow-y-auto"><FullSheet campaignId={campaignId} characterId={open} isMaster={isMaster} onBack={() => setOpen(null)} reloadKey={reloadKey} rules={rules} /></div>;
 
   const shared = members.filter((m) => m.shared_character_id);
   return (

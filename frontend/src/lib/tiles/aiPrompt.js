@@ -1,7 +1,7 @@
 // Prompt para qualquer IA (servidor ou copiar/colar no ChatGPT/Claude/Gemini) gerar
 // um mapa no nosso formato, e o leitor tolerante da resposta.
 import { TILES, CATEGORIES, DEFAULT_GROUND } from './catalog.js';
-import { repairMap, isSolid, ITEM_CATEGORIES, MAX_ITEMS, MAX_BUILDINGS } from './format.js';
+import { repairMap, isSolid, ITEM_CATEGORIES, MAX_ITEMS, MAX_BUILDINGS, MAX_CONTENTS } from './format.js';
 
 export function catalogText() {
   return CATEGORIES.map((cat) => {
@@ -36,9 +36,13 @@ const EXAMPLE = {
     ]
   },
   items: [
-    { id: 'i1', x: 9, y: 2, name: 'Poção de cura menor', description: 'Frasco turvo que fecha cortes leves.', quantity: 1, weight: 0.5, category: 'Poções' },
+    { id: 'i1', x: 9, y: 2, name: 'Poção de cura menor', description: 'Frasco turvo que fecha cortes leves.', quantity: 1, weight: 0.3, category: 'Poções' },
     { id: 'i2', x: 9, y: 2, name: 'Bolsa de moedas', description: 'Couro gasto, cheira a cerveja.', quantity: 1, weight: 0.2, category: 'Tesouro', dracmas: 25 },
-    { id: 'i3', x: 9, y: 4, name: 'Corda de cânhamo', description: '10 metros, um pouco úmida.', quantity: 1, weight: 1, category: 'Achados' }
+    { id: 'i3', x: 9, y: 4, name: 'Corda de cânhamo', description: '10 metros, um pouco úmida.', quantity: 1, weight: 1, category: 'Achados' },
+    { id: 'i4', x: 2, y: 4, name: 'Mochila esquecida', description: 'Lona remendada, alças gastas.', quantity: 1, weight: 1, category: 'Achados', container: true, contents: [
+      { id: 'c1', name: 'Pão dormido', quantity: 2, weight: 0.4, category: 'Achados' },
+      { id: 'c2', name: 'Pederneira', quantity: 1, weight: 0.1, category: 'Achados' }
+    ] }
   ],
   buildings: [
     { id: 'b1', x: 1, y: 1, w: 10, h: 5, name: 'Taverna do Corvo', roof: 'palha' }
@@ -95,7 +99,9 @@ ${items ? '' : 'ITENS: o mestre NÃO quer itens neste mapa. Responda "items": []
 - Nem todo objeto tem item. Um baú guarda de 1 a 3 itens (vários itens podem ter o mesmo x,y).
 - O x,y do item é a célula do objeto que o guarda.
 - Nomes em português, no clima sombrio do mundo: "Poção de cura menor", "Chave de ferro torta", "Pergaminho de luz", "Erva-de-sangue", "Adaga enferrujada", "Bolsa de moedas".
-- Valores pequenos e sensatos, nada poderoso demais: quantity de 1 a 5, weight em kg (0.1 a 5).
+- Valores pequenos e sensatos, nada poderoso demais: quantity de 1 a 5.
+- weight = peso de UMA unidade em kg, realista e nunca 0: moeda 0.01, anel/gema 0.02, chave/carta/erva 0.05, vela 0.1, poção 0.3, pão 0.4, adaga 0.5, tocha 0.5, livro 1, mochila 1, corda 1, espada 1.5, escudo 3, machado de guerra 3, cota de malha 12, baú 15, armadura de placas 20.
+- Recipiente (mochila, saco, baú, caixote): {"container": true, "contents": [itens sem x/y, até ${MAX_CONTENTS}]}, opcional "locked": true (trancado) e "hidden": true (escondido dos jogadores). Dentro de recipiente não vai outro recipiente.
 - category: ${ITEM_CATEGORIES.map((c) => `"${c}"`).join(', ')}.
 - Dinheiro: um item com "dracmas" (número inteiro, normalmente 5 a 60) vai para a bolsa do personagem.
 - Formato: {"id": "i1", "x": 0, "y": 0, "name": "...", "description": "até 1 frase", "quantity": 1, "weight": 0.5, "category": "Poções"}

@@ -4,6 +4,7 @@ import {
   Building2, Pipette, Redo2, RotateCcw, Save, Sparkles, Square, Trash2, Undo2, Wrench, X, ZoomIn, ZoomOut
 } from 'lucide-react';
 import TileMapCanvas from './TileMapCanvas';
+import ContainerContents from './ContainerContents';
 import { TILES, CATEGORIES, DEFAULT_GROUND, EMPTY_OBJECT, getTile } from '../../lib/tiles/catalog';
 import { renderTilePreview } from '../../lib/tiles/render';
 import {
@@ -565,7 +566,13 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
                       {ITEM_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
                     </select>
                   </label>
-                  <p className="mt-1 text-[11px] text-mist">Célula {it.x},{it.y}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-mist">
+                    <span className="text-[11px]">Célula {it.x},{it.y}</span>
+                    {/* recipiente (mochila, bau, saco): itens dentro, opcionalmente trancado */}
+                    <label className="flex items-center gap-1"><input type="checkbox" checked={Boolean(it.container)} disabled={it.contents?.length > 0} onChange={(e) => commit(updateItem(map, it.id, { container: e.target.checked, contents: e.target.checked ? it.contents || [] : undefined, locked: e.target.checked ? it.locked : undefined }))} /> Recipiente</label>
+                    {it.container && <label className="flex items-center gap-1"><input type="checkbox" checked={Boolean(it.locked)} onChange={(e) => commit(updateItem(map, it.id, { locked: e.target.checked }))} /> Trancado</label>}
+                  </div>
+                  {it.container && <ContainerContents item={it} isMaster onPatch={(patch) => commit(updateItem(map, it.id, patch))} />}
                 </li>
               ))}
             </ul>

@@ -4,6 +4,8 @@ import Button from '../Button';
 import EntityImage from '../EntityImage';
 import { primordialByName } from '../glass/primordiais';
 import MonsterDetails from './MonsterDetails';
+import MonsterPortrait, { hasUploadedImage } from './MonsterPortrait';
+import MonsterSprite from './MonsterSprite';
 import MonsterPngDownloadButton from './MonsterPngDownloadButton';
 
 export default function MonsterCard({ monster, rollResult, onRoll, onWarning }) {
@@ -18,7 +20,9 @@ export default function MonsterCard({ monster, rollResult, onRoll, onWarning }) 
   return (
     <article className="gothic-panel soft-motion overflow-hidden">
       <div className="grid gap-4 p-4 sm:grid-cols-[150px_1fr]">
-        <EntityImage src={monster.image_url} label="Monstro" name={monster.name} tint={primordialByName[monster.category]?.color} className="aspect-[4/3] w-full sm:aspect-square" />
+        {hasUploadedImage(monster)
+          ? <EntityImage src={monster.image_url} label="Monstro" name={monster.name} tint={primordialByName[monster.category]?.color} className="aspect-[4/3] w-full sm:aspect-square" />
+          : <MonsterPortrait monster={monster} size={144} className="aspect-[4/3] w-full sm:aspect-square" />}
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
@@ -57,6 +61,7 @@ export default function MonsterCard({ monster, rollResult, onRoll, onWarning }) 
 
       {open && (
         <div className="border-t-[3px] border-lead p-4">
+          <MonsterSpriteStrip monster={monster} />
           <MonsterDetails monster={monster} onRoll={onRoll} />
           {rollResult?.monster?.id === monster.id && (
             <div className="mt-4 border-[3px] border-lead lit p-4">
@@ -90,6 +95,20 @@ function RollInfo({ label, value }) {
     <div className="pane p-3">
       <p className="text-xs text-mist">{label}</p>
       <p className="tabular mt-1 text-lg font-semibold text-bone">{value}</p>
+    </div>
+  );
+}
+
+// Faixa com o sprite do mapa nas 4 direcoes + bote (so para conferir o token).
+function MonsterSpriteStrip({ monster }) {
+  const views = [['down', 'De frente'], ['left', 'Esquerda'], ['right', 'Direita'], ['up', 'De costas']];
+  return (
+    <div className="mb-4 pane flex flex-wrap items-end gap-3 p-3">
+      <p className="w-full text-xs uppercase tracking-wide text-mist">Sprite no mapa</p>
+      {views.map(([dir, label]) => (
+        <MonsterSprite key={dir} monster={monster} direction={dir} moving scale={2} title={`${monster.name} andando (${label.toLowerCase()})`} />
+      ))}
+      <MonsterSprite monster={monster} direction="left" attacking scale={2} title={`${monster.name} atacando`} />
     </div>
   );
 }

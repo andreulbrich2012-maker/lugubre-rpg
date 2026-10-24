@@ -241,4 +241,11 @@ describe('plano de mapa', () => {
     const texto = planToMap({ ...base, mode: 'texto' }, { cols: 80, rows: 60 });
     expect(texto.map.layers.ground.join('')).toContain('0');
   });
+  it('modo texto: acampamento com cerca de portao aberto ganha 6+ tendas dentro e fogueira grande', () => {
+    const plan = { mode: 'texto', name: 'Acampamento dos bandidos', areas: [{ type: 'floresta', rect: [0, 0, 1000, 1000] }], fences: [{ type: 'palicada', points: [[450, 300], [300, 300], [300, 700], [700, 700], [700, 300], [550, 300]] }], buildings: [{ type: 'tenda', x: 500, y: 500 }] };
+    const r = planToMap(plan, { cols: 120, rows: 100 });
+    const tents = r.map.buildings.filter((b) => /tenda|barraca/.test(b.design) && b.x > 36 && b.x < 84 && b.y > 30 && b.y < 70);
+    expect(tents.length).toBeGreaterThanOrEqual(6);
+    expect(r.map.layers.objects.join('')).toContain('È');
+  });
 });

@@ -140,7 +140,17 @@ export function enrichText(plan) {
   };
   out.fences = (Array.isArray(plan.fences) ? plan.fences : []).map((f, fi) => {
     const box = strip(f?.type ?? f?.tipo) === 'palicada' ? isRect(f?.points) : null;
-    if (!box) return f;
+    if (!box) {
+      // cerca quase fechada (IA deixou o vao do portao): conta como fechada (limpa a mata dentro, recebe tendas/casas)
+      const p = Array.isArray(f?.points) ? f.points.filter(Array.isArray) : [];
+      if (p.length >= 4) {
+        const xs = p.map((v) => num(v[0])); const ys = p.map((v) => num(v[1]));
+        const diag = Math.hypot(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+        const gap = Math.hypot(num(p[0][0]) - num(p[p.length - 1][0]), num(p[0][1]) - num(p[p.length - 1][1]));
+        if (gap > 0 && gap <= diag * 0.2) return { ...f, closed: true };
+      }
+      return f;
+    }
     const [x0, y0, x1, y1] = box; const cx = (x0 + x1) / 2; const cy = (y0 + y1) / 2; const a = (x1 - x0) / 2; const b = (y1 - y0) / 2;
     const pts = [];
     const N = 16;
@@ -617,7 +627,7 @@ function planToMapOnce(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     const p = pts(f?.points);
     if (p.length < 4) continue;
     const [ax, ay] = p[0]; const [bx, by] = p[p.length - 1];
-    if (Math.hypot(ax - bx, ay - by) > Math.max(3, C * 0.04)) continue;
+    if (!f?.closed && Math.hypot(ax - bx, ay - by) > Math.max(3, C * 0.04)) continue;
     const xs = p.map((q) => q[0]); const ys = p.map((q) => q[1]);
     for (let y = Math.min(...ys); y <= Math.max(...ys); y++) for (let x = Math.min(...xs); x <= Math.max(...xs); x++) {
       let inP = false;
@@ -1001,26 +1011,48 @@ function planToMapOnce(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     for (const f of Array.isArray(plan.fences) ? plan.fences : []) {
       if (!['palicada', 'muro'].includes(strip(f?.type ?? f?.tipo))) continue;
       const p = pts(f?.points);
-      if (p.length >= 4 && Math.hypot(p[0][0] - p[p.length - 1][0], p[0][1] - p[p.length - 1][1]) <= Math.max(3, C * 0.04)) places.push(polyCells(p));
+      if (p.length >= 4 && (f?.closed || Math.hypot(p[0][0] - p[p.length - 1][0], p[0][1] - p[p.length - 1][1]) <= Math.max(3, C * 0.04))) places.push({ cells: polyCells(p), fence: true });
     }
     const rad = Math.round(Math.min(C, R) * 0.12);
     for (const a of areas) {
       if (a.type !== 'praca') continue;
       const pc = shapeCells(a); if (!pc.length) continue;
       const cx = Math.round(pc.reduce((s2, c) => s2 + c[0], 0) / pc.length); const cy = Math.round(pc.reduce((s2, c) => s2 + c[1], 0) / pc.length);
-      if (places.some((cells) => cells.some(([x, y]) => x === cx && y === cy))) continue;
+      if (places.some((pl) => pl.cells.some(([x, y]) => x === cx && y === cy))) continue;
       const disc = [];
       for (let y = cy - rad; y <= cy + rad; y++) for (let x = cx - rad; x <= cx + rad; x++) if (inside(x, y) && Math.hypot(x - cx, y - cy) <= rad) disc.push([x, y, 0]);
-      places.push(disc);
+      places.push({ cells: disc });
     }
+    // fogueira grande no meio do acampamento se a IA nao pos nenhuma fogueira la dentro
+    const campFire = (cells) => {
+      const set = new Set(cells.map(([x, y]) => y * C + x));
+      const has = (plan.objects || []).some((o) => /fogueira/.test(strip(o?.type ?? o?.tipo)) && set.has(py(o.y) * C + px(o.x)));
+      if (has || !cells.length) return;
+      let cx = Math.round(cells.reduce((a, c) => a + c[0], 0) / cells.length); let cy = Math.round(cells.reduce((a, c) => a + c[1], 0) / cells.length);
+      // meio ocupado (tenda do lider ja esta la): o lugar livre mais perto
+      const okFire = (x, y) => { for (let yy = y - 2; yy <= y + 1; yy++) for (let xx = x - 2; xx <= x + 2; xx++) if (!inside(xx, yy) || lock[yy * C + xx] === 2 || !set.has(yy * C + xx)) return false; return true; };
+      search: for (let r = 0; r <= 12; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (Math.max(Math.abs(dx), Math.abs(dy)) === r && okFire(cx + dx, cy + dy)) { cx += dx; cy += dy; break search; }
+      extraObjects.push({ type: 'fogueira_grande', x: (cx / (C - 1)) * SCALE, y: (cy / (R - 1)) * SCALE });
+      // roda livre em volta do fogo: as tendas ficam em volta, nao em cima
+      for (let yy = cy - 3; yy <= cy + 2; yy++) for (let xx = cx - 3; xx <= cx + 3; xx++) if (inside(xx, yy)) noHouse[yy * C + xx] = 1;
+    };
     const camp = /acampamento|bandid|salteador|tenda/.test(strip(`${plan.name ?? ''} ${plan.notes ?? ''}`)) || [...(plan.buildings || []), ...(plan.objects || [])].filter((b) => /tenda/.test(strip(b?.type ?? b?.tipo))).length >= 2;
-    if (camp) for (const a of areas) if (a.type === 'clareira') places.push(shapeCells(a));
-    for (const cells of places) {
+    if (camp) for (const a of areas) if (a.type === 'clareira') places.push({ cells: shapeCells(a), clearing: true });
+    // acampamento: so as clareiras/cercas que tem tenda (ou a maior, se nenhuma tem) recebem o minimo de 6 tendas + fogueira
+    const tentAt = (cells) => { const set = new Set(cells.map(([x, y]) => y * C + x)); return buildings.filter((b) => /tenda|barraca/.test(b.design) && set.has((b.y + (b.h >> 1)) * C + b.x + (b.w >> 1))).length; };
+    let campPlaces = [];
+    if (camp) {
+      campPlaces = places.filter((pl) => (pl.clearing || pl.fence) && pl.cells.length >= 60 && tentAt(pl.cells) > 0);
+      if (!campPlaces.length) { const big = places.filter((pl) => pl.clearing || pl.fence).sort((a, b) => b.cells.length - a.cells.length)[0]; if (big) campPlaces = [big]; }
+    }
+    for (const { cells, fence, clearing } of places) {
+      const isCamp = campPlaces.some((pl) => pl.cells === cells);
       if (cells.length < 60) continue;
       const set = new Set(cells.map(([x, y]) => y * C + x));
-      const have = buildings.filter((b) => set.has((b.y + (b.h >> 1)) * C + b.x + (b.w >> 1))).length;
+      const have = camp && (fence || clearing) ? tentAt(cells) : buildings.filter((b) => set.has((b.y + (b.h >> 1)) * C + b.x + (b.w >> 1))).length;
       // vila do modo texto: pelo menos ~40 casas se o lugar comporta (cada casa ~20 celulas de chao)
       const target = Math.max(camp ? 6 : Math.min(40, Math.round(cells.length / 20)), Math.round((cells.length / 24) * (camp ? 0.22 : 0.45)));
+      if (isCamp) campFire(cells);
       if (have >= Math.min(6, target) && have >= target * (camp ? 0.5 : 0.75)) continue;
       const spec = { cells, small: 0.7, density: camp ? 1 : 1.5, type: camp ? 'tenda' : 'casa', want: target - have, avoidRoad: true, scatter: camp };
       const got = (camp ? fillDistrict : fillStreets)(spec);

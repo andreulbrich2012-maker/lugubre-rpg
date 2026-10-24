@@ -109,6 +109,7 @@ CONFIRA ANTES DE RESPONDER
 4. Cerque a vila com "palicada"; cercas nas hortas.
 5. Floresta do mapa inteiro (a vila abre a mata sozinha), manchas de bosque; plantações perto de celeiros; cemitério perto do templo.
 6. Use o clima pedido.
+7. Região grande (várias vilas/cidades): cada vila com sua praça, bairros e cerca, ligadas por estradas que passam pela mata; o resto do mapa é floresta, campo, rio ou montanha.
 
 `}EXEMPLO (só o formato; faça o seu):
 ${JSON.stringify(PLAN_EXAMPLE)}`;

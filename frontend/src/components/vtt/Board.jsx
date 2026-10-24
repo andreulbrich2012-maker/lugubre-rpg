@@ -14,7 +14,7 @@ import ContainerContents from './ContainerContents';
 import MonsterSprite from '../monsters/MonsterSprite';
 import { monsterLook } from '../../lib/monsters/classify';
 import { skyAt, clockLabel, phaseAt, resolveLight } from '../../lib/tiles/daylight';
-import { outsideTextureUrl, OUTSIDE_CELLS } from '../../lib/tiles/outside';
+import { padMap, PAD } from '../../lib/tiles/outside';
 import { Moon, Sun } from 'lucide-react';
 
 // Construcao 3D (estilo Stardew): fachada + telhado em perspectiva, desenhada uma vez no tamanho
@@ -91,21 +91,18 @@ function House({ building, tiles, light, open, cell, lazy = false }) {
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-// Fora do mapa: mata fechada continuando em volta (o mapa nao acaba num preto). So visual: a
-// borda do mapa continua sendo a barreira invisivel. Mesma luz e estilo da cena.
-const OUT = 48; // celulas de mata em cada lado
-function OutsideForest({ cell, width, height, style, light }) {
-  const url = useMemo(() => outsideTextureUrl(style || 'padrao'), [style]);
-  const sky = resolveLight(light);
-  const pad = OUT * cell;
-  const box = { left: -pad, top: -pad, width: width + pad * 2, height: height + pad * 2 };
+// Fora do mapa: nevoa leve que engrossa longe da borda (a continuacao em si e o padMap).
+function EdgeMist({ cell, width, height }) {
+  const pad = PAD * cell;
+  const fade = 'rgba(10,12,14,.5)';
+  const side = (style) => <div className="pointer-events-none absolute" style={style} aria-hidden="true" />;
   return (
-    <div className="pointer-events-none absolute" style={box} aria-hidden="true">
-      <div className="absolute inset-0" style={{ backgroundImage: url ? `url(${url})` : undefined, backgroundSize: `${OUTSIDE_CELLS * cell}px ${OUTSIDE_CELLS * cell}px`, backgroundPosition: `${pad}px ${pad}px`, imageRendering: 'pixelated' }} />
-      {sky.tintHex && <div className="absolute inset-0" style={{ background: sky.tintHex, mixBlendMode: 'multiply' }} />}
-      {/* nevoa leve que engrossa longe do mapa: a mata some aos poucos */}
-      <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at center, transparent ${Math.max(40, 100 - (pad / Math.max(width, height)) * 100)}%, rgba(8,10,12,.55) 100%)` }} />
-    </div>
+    <>
+      {side({ left: -pad, top: -pad, width: width + pad * 2, height: pad, background: `linear-gradient(to top, transparent 40%, ${fade})` })}
+      {side({ left: -pad, top: height, width: width + pad * 2, height: pad, background: `linear-gradient(to bottom, transparent 40%, ${fade})` })}
+      {side({ left: -pad, top: 0, width: pad, height, background: `linear-gradient(to left, transparent 40%, ${fade})` })}
+      {side({ left: width, top: 0, width: pad, height, background: `linear-gradient(to right, transparent 40%, ${fade})` })}
+    </>
   );
 }
 
@@ -178,6 +175,9 @@ export default function Board({
   // luz da cena: com o relogio do mestre ligado, as cenas de fora seguem a hora (interior nao)
   const sceneLight = isTiles && clock?.on && !scene?.parent_scene_id ? skyAt(clock.minutes) : (scene?.tiles?.light || 'dia');
   const litTiles = useMemo(() => (isTiles && scene.tiles.light !== sceneLight ? { ...scene.tiles, light: sceneLight } : scene?.tiles), [isTiles, scene?.tiles, sceneLight]);
+  // margem so depende do mapa (luz troca sem refazer a margem)
+  const paddedBase = useMemo(() => (isTiles ? padMap(scene.tiles) : null), [isTiles, scene?.tiles]);
+  const paddedTiles = useMemo(() => (paddedBase && paddedBase.light !== sceneLight ? { ...paddedBase, light: sceneLight } : paddedBase), [paddedBase, sceneLight]);
   const shakeRef = useRef(null);
   const tokenEls = useRef({});
   // Animacoes (lib/fx): tremida do mapa e empurrao/piscada dos tokens direto no estilo,
@@ -634,9 +634,12 @@ export default function Board({
       >
         <div ref={shakeRef} className="absolute inset-0">
         <div className="absolute left-0 top-0 origin-top-left" style={{ width, height, transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}>
-          {isTiles && <OutsideForest cell={cell} width={width} height={height} style={scene.tiles.style} light={sceneLight} />}
           {isTiles ? (
-            <TileMapCanvas map={litTiles} cellSize={cell} showGrid={Boolean(scene.show_grid)} viewport={vis} scale={view.z} buildingBlocks={farAway} className="absolute inset-0" />
+            <>
+              {/* mapa com a margem de continuacao (estrada/rio/mata seguem para fora); a mesa usa coordenadas do mapa original */}
+              <TileMapCanvas map={paddedTiles} cellSize={cell} showGrid={Boolean(scene.show_grid)} viewport={{ ...vis, x: vis.x + PAD * cell, y: vis.y + PAD * cell }} scale={view.z} buildingBlocks={farAway} className="absolute" style={{ left: -PAD * cell, top: -PAD * cell }} />
+              <EdgeMist cell={cell} width={width} height={height} />
+            </>
           ) : scene?.map_url ? (
             <img src={scene.map_url} alt="" draggable={false} className="absolute inset-0 h-full w-full select-none object-fill" />
           ) : (

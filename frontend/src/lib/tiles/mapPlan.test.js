@@ -47,4 +47,34 @@ describe('plano de mapa', () => {
     expect(p).toContain('"pois"');
     expect(p).toContain('bairro');
   });
+
+  it('rocha no mar vira ilha e o farol cabe; praia automatica na costa', () => {
+    const r = planToMap({ areas: [{ type: 'mar', rect: [600, 0, 400, 1000] }, { type: 'rocha', circle: [800, 500, 80] }], buildings: [{ type: 'farol', x: 800, y: 500 }] }, { cols: 80, rows: 60 });
+    expect(r.map.buildings.length).toBe(1);
+    expect(r.map.layers.ground.join('')).toContain(':');
+  });
+
+  it('campo do mapa todo nao apaga o mar', () => {
+    const r = planToMap({ areas: [{ type: 'mar', rect: [700, 0, 300, 1000] }, { type: 'campo', rect: [0, 0, 1000, 1000] }] }, { cols: 60, rows: 40 });
+    expect(r.map.layers.ground[20].slice(55)).toMatch(/^[ó~]+$/);
+  });
+
+  it('cais so na agua: no seco e ignorado; na agua ganha barco', () => {
+    const seco = planToMap({ roads: [{ type: 'cais', points: [[100, 500], [300, 500]] }] }, { cols: 60, rows: 40 });
+    expect(seco.map.layers.ground.join('')).not.toContain('-');
+    const mar = planToMap({ areas: [{ type: 'mar', rect: [600, 0, 400, 1000] }], roads: [{ type: 'cais', points: [[450, 500], [800, 500]] }] }, { cols: 60, rows: 40 });
+    expect(mar.map.layers.ground[20]).toContain('-');
+    expect(mar.map.layers.objects.join('')).toContain('Ù');
+  });
+
+  it('projeto em L: id novo minusculo e id antigo continua valendo', () => {
+    expect(pickDesign({ design: 'casa-L-media' }).id).toBe('casa-l-media');
+    const r = planToMap({ buildings: [{ type: 'casa', design: 'casa-l-media', x: 500, y: 500 }] }, { cols: 60, rows: 50 });
+    expect(r.map.buildings[0].design).toBe('casa-l-media');
+  });
+
+  it('modo texto usa exemplo sem mar/cais; modo foto mantem o exemplo completo', () => {
+    expect(buildPlanPrompt({ description: 'vila' })).not.toContain('"type":"cais"');
+    expect(buildPlanPrompt({ fromImage: true })).toContain('"type":"cais"');
+  });
 });

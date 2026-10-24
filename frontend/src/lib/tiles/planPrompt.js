@@ -53,6 +53,17 @@ export const PLAN_EXAMPLE = {
   items: [{ x: 480, y: 520, name: 'Bolsa de moedas', quantity: 1, weight: 0.2, dracmas: 20, category: 'Achados' }]
 };
 
+// exemplo do modo texto: sem mar, cais, barco nem pescador (a IA fraca copiava o porto do exemplo)
+export const TEXT_EXAMPLE = {
+  ...PLAN_EXAMPLE,
+  areas: [PLAN_EXAMPLE.areas[0], { type: 'campo', rect: [280, 280, 480, 480] }, ...PLAN_EXAMPLE.areas.slice(1).filter((a) => a.type !== 'mar')],
+  rivers: PLAN_EXAMPLE.rivers.slice(0, 1),
+  roads: PLAN_EXAMPLE.roads.filter((r) => r.type !== 'cais'),
+  buildings: PLAN_EXAMPLE.buildings.filter((b) => b.type !== 'pescador'),
+  objects: PLAN_EXAMPLE.objects.filter((o) => o.type !== 'barco'),
+  pois: PLAN_EXAMPLE.pois.slice(0, 2)
+};
+
 export function buildPlanPrompt({ description = '', fromImage = false, items = true, monsters = false } = {}) {
   const types = Object.keys(PLAN_BUILDINGS).join(', ');
   const objects = Object.keys(PLAN_OBJECTS).join(', ');
@@ -102,15 +113,17 @@ CONFIRA ANTES DE RESPONDER
 [ ] pois = legenda + nomes escritos fora dela
 
 ` : `REGRAS PARA FICAR BONITO
-1. Ponha MUITAS construções: uma vila tem de 30 a 60; uma cidade, 60 a 300. Use áreas "bairro" (pequenas, uma por grupo de casas) para encher as ruas.
-   Toda construção com nome ou função própria (templo, taverna, moinho, serraria, estábulo, celeiro, mercado...) vai em "buildings" no lugar certo.
-2. Praça no centro com fogueira grande ou fonte, barracas, bancos e lampiões.
-3. Estradas saem das bordas (0 ou 1000) e chegam na praça; ruas de "terra" levam aos grupos de casas; trilhas aos lugares afastados.
-4. Cerque a vila com "palicada"; cercas nas hortas.
-5. Floresta do mapa inteiro (a vila abre a mata sozinha), manchas de bosque; plantações perto de celeiros; cemitério perto do templo.
-6. Use o clima pedido.
-7. Região grande (várias vilas/cidades): cada vila com sua praça, bairros e cerca, ligadas por estradas que passam pela mata; o resto do mapa é floresta, campo, rio ou montanha.
+O pedido costuma ser curto e informal: complete com o que combina com ele (nomes, construções, detalhes, clima). Mapa pequeno e simples só se pedir.
+1. Siga o pedido item por item, no lado pedido. Não invente rio, mar, lago ou cais que ele não pede. NÃO copie nomes, frases nem coordenadas do EXEMPLO.
+2. Casas: muitos "bairro" retangulares de ~90x80, "size":"pequena", "density":1.5, com uma rua de "terra" entre eles. Aldeia/acampamento: 3–6. Vila: 8–12. Cidade: 15–25 enchendo todo o espaço dentro do muro. Prédios com função (taverna, templo, mercado, celeiro...) vão em "buildings", na beira de uma rua, fora dos bairros.
+3. Chão: "floresta" no mapa todo ou só no lado pedido; depois um "campo" cobrindo a vila com 80 de folga. Nunca "campo" no mapa inteiro. Neve = "neve" no mapa todo; pântano = várias manchas de "pantano" e "lago".
+4. Praça com fonte ou fogueira grande; mercado = área "terra" ao lado da praça com 4–6 barracas/tendas, caixotes e sacos.
+5. Estradas saem das bordas (0 ou 1000) até a praça; ruas de "terra" da praça a cada bairro; trilhas aos lugares afastados.
+6. Vila: "palicada" em volta das casas; cidade: "muro". Porto fica fora dela, ligado por estrada. Plantação com "cerca" e o celeiro AO LADO dela, nunca dentro.
+7. Como desenhar: morro = "montanha" circle raio 110 + "clareira" raio 60 no topo, a construção no centro; ponta de pedra = "rocha" entrando no mar; costa = "mar" numa borda (a praia é automática); porto = 3 "cais" de 120 da terra para dentro do mar (barcos automáticos); castelo = "muro" quadrado ~200x190 em volta, "torre" nos 4 cantos por dentro, "praca" na frente; "em volta" = nos 4 lados; mina = "montanha" + "cabana" + carroça e trilha; acampamento = tendas, fogueira e caixotes numa "clareira".
+8. Clima do pedido (sombrio/assombrado → "style":"gotico" ou "obscuro", "light":"entardecer" ou "noite").
+9. Região grande (várias vilas): cada vila com praça, bairros e cerca, ligadas por estradas; o resto é floresta, campo, rio ou montanha.
 
 `}EXEMPLO (só o formato; faça o seu):
-${JSON.stringify(PLAN_EXAMPLE)}`;
+${JSON.stringify(fromImage ? PLAN_EXAMPLE : TEXT_EXAMPLE)}`;
 }

@@ -29,7 +29,7 @@ export const PLAN_OBJECTS = {
 };
 // tipo de construcao -> projetos do catalogo (o tamanho escolhe entre eles)
 export const PLAN_BUILDINGS = {
-  casa: { pequena: ['casa-frente-pequena', 'casa-empena-pequena', 'casa-chale-pequena', 'casa-varanda-pequena', 'casa-ala-dir-pequena', 'casa-ala-esq-pequena'], media: ['casa-frente-media', 'casa-empena-media', 'casa-varanda-media', 'casa-ala-dir-media', 'casa-sobrado-media', 'casa-L-media', 'casa-geminada-media'], grande: ['casa-frente-grande', 'casa-varanda-grande', 'casa-sobrado-grande', 'casa-ala-esq-grande', 'casa-casarao-frente', 'casa-frente-casarao'] },
+  casa: { pequena: ['casa-frente-pequena', 'casa-empena-pequena', 'casa-chale-pequena', 'casa-varanda-pequena', 'casa-ala-dir-pequena', 'casa-ala-esq-pequena'], media: ['casa-frente-media', 'casa-empena-media', 'casa-varanda-media', 'casa-ala-dir-media', 'casa-sobrado-media', 'casa-l-media', 'casa-geminada-media'], grande: ['casa-frente-grande', 'casa-varanda-grande', 'casa-sobrado-grande', 'casa-ala-esq-grande', 'casa-casarao-frente', 'casa-frente-casarao'] },
   cabana: { pequena: ['casa-chale-cabana', 'casa-frente-cabana', 'casa-varanda-cabana'], media: ['casa-chale-pequena'], grande: ['casa-chale-media'] },
   mansao: { pequena: ['casa-frente-casarao'], media: ['casa-sobrado-casarao'], grande: ['casa-frente-mansao', 'casa-varanda-mansao'] },
   taverna: { pequena: ['taverna-8'], media: ['taverna-10'], grande: ['taverna-12'] },
@@ -162,14 +162,21 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     }
     return cells;
   };
-  const ORDER = { bairro: 10, mar: 7, floresta: 0, bosque: 1, montanha: 2, rocha: 3, campo: 4, neve: 4, areia: 5, terra: 5, pantano: 6, lago: 7, lava: 7, plantacao: 8, cemiterio: 8, clareira: 9, ritual: 9, praca: 10 };
+  // mar cedo: o que vem depois (rocha, montanha) pode virar ponta/ilha; o resto nao apaga a agua
+  const ORDER = { bairro: 10, mar: 1.5, floresta: 0, bosque: 1, montanha: 2, rocha: 3, campo: 4, neve: 4, areia: 5, terra: 5, pantano: 6, lago: 7, lava: 7, plantacao: 8, cemiterio: 8, clareira: 9, ritual: 9, praca: 10 };
   const areas = (Array.isArray(plan.areas) ? plan.areas : []).map((a) => ({ ...a, type: strip(a?.type ?? a?.tipo) })).filter((a) => ORDER[a.type] !== undefined).sort((a, b) => ORDER[a.type] - ORDER[b.type]);
   const forest = new Uint8Array(C * R); // 1 bosque, 2 floresta, 3 montanha
   const districts = []; // areas de bairro: o sistema enche de casas
+  const sea = new Uint8Array(C * R); // 1 = celula de mar
   for (const a of areas) {
     const cells = shapeCells(a);
     const cemetery = [];
     for (const [x, y, d] of cells) {
+      const i0 = y * C + x;
+      if (sea[i0] && a.type !== 'mar') {
+        // terra sobre o mar so para rocha/montanha (ponta de pedra, ilha); o resto respeita a agua
+        if (a.type === 'rocha' || a.type === 'montanha') { sea[i0] = 0; lock[i0] = 0; } else continue;
+      }
       switch (a.type) {
         case 'floresta': forest[y * C + x] = 2; break;
         case 'bosque': forest[y * C + x] = 1; break; // mancha rala, ate dentro da floresta
@@ -181,7 +188,7 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
         case 'terra': G[y][x] = ','; forest[y * C + x] = 0; break;
         case 'pantano': G[y][x] = d < 0.7 ? '%' : 'j'; forest[y * C + x] = 0; break;
         case 'lago': G[y][x] = d < 0.55 ? 'W' : '~'; forest[y * C + x] = 0; lock[y * C + x] = 1; break;
-        case 'mar': G[y][x] = d < 0.82 ? 'ó' : '~'; forest[y * C + x] = 0; lock[y * C + x] = 1; break;
+        case 'mar': G[y][x] = d < 0.82 ? 'ó' : '~'; forest[y * C + x] = 0; lock[y * C + x] = 1; sea[y * C + x] = 1; break;
         case 'lava': G[y][x] = 'L'; forest[y * C + x] = 0; lock[y * C + x] = 1; break;
         case 'plantacao': G[y][x] = 'â'; forest[y * C + x] = 0; lock[y * C + x] = 1; if (y % 2 === 0) setO(x, y, 'Ñ'); break;
         case 'cemiterio': forest[y * C + x] = 0; lock[y * C + x] = 1; cemetery.push([x, y, d]); break;
@@ -206,6 +213,28 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
       const r = Math.max(3, Math.round(Math.min(C, R) * 0.04), Math.round(Math.sqrt(cells.length / Math.PI) * 0.7));
       for (let yy = cy - r - 3; yy <= cy + r + 3; yy++) for (let xx = cx - r - 3; xx <= cx + r + 3; xx++) if (inside(xx, yy) && Math.hypot(xx - cx, (yy - cy) / 0.8) <= r + 3) { forest[yy * C + xx] = 0; lock[yy * C + xx] = Math.max(lock[yy * C + xx], 1); if ('TAb'.includes(O[yy][xx])) O[yy][xx] = ' '; }
       for (let k = 0; k < 8; k++) setO(Math.round(cx + Math.cos((k / 8) * Math.PI * 2) * r), Math.round(cy + Math.sin((k / 8) * Math.PI * 2) * r * 0.8), 'Ä');
+    }
+  }
+
+  // ---- praia automatica: toda costa de mar ganha areia e a mata recua ----
+  if (sea.some((v) => v)) {
+    const dist = new Int16Array(C * R).fill(99);
+    const q = [];
+    for (let i = 0; i < C * R; i++) if (sea[i]) { dist[i] = 0; q.push(i); }
+    for (let h = 0; h < q.length; h++) {
+      const i = q[h]; const x = i % C; const y = (i - x) / C;
+      if (dist[i] >= 5) continue;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const X = x + dx; const Y = y + dy; const j = Y * C + X;
+        if (inside(X, Y) && dist[j] > dist[i] + 1) { dist[j] = dist[i] + 1; q.push(j); }
+      }
+    }
+    const BEACH = Math.max(2, Math.round(Math.min(C, R) * 0.02));
+    for (let y = 0; y < R; y++) for (let x = 0; x < C; x++) {
+      const i = y * C + x; const k = dist[i];
+      if (!k || k > 5) continue;
+      if (k <= BEACH + (wob(x, y, 7) > 0.5 ? 1 : 0) && '.áàg'.includes(G[y][x])) { G[y][x] = ':'; if (O[y][x] === 'f') O[y][x] = ' '; }
+      if (forest[i] === 2 || forest[i] === 1) forest[i] = 0;
     }
   }
 
@@ -239,15 +268,43 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     line(r?.points, (x, y) => brush(x, y, w, (a, b) => { if (inside(a, b) && G[b][a] !== 'W' && G[b][a] !== '~') { G[b][a] = '0'; O[b][a] = ' '; forest[b * C + a] = 0; lock[b * C + a] = 1; } }), true);
   }
   const ROAD = { estrada: ';', pedra: 'c', trilha: 'û', terra: ',', cais: '-' };
+  const piers = []; // cais desenhados: barcos e barris depois
   for (const r of Array.isArray(plan.roads) ? plan.roads : []) {
     const ch = ROAD[strip(r?.type ?? r?.tipo)] || ';';
     const w = Math.max(1, Math.min(4, Math.round(num(r?.width, ch === 'û' ? 1 : 2))));
+    if (ch === '-') { pier(r?.points, w); continue; }
     line(r?.points, (x, y) => brush(x, y, w, (a, b) => {
       if (!inside(a, b)) return;
       forest[b * C + a] = 0; lock[b * C + a] = 1; O[b][a] = ' ';
       if (WATER.has(G[b][a]) || G[b][a] === '-') G[b][a] = '-'; else if (G[b][a] !== 'c' && G[b][a] !== ';') G[b][a] = ch;
     }), ch !== '-');
   }
+  // cais: tabuas so na agua (mais ate 2 celulas de terra na raiz); cais sem agua nenhuma e ignorado
+  function pier(list, w) {
+    const cells = [];
+    line(list, (x, y) => { if (inside(x, y) && !cells.some(([a, b]) => a === x && b === y)) cells.push([x, y]); });
+    const wet = cells.map(([x, y]) => WATER.has(G[y][x]) || G[y][x] === '-');
+    if (!wet.some(Boolean)) return;
+    // raiz: ate 2 celulas secas, ou toda a areia (praia) emendada na parte molhada
+    const ok = wet.map((v, k) => v || wet.some((u, j) => u && Math.abs(j - k) <= 2));
+    for (const dir of [1, -1]) for (let k = dir > 0 ? 1 : cells.length - 2; k >= 0 && k < cells.length; k += dir) if (!ok[k] && ok[k - dir] && G[cells[k][1]][cells[k][0]] === ':') ok[k] = true;
+    const keep = cells.filter((c, k) => ok[k]);
+    for (const [cx, cy] of keep) brush(cx, cy, w, (a, b) => {
+      if (!inside(a, b)) return;
+      const water = WATER.has(G[b][a]) || G[b][a] === '-';
+      if (!water && !keep.some(([x, y]) => x === a && y === b)) return;
+      G[b][a] = '-'; O[b][a] = ' '; forest[b * C + a] = 0; lock[b * C + a] = 1;
+    });
+    // ponta = a extremidade molhada mais longe da terra; raiz = a primeira celula seca
+    const wetIdx = wet.map((v, k) => (v ? k : -1)).filter((k) => k >= 0);
+    const dryIdx = wet.map((v, k) => (v ? -1 : k)).filter((k) => k >= 0);
+    const tipAtEnd = !dryIdx.length || dryIdx[0] < wetIdx[0];
+    const tip = cells[tipAtEnd ? wetIdx[wetIdx.length - 1] : wetIdx[0]];
+    const root = dryIdx.length ? cells[tipAtEnd ? dryIdx[dryIdx.length - 1] : dryIdx[0]] : null;
+    const [x0, y0] = cells[0]; const [x1, y1] = cells[cells.length - 1];
+    piers.push({ tip, root, horiz: Math.abs(x1 - x0) >= Math.abs(y1 - y0), w });
+  }
+
   const FENCE = { cerca: ['o', '+'], muro: ['g', 'ç'], sebe: ['g', 'ñ'], palicada: ['o', 'Æ'] };
   for (const f of Array.isArray(plan.fences) ? plan.fences : []) {
     const [layer, ch] = FENCE[strip(f?.type ?? f?.tipo)] || FENCE.cerca;
@@ -321,11 +378,21 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     if (!d) continue;
     const cx = px(b.x); const cy = py(b.y);
     let spot = null;
-    for (let r = 0; r <= 14 && !spot; r++) {
-      for (let dy = -r; dy <= r && !spot; dy++) for (let dx = -r; dx <= r && !spot; dx++) {
+    // busca em aneis; farol e pescador preferem o lugar livre com mais agua em volta
+    const RMAX = Math.max(14, Math.round(Math.min(C, R) * 0.15));
+    const coastal = /farol|pescador/.test(strip(b?.type ?? b?.tipo));
+    let best = -Infinity; let firstR = -1;
+    for (let r = 0; r <= RMAX && (coastal ? firstR < 0 || r <= firstR + 6 : !spot); r++) {
+      for (let dy = -r; dy <= r && (coastal || !spot); dy++) for (let dx = -r; dx <= r && (coastal || !spot); dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
         const x = cx + dx - Math.floor(d.w / 2); const y = cy + dy - Math.floor(d.h / 2);
-        if (free(d, x, y)) spot = [x, y];
+        if (!free(d, x, y)) continue;
+        if (!coastal) { spot = [x, y]; break; }
+        if (firstR < 0) firstR = r;
+        let wet = 0;
+        for (let yy = y - 3; yy < y + d.h + 3; yy++) for (let xx = x - 3; xx < x + d.w + 3; xx++) if (inside(xx, yy) && WATER.has(G[yy][xx])) wet++;
+        const score = Math.min(wet, 20) * 2 - r;
+        if (score > best) { best = score; spot = [x, y]; }
       }
     }
     if (!spot) continue;
@@ -379,6 +446,20 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     setO(x, y, ch); lock[y * C + x] = 1; forest[y * C + x] = 0;
     // objeto grande (moinho, tenda, fonte...): abre uma clareira em volta
     if ('ÔÕÖØÙÚÛÜÝÞ'.includes(ch)) for (let yy = y - 4; yy <= y + 1; yy++) for (let xx = x - 2; xx <= x + 3; xx++) if (inside(xx, yy) && !(xx === x && yy === y)) { forest[yy * C + xx] = 0; lock[yy * C + xx] = Math.max(lock[yy * C + xx], 1); if ('TAb'.includes(O[yy][xx])) O[yy][xx] = ' '; }
+  }
+
+  // ---- cais: 1-2 barcos na agua ao lado da ponta, barril/caixote na raiz seca ----
+  for (const { tip, root, horiz, w } of piers) {
+    let boats = 0;
+    for (const side of [1, -1]) for (let k = w; k <= w + 2 && boats < 2; k++) {
+      const X = horiz ? tip[0] - 1 : tip[0] + side * k; const Y = horiz ? tip[1] + side * k : tip[1] - 1;
+      if (inside(X, Y) && WATER.has(G[Y][X]) && O[Y][X] === ' ') { setO(X, Y, 'Ù'); boats++; break; }
+    }
+    if (!root) continue;
+    for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0], [-1, -1], [1, 1]]) {
+      const X = root[0] + dx * (w + 1); const Y = root[1] + dy * (w + 1);
+      if (inside(X, Y) && !WATER.has(G[Y][X]) && G[Y][X] !== '-' && O[Y][X] === ' ' && lock[Y * C + X] !== 2) { setO(X, Y, rnd() < 0.5 ? 'u' : 'q'); lock[Y * C + X] = 1; break; }
+    }
   }
 
   // ---- trilhas: da porta ate a estrada/praca mais perto (busca em largura curta) ----

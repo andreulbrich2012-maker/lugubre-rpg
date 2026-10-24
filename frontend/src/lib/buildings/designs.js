@@ -94,7 +94,7 @@ outer: for (const [tid, tname, build] of HOUSE_TEMPLATES) {
     if (hi % 3 === 0) spec.bushes = [8];
     if (hi % 4 === 1) spec.vines = 5;
     const name = `Casa ${sname} ${tname}`;
-    if (add({ id: `casa-${tid}-${sid}`, name, category: 'Casas', interior: 'casa', size: sid, w, h, spec, defaults: { material: HOUSE_MATERIALS[hi % HOUSE_MATERIALS.length], roofStyle: HOUSE_ROOFS[hi % HOUSE_ROOFS.length], colors: pal(hi) } })) hi++;
+    if (add({ id: `casa-${tid.toLowerCase()}-${sid}`, name, category: 'Casas', interior: 'casa', size: sid, w, h, spec, defaults: { material: HOUSE_MATERIALS[hi % HOUSE_MATERIALS.length], roofStyle: HOUSE_ROOFS[hi % HOUSE_ROOFS.length], colors: pal(hi) } })) hi++;
     if (hi >= 100) break outer;
   }
 }
@@ -221,6 +221,8 @@ for (let k = 0; designs.length < 250 && k < 400; k++) {
 
 export const DESIGNS = designs;
 export const DESIGN_BY_ID = Object.fromEntries(designs.map((d) => [d.id, d]));
+// ids antigos com maiuscula (casa-L-media...) continuam valendo em mapas salvos
+for (const d of designs) if (d.id.startsWith('casa-l-')) DESIGN_BY_ID[`casa-L-${d.id.slice(7)}`] = d;
 
 // Construcao do mapa -> especificacao final para o kit: projeto + trocas do mestre
 // (material principal, estilo do telhado e cores). Volumes de material fixo (vidro) ficam.

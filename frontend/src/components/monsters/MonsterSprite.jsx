@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
+import { styledCopy } from '../../lib/tiles/styles';
 import { buildMonsterSheet, monsterFrameRect, toLook } from '../../lib/monsters/render';
 import { FRAME_MS, ANIMS } from '../../lib/monsters/compose';
 
@@ -6,7 +7,7 @@ import { FRAME_MS, ANIMS } from '../../lib/monsters/compose';
 // 'attack' mostra o bote. A folha vem do cache (mesmo monstro = mesmo canvas),
 // entao varios tokens iguais na mesa nao recalculam nada. Respeita "menos movimento".
 // scale multiplica o tamanho natural do quadro (16/24/32/40 px conforme o nivel).
-export default function MonsterSprite({ monster, look: lookProp, direction = 'down', moving = false, attacking = false, scale = 3, className = '', style, title }) {
+export default function MonsterSprite({ monster, look: lookProp, direction = 'down', moving = false, attacking = false, scale = 3, mapStyle, className = '', style, title }) {
   const ref = useRef(null);
   const look = useMemo(() => lookProp || toLook(monster), [lookProp, monster]);
 
@@ -21,7 +22,7 @@ export default function MonsterSprite({ monster, look: lookProp, direction = 'do
       const r = monsterFrameRect(sheet.w, direction, anim, f);
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(sheet.canvas, r.sx, r.sy, r.sw, r.sh, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(styledCopy(sheet.canvas, mapStyle), r.sx, r.sy, r.sw, r.sh, 0, 0, canvas.width, canvas.height);
     };
     draw(0);
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -38,7 +39,7 @@ export default function MonsterSprite({ monster, look: lookProp, direction = 'do
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [look, direction, moving, attacking]);
+  }, [look, direction, moving, attacking, mapStyle]);
 
   return (
     <canvas

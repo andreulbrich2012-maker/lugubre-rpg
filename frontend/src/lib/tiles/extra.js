@@ -3,6 +3,7 @@
 // estilo Stardew do resto: rampa quente, contorno sepia, luz do alto-esquerda.
 // Os codigos ASCII acabaram; estes usam letras do Latin-1 (a validacao aceita ¡-ÿ).
 import { canvas, tone, hash, toImages, thumbnail } from './paint.js';
+import { WATER_TILES } from './water.js';
 
 const N = 16;
 // Pinta 'n' imagens (variantes ou quadros) chamando fn(c, i) em cada canvas 16x16.
@@ -141,24 +142,9 @@ const TERRAINS = [
       return tone('#2c4a8c', (x + y) % 4 === 0 ? 3 : 2);
     });
   }, 1)),
-  tile({ code: 'ó', name: 'Mar', category: 'Água', layer: 'ground', solid: true, animated: true }, images((c, f) => {
-    const B = '#1f528f';
-    each(c, (x, y) => {
-      const band = Math.floor(y / 5);
-      const ph = (x + f * 2 + band * 5) % 10;
-      if (y % 5 === 0 && ph < 4) return tone('#d8eef4', ph === 0 ? 3 : 4);
-      if (y % 5 === 1 && ph < 5) return tone(B, 3);
-      return tone(B, 2 + (hash(x, y, 7) < 0.1 ? -1 : 0));
-    });
-  })),
-  tile({ code: 'ô', name: 'Lodo', category: 'Água', layer: 'ground', animated: true }, images((c, f) => {
-    const B = '#55603a';
-    each(c, (x, y) => tone(B, 2 + jitter(x, y, 3, 0.2, 0.85)));
-    for (let i = 0; i < 4; i++) {
-      const x = 2 + Math.floor(hash(i, 1, 2) * 12); const y = (Math.floor(hash(i, 2, 2) * 16) - f * 2 + 16) % 16;
-      c.set(x, y, tone(B, 4)); c.set(x + 1, y, tone(B, 3)); c.set(x, y + 1, tone(B, 1));
-    }
-  })),
+  // mar e lodo: pintados em codigo junto com o resto da agua (water.js), 4 quadros ciclicos
+  WATER_TILES['ó'],
+  WATER_TILES['ô'],
   tile({ code: 'õ', name: 'Solo de cristal', category: 'Especiais', layer: 'ground', light: '#4cbcc6' }, images((c, v) => {
     const B = '#2c3048';
     each(c, (x, y) => tone(B, 2 + jitter(x, y, v + 8, 0.2, 0.9)));

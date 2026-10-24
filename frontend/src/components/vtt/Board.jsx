@@ -4,8 +4,7 @@ import TileMapCanvas from './TileMapCanvas';
 import Crack from '../glass/Crack';
 import { buildingAt, isSolid, PICKUP_RANGE, tokenBuilding, tokenItemDistance } from '../../lib/tiles/format';
 import { detectBuildings } from '../../lib/tiles/compose';
-import { ROOFS, ROOF_LABEL } from '../../lib/tiles/roofs';
-import { housePixels, doorColumn, WALLS, WALL_LABEL, wallOf } from '../../lib/tiles/house3d';
+import { buildingPixels, doorCol, MATERIALS, ROOF_STYLE_OPTIONS, DESIGN_BY_ID } from '../../lib/buildings';
 import { getTile } from '../../lib/tiles/catalog';
 import AvatarSprite from '../avatar/AvatarSprite';
 import FxLayer from '../fx/FxLayer';
@@ -18,7 +17,7 @@ import { monsterLook } from '../../lib/monsters/classify';
 // token atras (ao norte) fica escondido pela casa, token na frente passa por cima.
 function House({ building, tiles, light, open, cell }) {
   const ref = useRef(null);
-  const img = useMemo(() => housePixels(building, tiles, { light }), [building, tiles, light]);
+  const img = useMemo(() => buildingPixels(building, tiles, { light }), [building, tiles, light]);
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
@@ -30,7 +29,7 @@ function House({ building, tiles, light, open, cell }) {
   return (
     <div
       className={`vtt-house ${open ? 'is-open' : ''}`}
-      style={{ left: building.x * cell, top: building.y * cell + img.offsetY * k, width: img.width * k, height: img.height * k, zIndex: 10 + (building.y + building.h) * 2 }}
+      style={{ left: building.x * cell + (img.offsetX || 0) * k, top: building.y * cell + img.offsetY * k, width: img.width * k, height: img.height * k, zIndex: 10 + (building.y + building.h) * 2 }}
       aria-label={`${building.name || 'Construção'}${building.locked ? ' (trancada)' : ''}`}
     >
       <canvas ref={ref} aria-hidden="true" />
@@ -140,8 +139,10 @@ export default function Board({
   const buildings = useMemo(() => {
     if (!isTiles) return [];
     if (scene.tiles.buildings?.length) return scene.tiles.buildings;
+    // interior: as paredes sao a borda do mapa, nao e uma casa para cobrir com telhado
+    if (scene.parent_scene_id) return [];
     return detectBuildings(scene.tiles);
-  }, [isTiles, scene?.tiles]);
+  }, [isTiles, scene?.tiles, scene?.parent_scene_id]);
   const tilesWithRoofs = useMemo(() => (isTiles ? { ...scene.tiles, buildings } : null), [isTiles, scene?.tiles, buildings]);
   const [roofToggle, setRoofToggle] = useState({}); // escolha local de cada pessoa (id -> aberto?)
   const [interiors, setInteriors] = useState(false); // mestre: "ver interiores"
@@ -182,7 +183,7 @@ export default function Board({
       // porta de uma construcao com interior: entra na outra cena (o servidor confere tranca e regras)
       for (const b of buildings) {
         if (!b.interior) continue;
-        const dx = b.x + doorColumn(b, scene.tiles);
+        const dx = b.x + doorCol(b, scene.tiles);
         const dy = b.y + b.h - 1;
         if (Math.hypot(dx + 0.5 - cx, dy + 0.5 - cy) > 1.6) continue;
         e.preventDefault();
@@ -303,7 +304,7 @@ export default function Board({
         const cy = Math.floor((y + 1) / cell) + dy;
         if (cx < 0 || cy < 0 || cx >= scene.tiles.cols || cy >= scene.tiles.rows) return true;
         if (isSolid(scene.tiles, cx, cy)) return true;
-        if (buildings.some((b) => b.interior && cx >= b.x && cy >= b.y && cx < b.x + b.w && cy < b.y + b.h)) return true;
+        if (buildings.some((b) => (b.interior || b.design) && cx >= b.x && cy >= b.y && cx < b.x + b.w && cy < b.y + b.h)) return true;
       }
     }
     return false;
@@ -552,11 +553,11 @@ export default function Board({
               >
                 {mlook ? (
                   <span key={fx?.n} className={`vtt-sprite ${fx?.n && fx?.hit ? 'hit-shake' : ''}`} style={{ width: size * (mlook.size / 16) * 0.9, height: size * (mlook.size / 16) * 0.9 }}>
-                    <MonsterSprite look={mlook} direction={motion[t.id]?.dir || 'down'} moving={Boolean(motion[t.id]?.moving)} scale={4} style={{ width: '100%', height: '100%' }} title={t.name} />
+                    <MonsterSprite look={mlook} mapStyle={scene.tiles?.style} direction={motion[t.id]?.dir || 'down'} moving={Boolean(motion[t.id]?.moving)} scale={4} style={{ width: '100%', height: '100%' }} title={t.name} />
                   </span>
                 ) : sprite ? (
                   <span key={fx?.n} className={`vtt-sprite ${fx?.n && fx?.hit ? 'hit-shake' : ''}`} style={{ width: size * 1.05, height: size * 1.4 }}>
-                    <AvatarSprite appearance={sprite} direction={motion[t.id]?.dir || 'down'} moving={Boolean(motion[t.id]?.moving)} scale={4} style={{ width: '100%', height: '100%' }} title={t.name} />
+                    <AvatarSprite appearance={sprite} mapStyle={scene.tiles?.style} direction={motion[t.id]?.dir || 'down'} moving={Boolean(motion[t.id]?.moving)} scale={4} style={{ width: '100%', height: '100%' }} title={t.name} />
                   </span>
                 ) : (
                   <span key={fx?.n} className={`vtt-token-face ${fx?.n && fx?.hit ? 'hit-shake' : ''}`}>
@@ -602,7 +603,7 @@ export default function Board({
         const b = (scene.tiles.buildings || []).find((d) => d.id === housePop);
         if (!b) return null;
         return (
-          <div role="dialog" aria-label={`Construção: ${b.name}`} className="gothic-panel absolute right-16 top-3 z-20 w-72 max-w-[calc(100%-5rem)] rounded-md border-[3px] border-lead p-3 text-sm text-bone">
+          <div role="dialog" aria-label={`Construção: ${b.name}`} className="gothic-panel absolute left-3 top-3 z-20 max-h-[calc(100%-1.5rem)] w-72 max-w-[calc(100%-5rem)] overflow-y-auto rounded-md border-[3px] border-lead p-3 text-sm text-bone">
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="font-display text-lg">{b.name || 'Construção'}</p>
               <button type="button" className="btn btn-glass !min-h-8 !w-8 !p-0" onClick={() => setHousePop(null)} aria-label="Fechar"><X size={15} /></button>
@@ -611,16 +612,25 @@ export default function Board({
               {b.locked ? <><Lock size={16} /> Trancada: clique para abrir</> : <><LockOpen size={16} /> Aberta: clique para trancar</>}
             </button>
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <label className="text-xs text-mist">Parede
-                <select className="field !mt-1 py-1 text-sm" value={wallOf(b)} onChange={(e) => onPatchBuilding?.(b, { wall: e.target.value })}>
-                  {WALLS.map((w) => <option key={w} value={w}>{WALL_LABEL[w]}</option>)}
+              <label className="text-xs text-mist">Material
+                <select className="field !mt-1 py-1 text-sm" value={b.material || DESIGN_BY_ID[b.design]?.defaults.material || ''} onChange={(e) => onPatchBuilding?.(b, { material: e.target.value })}>
+                  {!b.material && !b.design && <option value="">Original</option>}
+                  {MATERIALS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </label>
               <label className="text-xs text-mist">Telhado
-                <select className="field !mt-1 py-1 text-sm" value={b.roof} onChange={(e) => onPatchBuilding?.(b, { roof: e.target.value })}>
-                  {ROOFS.map((r) => <option key={r} value={r}>{ROOF_LABEL[r]}</option>)}
+                <select className="field !mt-1 py-1 text-sm" value={b.roofStyle || DESIGN_BY_ID[b.design]?.defaults.roofStyle || ''} onChange={(e) => onPatchBuilding?.(b, { roofStyle: e.target.value })}>
+                  {!b.roofStyle && !b.design && <option value="">Original</option>}
+                  {ROOF_STYLE_OPTIONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                 </select>
               </label>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {[['roof', 'Telhado'], ['wall', 'Parede'], ['accent', 'Detalhes']].map(([k, l]) => (
+                <label key={k} className="text-xs text-mist">{l}
+                  <input type="color" className="mt-1 block h-8 w-full cursor-pointer border-2 border-lead bg-transparent" value={b.colors?.[k] || DESIGN_BY_ID[b.design]?.defaults.colors[k] || '#8a6a4a'} onChange={(e) => onPatchBuilding?.(b, { colors: { ...(b.colors || {}), [k]: e.target.value } })} />
+                </label>
+              ))}
             </div>
             {b.interior ? (
               <button type="button" className="btn btn-glass mt-2 w-full" onClick={() => { setHousePop(null); onViewScene?.(b.interior); }}><DoorOpen size={16} /> Ver o interior</button>

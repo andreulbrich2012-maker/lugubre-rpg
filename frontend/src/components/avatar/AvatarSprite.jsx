@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
+import { styledCopy } from '../../lib/tiles/styles';
 import { buildSpriteSheet, frameRect, FRAME_W, FRAME_H } from '../../lib/avatar/render';
 import { FRAME_MS, ANIMS } from '../../lib/avatar/skeleton';
 
 // Boneco animado em pixel art: parado respira (2 quadros), andando da 4 passos.
 // A folha de sprites vem do cache (mesma aparencia = mesmo canvas), entao varios tokens
 // iguais na mesa nao recalculam nada. Respeita "menos movimento" do sistema.
-export default function AvatarSprite({ appearance, direction = 'down', moving = false, scale = 3, className = '', style, title }) {
+export default function AvatarSprite({ appearance, direction = 'down', moving = false, scale = 3, mapStyle, className = '', style, title }) {
   const ref = useRef(null);
 
   useEffect(() => {
@@ -19,7 +20,7 @@ export default function AvatarSprite({ appearance, direction = 'down', moving = 
       const r = frameRect(direction, anim, f);
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(sheet.canvas, r.sx, r.sy, r.sw, r.sh, 0, 0, canvas.width, canvas.height);
+      ctx.drawImage(styledCopy(sheet.canvas, mapStyle), r.sx, r.sy, r.sw, r.sh, 0, 0, canvas.width, canvas.height);
     };
     draw(0);
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -36,7 +37,7 @@ export default function AvatarSprite({ appearance, direction = 'down', moving = 
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [appearance, direction, moving]);
+  }, [appearance, direction, moving, mapStyle]);
 
   return (
     <canvas

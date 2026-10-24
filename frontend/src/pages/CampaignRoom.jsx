@@ -19,6 +19,7 @@ import SheetsPanel from '../components/campaigns/room/SheetsPanel';
 import { useCampaignFeed } from '../hooks/useCampaignFeed';
 import { api } from '../lib/api';
 import { PICKUP_RANGE, tokenItemDistance } from '../lib/tiles/format';
+import { interiorFor } from '../lib/buildings';
 import { useAuth } from '../store/authStore';
 
 const TileMapEditor = lazy(() => import('../components/vtt/TileMapEditor'));
@@ -320,8 +321,9 @@ export default function CampaignRoom() {
   }, [id, viewSceneId, notify]);
   const createInterior = useCallback(async (b) => {
     try {
-      const { data } = await api.post(`/campaigns/${id}/scenes/${viewSceneId}/buildings/${b.id}/interior`);
-      notify(`Interior criado: ${data.name}. Decore no editor de mapa.`);
+      const { map } = interiorFor(b);
+      const { data } = await api.post(`/campaigns/${id}/scenes/${viewSceneId}/buildings/${b.id}/interior`, { tiles: map });
+      notify(`Interior pronto: ${data.name}. Dá para ajustar no editor de mapa.`);
       await loadScenes(true);
       loadScene(viewSceneId).catch(() => null);
     } catch (err) { notify(err.response?.data?.message || 'Não deu para criar o interior.', 'error'); }

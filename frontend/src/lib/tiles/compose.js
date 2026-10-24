@@ -12,6 +12,8 @@
 import { SIZE, getTile, tileImages } from './catalog.js';
 import { rasterize, cellHash } from './render.js';
 import { wallVariant, wallPixels, FACE_SHADOW } from './walls.js';
+import { riverStone, sparkle, FOAM_HEX } from './water.js';
+import { applyStyle } from './styles.js';
 
 // ---------- terrenos que se misturam (resto e "construido": borda reta) ----------
 // Ordem = precedencia: quem vem depois cobre a borda de quem vem antes.
@@ -97,21 +99,32 @@ const hexRgb = (hex) => {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 };
 
-// RGBA das imagens dos blocos (cache por codigo/imagem).
+// RGBA das imagens dos blocos (cache por codigo/imagem). bare: versao "so a agua" do rio
+// (as pedras entram pelo compose, cada celula com as suas, sem repetir o mesmo desenho).
 const tileCache = new Map();
-function tileRgba(t, index) {
-  const key = `${t.code}:${index}`;
+function tileRgba(t, index, bare = false) {
+  const useBare = bare && t.bare;
+  const key = `${t.code}:${index}${useBare ? ':b' : ''}`;
   let out = tileCache.get(key);
   if (!out) {
-    out = rasterize(tileImages(t)[index], t.palette);
+    out = useBare ? rasterize(t.bare.frames[index], t.bare.palette) : rasterize(tileImages(t)[index], t.palette);
     tileCache.set(key, out);
   }
   return out;
 }
+// Quadro de cada bloco no "tique" do terreno: a agua nova e ciclica (tile.cycle: 0,1,2,3,0...);
+// o resto (lava, acido...) segue o vai-e-volta antigo (0,1,2,1), escrito como ciclo.
+export function tileFrame(t, tick) {
+  const n = t.frames.length;
+  if (t.cycle) return tick % n;
+  const len = n * 2 - 2;
+  const i = tick % len;
+  return i < n ? i : len - i;
+}
 function imageIndex(t, cx, cy, frame) {
   const count = tileImages(t).length;
   if (count < 2) return 0;
-  return t.frames ? frame % count : cellHash(cx, cy) % count;
+  return t.frames ? tileFrame(t, frame) : cellHash(cx, cy) % count;
 }
 
 // ---------- decoracoes pequenas (pixel art 3x3 a 5x5) ----------
@@ -170,6 +183,164 @@ const BIOME = {
   'ë': [['dust', 0.08]],
   'ê': [['dust', 0.04]]
 };
+
+// ---------- margem da agua (24/10, agua nova) ----------
+// Distancia (em px) de cada pixel ate o alvo mais proximo, limitada em cap (chanfro 1 / 1.41).
+function distanceField(W, H, isTarget, cap) {
+  const d = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) d[i] = isTarget(i) ? 0 : cap;
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      let v = d[i];
+      if (!v) continue;
+      if (x > 0) v = Math.min(v, d[i - 1] + 1);
+      if (y > 0) {
+        v = Math.min(v, d[i - W] + 1);
+        if (x > 0) v = Math.min(v, d[i - W - 1] + 1.41);
+        if (x < W - 1) v = Math.min(v, d[i - W + 1] + 1.41);
+      }
+      d[i] = v;
+    }
+  }
+  for (let y = H - 1; y >= 0; y--) {
+    for (let x = W - 1; x >= 0; x--) {
+      const i = y * W + x;
+      let v = d[i];
+      if (!v) continue;
+      if (x < W - 1) v = Math.min(v, d[i + 1] + 1);
+      if (y < H - 1) {
+        v = Math.min(v, d[i + W] + 1);
+        if (x < W - 1) v = Math.min(v, d[i + W + 1] + 1.41);
+        if (x > 0) v = Math.min(v, d[i + W - 1] + 1.41);
+      }
+      d[i] = v;
+    }
+  }
+  return d;
+}
+
+const RING = hexRgb('#8fdfe8');
+const FOAM = hexRgb(FOAM_HEX);
+const SHALLOW_EDGE = hexRgb('#2c8ec0');
+const BANK_FACE = ['#3a2630', '#563628', '#74502f'].map(hexRgb);
+const WET_SOIL = hexRgb('#4e3a34');
+const ROCK = ['#2a1c2e', '#524866', '#6d627c', '#8a7f8e'].map(hexRgb);
+
+// Estilo Stardew na beira da agua: espuma branca que "lambe" a margem (vai e vem com o quadro),
+// anel claro raso perto da terra, transicao pontilhada entre agua funda e rasa, barranco
+// molhado (face escura quando a terra fica em cima da agua) e solo umido em volta.
+// Tambem: pedras do rio por celula e as bordas da cachoeira (pedra dos lados, espuma no pe).
+function waterEdges(img, terr, map, frame) {
+  const { w: W, h: H } = img;
+  const { cols, rows } = map;
+  const ground = map.layers.ground;
+  const code = (cx, cy) => ground[cy]?.[cx];
+  const waterOf = new Uint8Array(BLEND_ORDER.length + 1); // 1 agua clara, 2 agua escura (funda/mar)
+  BLEND_ORDER.forEach((c, i) => { waterOf[i + 1] = c === 'W' || c === 'ó' ? 2 : WATER.has(c) ? 1 : 0; });
+  let any = false;
+  for (const row of ground) if (/[~W0óV]/.test(row)) { any = true; break; }
+  if (!any) return;
+  const wcls = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) wcls[i] = waterOf[terr[i]];
+  const isV = new Uint8Array(W * H); // cachoeira nao gera espuma de margem (tem a sua)
+  for (let cy = 0; cy < rows; cy++) for (let cx = 0; cx < cols; cx++) {
+    if (code(cx, cy) !== 'V') continue;
+    for (let y = 0; y < SIZE; y++) isV.fill(1, (cy * SIZE + y) * W + cx * SIZE, (cy * SIZE + y) * W + cx * SIZE + SIZE);
+  }
+  const toLand = distanceField(W, H, (i) => !wcls[i] && !isV[i], 7);
+  const toWater = distanceField(W, H, (i) => wcls[i] > 0, 5);
+  const toLight = distanceField(W, H, (i) => wcls[i] === 1, 4);
+  const lap = [0, 1, 2, 1];
+  for (let py = 0; py < H; py++) {
+    for (let px = 0; px < W; px++) {
+      const i = py * W + px;
+      const c = wcls[i];
+      if (c) {
+        const d = toLand[i];
+        // manchas largas de profundidade (ruido do mapa, nao do bloco): quebram a repeticao
+        const deepN = valueNoise(px, py, 23, 12) * 0.7 + valueNoise(px, py, 9, 13) * 0.3;
+        if (deepN > 0.62) tint(img, px, py, RING, (deepN - 0.62) * 0.55);
+        else if (deepN < 0.38) scaleRgb(img, px, py, 1 - (0.38 - deepN) * 0.45);
+        if (c === 2 && toLight[i] < 4) {
+          // agua funda -> rasa: degrade pontilhado (pixel art, sem borrao)
+          const t = toLight[i];
+          const chk = (px + py) & 1;
+          const a = t <= 1.5 ? 0.55 : t <= 2.5 ? (chk ? 0.4 : 0.15) : chk ? 0.18 : 0;
+          if (a) tint(img, px, py, SHALLOW_EDGE, a);
+        }
+        if (d >= 7) continue;
+        // fase da onda muda ao longo da margem (trechos diferentes nao batem juntos)
+        const ph = Math.floor(valueNoise(px, py, 9, 4) * 8);
+        const wave = lap[(frame + ph) & 3];
+        const n = rand(px, py, 5);
+        if (d <= 1.5) tint(img, px, py, FOAM, n < 0.18 ? 0.55 : 0.9);
+        else if (Math.abs(d - (2.2 + wave)) < 0.55) tint(img, px, py, FOAM, n < 0.3 ? 0.25 : 0.6);
+        else if (d < 6) tint(img, px, py, RING, 0.42 * (1 - (d - 1.5) / 4.5) * (c === 2 ? 0.7 : 1));
+        continue;
+      }
+      if (isV[i] || !terr[i]) continue; // cachoeira e construido (ponte, parede) ficam como estao
+      const dw = toWater[i];
+      if (dw >= 5) continue;
+      // barranco: terra logo acima da agua mostra a face de terra molhada (3 px)
+      let k = 0;
+      for (let s = 1; s <= 3; s++) if (py + s < H && wcls[i + s * W]) { k = s; break; }
+      if (k) tint(img, px, py, BANK_FACE[k - 1], k === 1 ? 0.85 : k === 2 ? 0.75 : 0.5);
+      else if (dw <= 1.5) tint(img, px, py, WET_SOIL, 0.55);
+      else if (dw <= 2.5) tint(img, px, py, WET_SOIL, 0.32);
+      else if (dw <= 3.5 && (px + py) & 1) tint(img, px, py, WET_SOIL, 0.18);
+    }
+  }
+
+  const setHex = (x, y, hex) => { const [r, g, b] = hexRgb(hex); blend(img, x, y, r, g, b, 1); };
+  for (let cy = 0; cy < rows; cy++) {
+    for (let cx = 0; cx < cols; cx++) {
+      const c = code(cx, cy);
+      const x0 = cx * SIZE;
+      const y0 = cy * SIZE;
+      if (WATER.has(c) && hash(cx, cy, 97) % 5 < 2) {
+        // brilho do sol na agua: por celula (sem grade), so sobre pixel de agua aberta
+        const sx = x0 + 2 + (hash(cx, cy, 98) % 10);
+        const sy = y0 + 2 + (hash(cx, cy, 99) % 12);
+        sparkle((x, y, h) => { if (x >= 0 && y >= 0 && x < W && y < H && wcls[y * W + x] && toLand[y * W + x] > 2.5) setHex(x, y, h); }, sx, sy, frame + (hash(cx, cy, 100) % 4));
+      }
+      if (c === '0') {
+        // pedras do rio: 0 a 2 por celula, posicao e tamanho pelo hash (nunca o mesmo desenho)
+        const n = hash(cx, cy, 90) % 5;
+        const count = n < 1 ? 0 : n < 4 ? 1 : 2;
+        for (let s = 0; s < count; s++) {
+          const sx = x0 + 4 + (hash(cx, cy, 91 + s) % 8);
+          const sy = y0 + 4 + ((hash(cx, cy, 93 + s) % 4) + s * 5);
+          riverStone(setHex, sx, sy, hash(cx, cy, 95 + s) % 2, frame + s);
+        }
+      }
+      if (c !== 'V') continue;
+      // cachoeira: pedra dos lados onde nao continua, borda de cima clara, espuma no pe
+      const side = (dx) => code(cx + dx, cy) !== 'V';
+      for (let y = 0; y < SIZE; y++) {
+        const r = ROCK[1 + (hash(cx, cy * SIZE + y, 70) % 3)];
+        if (side(-1)) { blend(img, x0, y0 + y, ...ROCK[0], 1); blend(img, x0 + 1, y0 + y, ...r, 1); if ((y + frame * 4) % 7 === 0) blend(img, x0 + 2, y0 + y, ...FOAM, 0.8); }
+        if (side(1)) { blend(img, x0 + 15, y0 + y, ...ROCK[0], 1); blend(img, x0 + 14, y0 + y, ...r, 1); if ((y + frame * 4 + 3) % 7 === 0) blend(img, x0 + 13, y0 + y, ...FOAM, 0.8); }
+      }
+      if (code(cx, cy - 1) !== 'V') {
+        for (let x = 1; x < 15; x++) { tint(img, x0 + x, y0, FOAM, 0.75); tint(img, x0 + x, y0 + 1, RING, 0.5); }
+      }
+      const below = code(cx, cy + 1);
+      if (below !== 'V') {
+        // pe da cachoeira: espuma borbulhante (no proprio bloco e na agua de baixo)
+        const intoWater = WATER.has(below);
+        for (let y = 10; y < SIZE + (intoWater ? 7 : 0); y++) {
+          for (let x = 1; x < 15; x++) {
+            const depth = y < SIZE ? (y - 10) / 6 : 1 - (y - SIZE) / 7;
+            const v = valueNoise(x0 + x, y0 + y - frame * 2, 3, 8) * 0.7 + rand(x0 + x, y0 + y + frame, 9) * 0.3;
+            if (v < 0.75 - depth * 0.45) continue;
+            tint(img, x0 + x, y0 + y, FOAM, v > 0.7 ? 0.95 : 0.6);
+          }
+        }
+      }
+    }
+  }
+}
 
 // ---------- terreno ----------
 // Devolve a imagem do chao inteiro (16 px por celula) para um quadro de animacao.
@@ -259,7 +430,7 @@ export function renderTerrain(map, { frame = 0, beautify = true, decor = 'normal
       const wall = beautify && own.wall ? wallVariant(map, cx, cy) : null;
       const ownRgba = wall
         ? wallPixels(own, tileImages(own)[imageIndex(own, cx, cy, frame)], wall.kind, wall.mask)
-        : tileRgba(own, imageIndex(own, cx, cy, frame));
+        : tileRgba(own, imageIndex(own, cx, cy, frame), beautify);
       const bySrc = [];
       for (let y = 0; y < SIZE; y++) {
         for (let x = 0; x < SIZE; x++) {
@@ -270,7 +441,7 @@ export function renderTerrain(map, { frame = 0, beautify = true, decor = 'normal
           if (id && codeOf(id) !== own.code) {
             if (!bySrc[id]) {
               const t = getTile(codeOf(id));
-              bySrc[id] = tileRgba(t, imageIndex(t, cx, cy, frame));
+              bySrc[id] = tileRgba(t, imageIndex(t, cx, cy, frame), beautify);
             }
             src = bySrc[id];
           }
@@ -288,43 +459,26 @@ export function renderTerrain(map, { frame = 0, beautify = true, decor = 'normal
   const kindOf = new Uint8Array(BLEND_ORDER.length + 1); // 1 agua, 2 grama, 3 lava
   BLEND_ORDER.forEach((c, i) => { kindOf[i + 1] = WATER.has(c) ? 1 : GRASS.has(c) ? 2 : c === 'L' ? 3 : 0; });
   const K = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? 255 : kindOf[terr[y * W + x]] | (terr[y * W + x] ? 0 : 8));
-  const isW = (k) => k !== 255 && (k & 7) === 1;
   const isG = (k) => k !== 255 && (k & 7) === 2;
-  const deepId = PRECEDENCE.W;
-  const FOAM = hexRgb('#e8f8fa');
-  const WET = hexRgb('#4a3038');
-  const BANK = hexRgb('#8a5a34');
   const GLOW = hexRgb('#ffd27a');
   for (let cy = 0; cy < rows; cy++) {
     for (let cx = 0; cx < cols; cx++) {
       // so celulas com borda que interessa por perto (agua x terra, grama x outro chao, lava)
-      let water = 0; let dry = 0; let grass = 0; let notGrass = 0; let lava = 0;
+      let grass = 0; let notGrass = 0; let lava = 0;
       for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
           const c = code(cx + dx, cy + dy);
           if (c === undefined) continue;
-          if (WATER.has(c)) water++; else dry++;
           if (GRASS.has(c)) grass++; else notGrass++;
           if (c === 'L') lava++;
         }
       }
-      if (!(water && dry) && !(grass && notGrass) && !(lava && lava < 9) && !(water && code(cx, cy) === 'W')) continue;
+      if (!(grass && notGrass) && !(lava && lava < 9)) continue;
       for (let py = cy * SIZE; py < (cy + 1) * SIZE; py++) {
         for (let px = cx * SIZE; px < (cx + 1) * SIZE; px++) {
           const id = terr[py * W + px];
           const k = kindOf[id] | (id ? 0 : 8);
           const l = K(px - 1, py); const r = K(px + 1, py); const u = K(px, py - 1); const d = K(px, py + 1);
-          if (id && (k & 7) === 1) {
-            const land = (q) => q !== 255 && (q & 7) !== 1;
-            if (land(l) || land(r) || land(u) || land(d)) tint(img, px, py, FOAM, hash(px, py + frame, 9) % 3 === 0 ? 0.85 : 0.6);
-            else if (land(K(px - 2, py)) || land(K(px + 2, py)) || land(K(px, py - 2)) || land(K(px, py + 2))) tint(img, px, py, FOAM, 0.22);
-            else if (id === deepId && [px - 1, px + 1].some((x) => terr[py * W + x] && terr[py * W + x] !== deepId)) tint(img, px, py, FOAM, 0.12);
-          } else {
-            // margem: faixa de terra molhada entre a agua e o resto (mais grossa em cima da agua: barranco)
-            if (isW(l) || isW(r) || isW(u) || isW(d)) tint(img, px, py, WET, 0.6);
-            else if (isW(K(px - 2, py)) || isW(K(px + 2, py)) || isW(K(px, py - 2)) || isW(K(px, py + 2)) || isW(K(px - 1, py - 1)) || isW(K(px + 1, py - 1)) || isW(K(px - 1, py + 1)) || isW(K(px + 1, py + 1))) tint(img, px, py, BANK, 0.65);
-            else if (isW(K(px - 3, py)) || isW(K(px + 3, py)) || isW(K(px, py + 3)) || isW(K(px, py + 4))) tint(img, px, py, BANK, 0.35);
-          }
           if ((k & 7) === 2) {
             // contorno da touceira de grama onde encosta em outro chao
             const other = (q) => q !== 255 && (q & 7) !== 2 && (q & 7) !== 1;
@@ -338,6 +492,8 @@ export function renderTerrain(map, { frame = 0, beautify = true, decor = 'normal
       }
     }
   }
+
+  waterEdges(img, terr, map, frame);
 
   // sombra que a frente da parede projeta no chao abaixo
   for (let cy = 0; cy < rows - 1; cy++) {
@@ -626,9 +782,22 @@ export function detectBuildings(map, max = 30) {
 }
 
 // Celulas de terreno animado (agua/lava): se nao houver, o terreno e desenhado uma vez so.
+// Devolve o tamanho do ciclo (em tiques de FRAME_MS): agua ciclica de 4 + vai-e-volta de 3
+// (0,1,2,1 = ciclo de 4) fecham juntos; o drawMap guarda um canvas por tique.
 export function terrainFrames(map) {
   let n = 1;
-  for (const row of map.layers.ground) for (const ch of row) { const t = getTile(ch); if (t?.frames) n = Math.max(n, t.frames.length); }
+  const seen = new Set();
+  const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+  for (const row of map.layers.ground) {
+    for (const ch of row) {
+      if (seen.has(ch)) continue;
+      seen.add(ch);
+      const t = getTile(ch);
+      if (!t?.frames || t.frames.length < 2) continue;
+      const p = t.cycle ? t.frames.length : t.frames.length * 2 - 2;
+      n = (n * p) / gcd(n, p);
+    }
+  }
   return n;
 }
 
@@ -649,18 +818,20 @@ export function lightSources(map) {
 }
 
 // Pura: imagem final como a mesa mostra (usada no preview em PNG e nos testes).
-export function renderScene(map, { beautify = true, decor = map.decor || 'normal', light = map.light || 'dia', roofs = [], frame = 0, roofPixels } = {}) {
+// style: estilo global do mapa (styles.js), aplicado antes da luz da cena.
+export function renderScene(map, { beautify = true, decor = map.decor || 'normal', light = map.light || 'dia', roofs = [], frame = 0, roofPixels, style = map.style } = {}) {
   const img = renderTerrain(map, { frame, beautify, decor });
   const obj = renderObjects(map, { beautify });
   stamp(img, obj.data, obj.w, obj.h, 0, 0);
   map.layers.objects.forEach((row, y) => [...row].forEach((ch, x) => {
     const t = getTile(ch);
-    if (t && isAnimatedObject(t)) stamp(img, tileRgba(t, frame % t.frames.length), SIZE, SIZE, x * SIZE, y * SIZE);
+    if (t && isAnimatedObject(t)) stamp(img, tileRgba(t, tileFrame(t, frame)), SIZE, SIZE, x * SIZE, y * SIZE);
   }));
   for (const b of roofs) {
     const r = roofPixels(b);
     stamp(img, r.data, r.width, r.height, b.x * SIZE, b.y * SIZE);
   }
+  applyStyle(img, style);
   const tintHex = LIGHT_TINT[light];
   if (tintHex) {
     const [r, g, b] = hexRgb(tintHex);

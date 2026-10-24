@@ -1,5 +1,5 @@
 // Validacao do mapa em tiles (o editor do front conserta; aqui so aceita o que esta certo).
-// Formato: {cols, rows, layers:{ground, objects}, items?, buildings?, light?, decor?} — ver docs/API-v2.md.
+// Formato: {cols, rows, layers:{ground, objects}, items?, buildings?, light?, decor?, style?} — ver docs/API-v2.md.
 import { z } from 'zod';
 import { httpError } from './http.js';
 
@@ -26,7 +26,17 @@ const itemSchema = z.object({
   note: z.string().max(300).optional(),
   icon: z.string().regex(/^[a-z0-9_-]{1,60}$/).optional()
 });
+// projeto do catalogo (frontend/src/lib/buildings/designs.js) e trocas do mestre: material principal,
+// estilo do telhado e cores (hex). Sem projeto, a construcao usa a casa generica.
+const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+export const buildingLook = {
+  design: z.string().regex(/^[a-z0-9-]{1,60}$/).optional(),
+  material: z.enum(['tabuas', 'verticais', 'troncos', 'pedra', 'tijolo', 'reboco', 'vidro']).optional(),
+  roofStyle: z.enum(['escama', 'ardosia', 'palha', 'vidro', 'tabuinhas']).optional(),
+  colors: z.object({ roof: hex, wall: hex, trim: hex, wood: hex, stone: hex, window: hex, accent: hex }).partial().optional()
+};
 const buildingSchema = z.object({
+  ...buildingLook,
   id,
   x: cell,
   y: cell,
@@ -40,11 +50,14 @@ const buildingSchema = z.object({
   interior: z.string().uuid().optional().nullable(),
   door: z.object({ x: cell, y: cell }).optional()
 });
+export const MAP_STYLES = ['padrao', 'obscuro', 'arco-iris', 'outono', 'inverno', 'primavera', 'verao-tropical', 'sepia', 'noturno-azul', 'pastel', 'neon', 'gotico', 'vitral', 'cinzas', 'sangue', 'gelo', 'floresta-encantada', 'deserto', 'pantano', 'aquarela'];
 const extrasSchema = z.object({
   items: z.array(itemSchema).max(60, 'No máximo 60 itens no mapa.').optional().default([]),
   buildings: z.array(buildingSchema).max(30, 'No máximo 30 construções no mapa.').optional().default([]),
   light: z.enum(['dia', 'entardecer', 'noite']).optional(),
-  decor: z.enum(['nenhuma', 'pouca', 'normal', 'muita']).optional()
+  decor: z.enum(['nenhuma', 'pouca', 'normal', 'muita']).optional(),
+  // estilo global de cor do mapa (frontend/src/lib/tiles/styles.js: mesma lista de ids)
+  style: z.enum(MAP_STYLES).optional()
 });
 
 // Valida o formato {cols, rows, layers:{nome:[linhas]}} com 1 caractere ASCII por celula,
@@ -92,7 +105,7 @@ export function validateTiles(tiles) {
     const issue = parsed.error.issues[0];
     throw httpError(`Mapa: ${issue.path.join('.')} — ${issue.message}`);
   }
-  const { items, buildings, light, decor } = parsed.data;
+  const { items, buildings, light, decor, style } = parsed.data;
   for (const list of [items, buildings]) {
     if (new Set(list.map((entry) => entry.id)).size !== list.length) throw httpError('Mapa: ids repetidos em itens ou construções.');
   }
@@ -100,7 +113,7 @@ export function validateTiles(tiles) {
   if (buildings.some((b) => b.x + b.w > cols || b.y + b.h > rows)) throw httpError('Mapa: construção fora do mapa.');
   return {
     cols, rows, layers: Object.fromEntries(names.map((name) => [name, [...layers[name]]])),
-    items, buildings, ...(light ? { light } : {}), ...(decor ? { decor } : {})
+    items, buildings, ...(light ? { light } : {}), ...(decor ? { decor } : {}), ...(style && style !== 'padrao' ? { style } : {})
   };
 }
 

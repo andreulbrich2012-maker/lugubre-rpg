@@ -5,6 +5,7 @@
 
 import { MORE_TILES, REPAINT } from './extra.js';
 import { toImages } from './paint.js';
+import { WATER_TILES } from './water.js';
 
 export const SIZE = 16;
 export const DEFAULT_GROUND = '.';
@@ -30,11 +31,6 @@ const PAL = {
   F: '#d8c6a2', W: '#faefd6', // osso
   '+': '#5a8c2c', '*': '#90c642', '^': '#d2ee7c' // acido
 };
-
-// Desloca as linhas na horizontal (com volta): usado para a agua/lava "correr".
-function shift(rows, n) {
-  return rows.map((r) => r.slice(SIZE - n) + r.slice(0, SIZE - n));
-}
 
 // Troca cores (quadros da lava: as rachaduras "respiram" sem a crosta andar).
 function recolor(rows, map) {
@@ -142,42 +138,6 @@ const FLOOR_B = [
   '1111111111111111'
 ];
 
-const WATER = [
-  'BBBBBBBBBBBBBBBB',
-  'BBCCBBBBBBBBBBBB',
-  'BAAAABBBBBBCCBBB',
-  'BBBBBBBBBBAAAABB',
-  'BBBBBBBBBBBBBBBB',
-  'BBBBBBCCBBBBBBBB',
-  'BBBBBAAAABBBBBBB',
-  'BBBBBBBBBBBBBBBB',
-  'BCCBBBBBBBBBBBBB',
-  'AAAABBBBBBBBCCBB',
-  'BBBBBBBBBBBAAAAB',
-  'BBBBBBBBBBBBBBBB',
-  'BBBBBBBBCCBBBBBB',
-  'BBBBBBBAAAABBBBB',
-  'BBBBBBBBBBBBBBBB',
-  'BBBBBBBBBBBBBBBB'
-];
-const DEEP = [
-  'zzzzzzzzzzzzzzzz',
-  'zzAAzzzzzzzzzzzz',
-  'zyyyyzzzzzzzzzzz',
-  'zzzzzzzzzzAAzzzz',
-  'zzzzzzzzzyyyyzzz',
-  'zzzzzzzzzzzzzzzz',
-  'zzzzzBzzzzzzzzzz',
-  'zzzzAAAzzzzzzzzz',
-  'zzzyyyyyzzzzzAzz',
-  'zzzzzzzzzzzzyyyz',
-  'zzzzzzzzzzzzzzzz',
-  'zAAzzzzzzzzzzzzz',
-  'yyyyzzzzzzAAzzzz',
-  'zzzzzzzzzyyyyzzz',
-  'zzzzzzzzzzzzzzzz',
-  'zzzzzzzzzzzzzzzz'
-];
 const LAVA = [
   'NMLLJIJLLJJJJLMM',
   'MLJIIIILMJJIIIIJ',
@@ -448,8 +408,9 @@ const BASE_TILES = [
   }),
 
   // ---------- Agua ----------
-  tile({ code: '~', name: 'Água rasa', category: 'Água', layer: 'ground', frames: [WATER, shift(WATER, 1), shift(WATER, 2)] }),
-  tile({ code: 'W', name: 'Água funda', category: 'Água', layer: 'ground', solid: true, frames: [DEEP, shift(DEEP, 1), shift(DEEP, 2)] }),
+  // agua rasa e funda: pintadas em codigo (water.js), 4 quadros ciclicos
+  WATER_TILES['~'],
+  WATER_TILES.W,
   tile({
     code: '%', name: 'Pântano', category: 'Água', layer: 'ground',
     pixels: [
@@ -1156,54 +1117,13 @@ const BASE_TILES = [
 
 // ---------- Blocos extras (24/10: o Andre pediu mais variedade para montar mapas) ----------
 
-// Desloca na vertical (com volta): agua da cachoeira caindo.
-function vshift(rows, n) {
-  return n ? [...rows.slice(SIZE - n), ...rows.slice(0, SIZE - n)] : rows;
-}
-const rot = (s, n) => (n ? s.slice(-n) + s.slice(0, -n) : s);
-
-// Sobrepoe um sprite com transparencia ('.') sobre outro: tocha na parede, pedras no rio.
+// Sobrepoe um sprite com transparencia ('.') sobre outro: tocha na parede.
 function overlay(base, top) {
   return base.map((r, y) => [...r].map((ch, x) => (top[y][x] === '.' ? ch : top[y][x])).join(''));
 }
 
 const STONE_WALL = BASE_TILES.find((t) => t.code === '#').pixels;
 
-const FALL_TEX = [
-  'BCABBGBACBAB', 'BCABBCBABBAB', 'BBABBCBACBAB', 'BBAGBCBACBAB',
-  'BBACBBBABBAG', 'BCACBBBABBAC', 'BCABBBGABBAC', 'BCABBBCACBAB',
-  'BBABBBCACBAB', 'GBABBGBABBAB', 'CBABBCBABGAB', 'CBACBCBABCAB',
-  'BBACBBBABCAB', 'BBABBBBACBAB', 'BGABBGBACBAB', 'BCABBCBABBAB'
-];
-const FALL_L = ['k4', 'k5', 'k4', 'k3', 'k4', 'k5', 'k4', 'k3', 'k4', 'k5', 'k4', 'k3', 'k4'];
-const FALL_R = ['3k', '2k', '3k', '2k', '2k', '3k', '2k', '2k', '3k', '2k', '2k', '3k', '2k'];
-const FALL_FOAM = ['EGGEGCGGEGGCGE', 'BEGGEBGEGGEBGB', 'AABEBAABEBAABA'];
-function waterfall(f) {
-  const body = vshift(FALL_TEX, f * 3);
-  const rows = [];
-  for (let y = 0; y < 13; y++) rows.push(FALL_L[y] + body[y] + FALL_R[y]);
-  for (const r of FALL_FOAM) rows.push('k' + rot(r, f * 2) + 'k');
-  return rows;
-}
-
-const RIVER_STONES = [
-  '................',
-  '................',
-  '..kkk...........',
-  '.k654k..........',
-  '.k432k..........',
-  '..kkk...........',
-  '..........kkkk..',
-  '.........k6554k.',
-  '.........k5432k.',
-  '..........kkkk..',
-  '................',
-  '....kkk.........',
-  '...k654k........',
-  '...k432k........',
-  '....kkk.........',
-  '................'
-];
 
 const ACID = [
   '++++S+++++++++++',
@@ -1471,8 +1391,8 @@ const EXTRA_TILES = [
   }),
 
   // ---------- Agua e terreno ----------
-  tile({ code: 'V', name: 'Cachoeira', category: 'Água', layer: 'ground', solid: true, frames: [waterfall(0), waterfall(1), waterfall(2)] }),
-  tile({ code: '0', name: 'Rio com pedras', category: 'Água', layer: 'ground', frames: [WATER, shift(WATER, 1), shift(WATER, 2)].map((w) => overlay(w, RIVER_STONES)) }),
+  WATER_TILES.V,
+  WATER_TILES[0],
   tile({
     code: 'G', name: 'Poça de ácido', category: 'Água', layer: 'ground', light: '#7fa040',
     frames: [ACID, recolor(ACID, { '^': '*', '*': '+' }), recolor(ACID, { '^': '+', '*': '^' })]

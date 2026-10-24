@@ -3,6 +3,7 @@
 import { SIZE, TILES, getTile, tileImages } from './catalog.js';
 import { roofPixels } from './roofs.js';
 import { renderTerrain, renderObjects, terrainFrames, isAnimatedObject, lightSources, LIGHT_TINT } from './compose.js';
+import { applyStyle } from './styles.js';
 
 export const FRAME_MS = 250; // ~4 fps: pixel art animada mais rapido que isso parece tremida
 
@@ -48,9 +49,27 @@ export function isAnimatedCode(code) {
 }
 
 let atlas = null;
+const styledAtlas = new Map();
 
 // Atlas: uma linha por bloco, colunas = imagens; objetos ganham uma linha de silhueta (sombra).
-function getAtlas() {
+// Com estilo de mapa (styles.js): copia do atlas com a cor transformada, feita uma vez por estilo
+// (objetos animados - fogo, tocha, portal - sao desenhados dele a cada quadro).
+function getAtlas(style) {
+  if (style && style !== 'padrao') {
+    let a = styledAtlas.get(style);
+    if (!a) {
+      const base = getAtlas();
+      const canvas = document.createElement('canvas');
+      canvas.width = base.canvas.width;
+      canvas.height = base.canvas.height;
+      const ctx = canvas.getContext('2d');
+      const img = base.canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+      ctx.putImageData(applyStyle(img, style), 0, 0);
+      a = { canvas, index: base.index };
+      styledAtlas.set(style, a);
+    }
+    return a;
+  }
   if (atlas) return atlas;
   const cols = Math.max(...TILES.map((t) => tileImages(t).length));
   const canvas = document.createElement('canvas');
@@ -75,15 +94,17 @@ function getAtlas() {
 const roofCache = new Map();
 
 // Telhado de uma construcao num canvas do tamanho nativo (16 px por celula); escalar e com o CSS/drawImage.
-export function roofCanvas(b, canvas = document.createElement('canvas')) {
+export function roofCanvas(b, canvas = document.createElement('canvas'), style) {
   const { width, height, data } = roofPixels(b);
+  applyStyle(data, style);
   canvas.width = width;
   canvas.height = height;
   canvas.getContext('2d').putImageData(new ImageData(data, width, height), 0, 0);
   return canvas;
 }
 
-function toCanvas(img) {
+function toCanvas(img, style) {
+  applyStyle(img, style);
   const c = document.createElement('canvas');
   c.width = img.w;
   c.height = img.h;
@@ -96,28 +117,32 @@ function toCanvas(img) {
 const layerCache = new WeakMap();
 function sceneLayers(map, beautify) {
   const decor = map.decor || 'normal';
+  const style = map.style || 'padrao';
   let c = layerCache.get(map.layers);
-  if (!c || c.beautify !== beautify || c.decor !== decor || c.cols !== map.cols) {
+  if (!c || c.beautify !== beautify || c.decor !== decor || c.cols !== map.cols || c.style !== style) {
     const animated = [];
     map.layers.objects.forEach((row, y) => [...row].forEach((ch, x) => {
       const t = getTile(ch);
       if (t && isAnimatedObject(t)) animated.push([x, y, t]);
     }));
-    c = { beautify, decor, cols: map.cols, frames: terrainFrames(map), terrain: [], objects: null, animated, lights: lightSources(map) };
+    c = { beautify, decor, style, cols: map.cols, frames: terrainFrames(map), terrain: [], objects: null, animated, lights: lightSources(map) };
     layerCache.set(map.layers, c);
   }
   return c;
 }
 
 // light: 'dia' | 'entardecer' | 'noite' (map.light). roofs: desenha todos os telhados (previa do editor).
+// map.style: estilo global (styles.js), aplicado uma vez nas camadas cacheadas; a luz vem por cima.
 export function drawMap(ctx, map, { cellSize = 48, time = 0, showGrid = false, roofs = false, beautify = true } = {}) {
-  const { canvas: img, index } = getAtlas();
+  const L = sceneLayers(map, beautify);
+  const { canvas: img, index } = getAtlas(L.style);
   const { cols, rows } = map;
   const s = cellSize;
-  const L = sceneLayers(map, beautify);
-  const f = L.frames > 1 ? frameIndex(time, L.frames) : 0;
-  if (!L.terrain[f]) L.terrain[f] = toCanvas(renderTerrain(map, { frame: f, beautify, decor: L.decor }));
-  if (!L.objects) L.objects = toCanvas(renderObjects(map, { beautify }));
+  // tique ciclico do terreno: a agua (tile.cycle) anda sempre para frente; os blocos de
+  // vai-e-volta viram ciclo dentro do compose (tileFrame), entao nada "pula"
+  const f = L.frames > 1 ? Math.floor(Math.max(0, time) / FRAME_MS) % L.frames : 0;
+  if (!L.terrain[f]) L.terrain[f] = toCanvas(renderTerrain(map, { frame: f, beautify, decor: L.decor }), L.style);
+  if (!L.objects) L.objects = toCanvas(renderObjects(map, { beautify }), L.style);
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, cols * s, rows * s);
   ctx.drawImage(L.terrain[f], 0, 0, cols * s, rows * s);
@@ -160,8 +185,8 @@ export function drawMap(ctx, map, { cellSize = 48, time = 0, showGrid = false, r
 
   if (roofs) {
     for (const b of map.buildings || []) {
-      const key = `${b.w}x${b.h}:${b.roof}`;
-      if (!roofCache.has(key)) roofCache.set(key, roofCanvas(b));
+      const key = `${b.w}x${b.h}:${b.roof}:${L.style}`;
+      if (!roofCache.has(key)) roofCache.set(key, roofCanvas(b, undefined, L.style));
       const rc = roofCache.get(key);
       ctx.drawImage(rc, b.x * s, b.y * s, b.w * s, (rc.height / SIZE) * s);
     }

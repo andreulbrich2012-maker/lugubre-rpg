@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check, Copy, Eraser, Gem, Grid3x3, Hand, Home, PaintBucket, Paintbrush,
-  Pipette, Redo2, RotateCcw, Save, Sparkles, Square, Trash2, Undo2, Wrench, X, ZoomIn, ZoomOut
+  Building2, Pipette, Redo2, RotateCcw, Save, Sparkles, Square, Trash2, Undo2, Wrench, X, ZoomIn, ZoomOut
 } from 'lucide-react';
 import TileMapCanvas from './TileMapCanvas';
 import { TILES, CATEGORIES, DEFAULT_GROUND, EMPTY_OBJECT, getTile } from '../../lib/tiles/catalog';
@@ -9,9 +9,13 @@ import { renderTilePreview } from '../../lib/tiles/render';
 import {
   emptyMap, repairMap, resizeMap, setCell, floodFill, rectFill, getCell, MIN_SIZE, MAX_SIZE,
   addItem, updateItem, removeItem, placeBuilding, updateBuilding, removeBuilding, itemAt, ITEM_CATEGORIES, MAX_ITEMS,
-  setAmbience
+  setAmbience, placeDesign
 } from '../../lib/tiles/format';
+import { DESIGN_BY_ID } from '../../lib/buildings';
+import BuildingSprite from '../buildings/BuildingSprite';
+import DesignPicker from '../buildings/DesignPicker';
 import { ROOFS, ROOF_LABEL } from '../../lib/tiles/roofs';
+import { STYLES } from '../../lib/tiles/styles';
 import { buildMapPrompt, parseMapResponse } from '../../lib/tiles/aiPrompt';
 
 const HISTORY = 50;
@@ -22,6 +26,7 @@ const TOOLS = [
   { id: 'rect', label: 'Retângulo', icon: Square },
   { id: 'eraser', label: 'Borracha', icon: Eraser },
   { id: 'picker', label: 'Conta-gotas', icon: Pipette },
+  { id: 'design', label: 'Construção pronta (catálogo)', icon: Building2 },
   { id: 'building', label: 'Construção (arraste um retângulo)', icon: Home },
   { id: 'item', label: 'Colocar item', icon: Gem },
   { id: 'pan', label: 'Mover a vista', icon: Hand }
@@ -105,6 +110,7 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
   const [pasted, setPasted] = useState('');
   const [result, setResult] = useState(null);
   const [build, setBuild] = useState({ wall: '#', floor: '=', roof: 'telha' });
+  const [design, setDesign] = useState('casa-frente-media');
 
   const code = selected[layer];
   const aiDims = SIZES.find((x) => x.id === aiSize);
@@ -188,6 +194,11 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
       return;
     }
     if (tool === 'bucket') { commit(floodFill(map, layer, x, y, code)); return; }
+    if (tool === 'design') {
+      const d = DESIGN_BY_ID[design];
+      if (d) commit(placeDesign(map, x, y, d));
+      return;
+    }
     if (tool === 'item') {
       if (itemAt(map, x, y)) return;
       commit(addItem(map, x, y, { name: 'Item achado' }));
@@ -389,6 +400,9 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
                 onPointerCancel={onPointerUp}
                 style={{ touchAction: tool === 'pan' ? 'auto' : 'none', cursor: tool === 'pan' ? 'grab' : 'crosshair' }}
               />
+              {buildings.filter((b) => b.design).sort((a, b) => a.y + a.h - b.y - b.h).map((b) => (
+                <BuildingSprite key={`s-${b.id}`} building={b} tiles={map} scale={zoom / 16} placed className="pointer-events-none" />
+              ))}
               {buildings.map((b) => (
                 <div key={b.id} className="pointer-events-none absolute border-2 border-dashed border-ember/70" style={{ left: b.x * zoom, top: b.y * zoom, width: b.w * zoom, height: b.h * zoom }}>
                   <span className="absolute left-0 top-0 bg-abyss/85 px-1 text-[10px] font-bold text-ember">{b.name}</span>
@@ -450,9 +464,23 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
                   {DECOR_OPTIONS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
                 </select>
               </label>
+              <label className="col-span-2 text-sm text-mist">Estilo do mapa
+                <select className="field py-1.5" value={map.style || 'padrao'} title={STYLES.find((st) => st.id === (map.style || 'padrao'))?.description}
+                  onChange={(e) => commit(setAmbience(map, { style: e.target.value }))}>
+                  {STYLES.map((st) => <option key={st.id} value={st.id} title={st.description}>{st.name}</option>)}
+                </select>
+              </label>
             </div>
-            <p className="text-xs text-mist">À noite, tochas, fogueiras, janelas e cristais brilham. A decoração (grama, flores, pedrinhas) é espalhada sozinha, sem cobrir caminhos, portas ou objetos.</p>
+            <p className="text-xs text-mist">À noite, tochas, fogueiras, janelas e cristais brilham. A decoração (grama, flores, pedrinhas) é espalhada sozinha, sem cobrir caminhos, portas ou objetos. O estilo muda as cores do mapa inteiro (ex.: Outono, Inverno, Sépia).</p>
           </section>
+
+          {tool === 'design' && (
+            <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
+              <h3 className="font-display text-xl">Construção pronta</h3>
+              <p className="text-sm text-mist">Escolha e clique no mapa (canto de cima-esquerda). Casas já vêm com interior pronto quando o mestre abrir a porta.</p>
+              <DesignPicker value={design} onChange={setDesign} />
+            </section>
+          )}
 
           {tool === 'building' && (
             <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">

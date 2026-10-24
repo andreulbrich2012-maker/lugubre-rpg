@@ -5,6 +5,7 @@ import { SIZE } from './catalog.js';
 import { ROOF_RGB, roofShade } from './roofs.js';
 import { ramp, hexToRgb } from '../avatar/palette.js';
 import { cellHash } from './render.js';
+import { styleRgb } from './styles.js';
 
 export const WALLS = ['enxaimel', 'madeira', 'pedra', 'tijolo'];
 export const WALL_LABEL = { enxaimel: 'Enxaimel (reboco e vigas)', madeira: 'Madeira', pedra: 'Pedra', tijolo: 'Tijolo' };
@@ -38,7 +39,8 @@ export function doorColumn(b, tiles) {
 // em volta de tudo; sombra no chao; luz da cena (janelas e lampiao continuam acesos).
 const RISE_PX = 24;
 const PATH_PX = 10; // caminho de pedras que sai da porta (desenhado no chao, abaixo da pegada)
-export function housePixels(b, tiles, { light = 'dia' } = {}) {
+// style: estilo global do mapa (styles.js; o Board passa scene.tiles.style), antes da luz.
+export function housePixels(b, tiles, { light = 'dia', style } = {}) {
   const W = b.w * SIZE;
   const H = b.h * SIZE;
   const T = H + RISE_PX + Math.max(SHADOW, PATH_PX);
@@ -314,7 +316,7 @@ export function housePixels(b, tiles, { light = 'dia' } = {}) {
   const data = new Uint8ClampedArray(W * T * 4);
   const tint = { entardecer: [242, 184, 144], noite: [58, 70, 136] }[light];
   for (let i = 0; i < W * T; i++) {
-    const c = rgb[i];
+    const c = style && style !== 'padrao' && rgb[i] ? styleRgb(rgb[i][0], rgb[i][1], rgb[i][2], style) : rgb[i];
     if (!c) continue;
     const m = tint && !glow[i] ? tint.map((v) => v / 255) : [1, 1, 1];
     data[i * 4] = c[0] * m[0]; data[i * 4 + 1] = c[1] * m[1]; data[i * 4 + 2] = c[2] * m[2]; data[i * 4 + 3] = 255;
@@ -323,7 +325,7 @@ export function housePixels(b, tiles, { light = 'dia' } = {}) {
     for (let x = 4; x < W; x++) {
       const i = (y * W + x) * 4;
       if (data[i + 3]) continue;
-      data.set([30, 18, 40, Math.max(0, 130 - (y - groundY - 2) * 30)], i);
+      data.set([...(style ? styleRgb(30, 18, 40, style) : [30, 18, 40]), Math.max(0, 130 - (y - groundY - 2) * 30)], i);
     }
   }
   return { width: W, height: T, data, offsetY: -RISE_PX };

@@ -7,7 +7,7 @@ import { pool, query } from '../db/pool.js';
 import { assertCampaignMaster, requireCampaignMember } from '../utils/campaignAccess.js';
 import { emitEvent, emitSplit, latestEventId, listEvents } from '../utils/events.js';
 import { boolish, httpError, parseJson, requireDatabase } from '../utils/http.js';
-import { buildingDoor, dracmasToCoins, playerTiles, validateTiles } from '../utils/tiles.js';
+import { buildingDoor, buildingLook, dracmasToCoins, playerTiles, validateTiles } from '../utils/tiles.js';
 import { assertRight, normalizeRules, tableRulesSchema } from '../utils/tableRules.js';
 import { parseDiceFormula, rollDiceFormula, SKILL_DEFINITIONS } from '../utils/rules.js';
 import { enrich } from './character.routes.js';
@@ -957,7 +957,8 @@ export function registerCampaignV2Routes(router) {
     roof: z.enum(['telha', 'telha-azul', 'palha', 'palha-escura', 'ardosia', 'ardosia-verde', 'madeira', 'madeira-escura']).optional(),
     wall: z.enum(['madeira', 'pedra', 'tijolo', 'enxaimel']).optional(),
     locked: z.boolean().optional(),
-    interior: z.string().uuid().nullable().optional()
+    interior: z.string().uuid().nullable().optional(),
+    ...buildingLook
   });
   router.patch('/:id/scenes/:sceneId/buildings/:buildingId', async (req, res) => {
     await assertCampaignMaster(req.params.id, req.user);
@@ -1031,7 +1032,8 @@ export function registerCampaignV2Routes(router) {
       const exists = await query('select 1 from campaign_scenes where id = $1 and campaign_id = $2', [building.interior, req.params.id]);
       if (exists.rowCount) throw httpError('Esta construção já tem interior.', 409);
     }
-    const map = interiorMap(building);
+    // o cliente manda o interior pronto (gerador de interiores do catalogo); sem ele, sala simples
+    const map = req.body?.tiles ? validateTiles(req.body.tiles) : interiorMap(building);
     const count = await query('select count(*)::int as total from campaign_scenes where campaign_id = $1', [req.params.id]);
     const { rows } = await query(
       `insert into campaign_scenes (campaign_id, name, map_kind, tiles, grid_size, width, height, position, mode, move_speed, parent_scene_id, parent_building_id, is_active)

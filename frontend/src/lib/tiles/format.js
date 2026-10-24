@@ -2,9 +2,11 @@
 // {cols, rows, layers: {ground: [rows de cols chars], objects: [idem]},
 //  items: [{id, x, y, name, description, quantity, weight, category, dracmas?}],   (pegaveis, max 60)
 //  buildings: [{id, x, y, w, h, name, roof}],                                     (telhados, max 30)
-//  light: 'dia'|'entardecer'|'noite', decor: 'nenhuma'|'pouca'|'normal'|'muita'}  (ambiente da cena)
+//  light: 'dia'|'entardecer'|'noite', decor: 'nenhuma'|'pouca'|'normal'|'muita',   (ambiente da cena)
+//  style: id de STYLES (styles.js), estilo global de cor do mapa}
 // Funcoes puras: sempre devolvem um mapa novo (o desfazer guarda as versoes antigas).
 import { DEFAULT_GROUND, EMPTY_OBJECT, getTile } from './catalog.js';
+import { STYLE_IDS } from './styles.js';
 
 export const MIN_SIZE = 4;
 export const MAX_SIZE = 80;
@@ -21,16 +23,18 @@ export const ITEM_CATEGORIES = ['Achados', 'Armas', 'Armaduras', 'Poções', 'Te
 export const ROOF_TYPES = ['telha', 'telha-azul', 'palha', 'palha-escura', 'ardosia', 'ardosia-verde', 'madeira', 'madeira-escura'];
 export const LIGHTS = ['dia', 'entardecer', 'noite'];
 export const DECORS = ['nenhuma', 'pouca', 'normal', 'muita'];
+export const MAP_STYLES = STYLE_IDS;
 // Ambiente so entra no mapa quando foge do padrao (dia / normal): mapa antigo continua igual.
 function ambience(src) {
   const out = {};
   if (LIGHTS.includes(src?.light) && src.light !== 'dia') out.light = src.light;
   if (DECORS.includes(src?.decor) && src.decor !== 'normal') out.decor = src.decor;
+  if (MAP_STYLES.includes(src?.style) && src.style !== 'padrao') out.style = src.style;
   return out;
 }
 export const setAmbience = (map, patch) => {
-  const { light, decor, ...rest } = map;
-  return { ...rest, ...ambience({ light, decor, ...patch }) };
+  const { light, decor, style, ...rest } = map;
+  return { ...rest, ...ambience({ light, decor, style, ...patch }) };
 };
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 const num = (v, min, max, dflt) => {
@@ -81,7 +85,17 @@ export function repairBuildings(list, cols, rows) {
     while (ids.has(id)) id = shortId();
     ids.add(id);
     const roof = String(raw.roof ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, '-');
-    buildings.push({ id, x, y, w, h, name: text(raw.name, 60) || 'Construção', roof: ROOF_TYPES.includes(roof) ? roof : 'telha' });
+    const b = { id, x, y, w, h, name: text(raw.name, 60) || 'Construção', roof: ROOF_TYPES.includes(roof) ? roof : 'telha' };
+    // campos opcionais (fachada, porta, interior, projeto do catalogo e trocas do mestre)
+    for (const k of ['wall', 'design', 'material', 'roofStyle']) if (typeof raw[k] === 'string' && /^[a-z0-9-]{1,60}$/.test(raw[k])) b[k] = raw[k];
+    if (typeof raw.locked === 'boolean') b.locked = raw.locked;
+    if (typeof raw.interior === 'string') b.interior = raw.interior;
+    if (raw.door && Number.isInteger(raw.door.x) && Number.isInteger(raw.door.y)) b.door = { x: raw.door.x, y: raw.door.y };
+    if (raw.colors && typeof raw.colors === 'object') {
+      const colors = Object.fromEntries(Object.entries(raw.colors).filter(([k, v]) => /^(roof|wall|trim|wood|stone|window|accent)$/.test(k) && /^#[0-9a-fA-F]{6}$/.test(v)));
+      if (Object.keys(colors).length) b.colors = colors;
+    }
+    buildings.push(b);
   }
   return { buildings, dropped };
 }
@@ -254,6 +268,19 @@ export function placeBuilding(map, x0, y0, x1, y1, { wall = '#', floor = '=', ro
     layers: { ground: g.map((r) => r.join('')), objects: o.map((r) => r.join('')) },
     buildings: [...(map.buildings || []), b]
   };
+}
+
+// Construcao pronta do catalogo: a pegada (w x h do projeto) com o canto de cima-esquerda na celula
+// clicada. O chao fica como esta; objetos embaixo saem. Nao entra se sair do mapa.
+export function placeDesign(map, x, y, design, name) {
+  if (!design || (map.buildings || []).length >= MAX_BUILDINGS) return map;
+  const bx = Math.max(0, Math.min(map.cols - design.w, x));
+  const by = Math.max(0, Math.min(map.rows - design.h, y));
+  if (bx < 0 || by < 0) return map;
+  const o = map.layers.objects.map((row, ry) => (ry < by || ry >= by + design.h ? row : row.slice(0, bx) + EMPTY_OBJECT.repeat(design.w) + row.slice(bx + design.w)));
+  const [b] = repairBuildings([{ x: bx, y: by, w: design.w, h: design.h, name: name || design.name, design: design.id }], map.cols, map.rows).buildings;
+  if (!b) return map;
+  return { ...map, layers: { ...map.layers, objects: o }, buildings: [...(map.buildings || []), b] };
 }
 
 export function getCell(map, layer, x, y) {

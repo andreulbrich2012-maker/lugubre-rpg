@@ -5,6 +5,7 @@ import Button from '../Button';
 import LoadingButton from '../LoadingButton';
 import { api } from '../../lib/api';
 import { PowerCard, powerElements, powerTypes } from '../../pages/PowerLibrary';
+import SpellIcon from '../icons/SpellIcon';
 
 const blankPower = {
   name: '',
@@ -100,7 +101,16 @@ export default function AdminPowerLibraryPage() {
   return (
     <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
       <form onSubmit={save} className="gothic-panel rounded-md p-4 sm:p-5">
-        <h2 className="font-display text-3xl text-bone">{editingId ? 'Editar magia/poder' : 'Nova magia/poder'}</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-display text-3xl text-bone">{editingId ? 'Editar magia/poder' : 'Nova magia/poder'}</h2>
+          {/* previa do icone automatico (usado quando nao ha imagem) */}
+          {!form.imageUrl && (
+            <SpellIcon
+              size={48}
+              power={{ name: form.name, type: form.type, element: form.type === 'magia' ? form.element : null, description: form.description, range: form.range, duration: form.duration, damage_formula: form.damageFormula, recommended_class: form.recommendedClass }}
+            />
+          )}
+        </div>
         <div className="mt-5 grid gap-3">
           <input className="field !mt-0" placeholder="Nome" value={form.name} onChange={(event) => patch({ name: event.target.value })} />
           <div className="grid gap-3 sm:grid-cols-2">

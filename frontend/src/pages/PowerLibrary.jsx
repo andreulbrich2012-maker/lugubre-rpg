@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
-import { BookOpen, Filter, Plus, Search, X } from 'lucide-react';
+import { Filter, Plus, Search, X } from 'lucide-react';
 import Alert from '../components/Alert';
 import Button from '../components/Button';
 import LoadingButton from '../components/LoadingButton';
 import { api } from '../lib/api';
-import { primordialByName } from '../components/glass/primordiais';
+import SpellIcon from '../components/icons/SpellIcon';
 
 export const powerElements = ['Érebo', 'Nix', 'Tártaro', 'Ananque', 'Éter', 'Gaia', 'Caos', 'Hemera', 'Ponto'];
 export const powerTypes = ['magia', 'poder'];
 
-// Os elementos sao os Primordiais: o vidro do cartao leva a cor dele (Hemera nao tem vidro proprio, fica ambar).
-const elementTint = (element) => `color-mix(in srgb, ${primordialByName[element]?.color || 'var(--color-ember)'} 70%, #000)`;
+// Icone do cartao: a imagem enviada pelo admin, se houver; senao o pixel art gerado do registro.
+function PowerIcon({ power, size = 48 }) {
+  if (power.image_url) return <img src={power.image_url} alt="" className="shrink-0 border-[3px] border-lead object-cover" style={{ width: size, height: size }} />;
+  return <SpellIcon power={power} size={size} className="shrink-0" />;
+}
 
 export default function PowerLibrary() {
   const [powers, setPowers] = useState([]);
@@ -122,9 +125,7 @@ export function PowerCard({ power, onDetails, onAdd, disabled = false, adminActi
   return (
     <article className="pane p-4 soft-motion">
       <div className="flex items-start gap-3">
-        <div className="grid h-12 w-12 shrink-0 place-items-center border-[3px] border-lead" style={{ background: elementTint(power.element) }}>
-          <BookOpen className="text-bone" size={22} />
-        </div>
+        <PowerIcon power={power} />
         <div className="min-w-0 flex-1">
           <p className="text-sm text-mist">{power.type}{power.element ? ` · ${power.element}` : ''}</p>
           <h3 className="break-words font-display text-2xl text-bone">{power.name}</h3>
@@ -151,7 +152,8 @@ function PowerDetails({ power, characters, characterId, setCharacterId, onClose,
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 p-3">
       <section className="gothic-panel max-h-[92vh] w-full max-w-2xl overflow-auto p-4 sm:p-6">
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <PowerIcon power={power} size={72} />
+          <div className="min-w-0 flex-1">
             <p className="text-sm text-mist">{power.type}{power.element ? ` · ${power.element}` : ''}</p>
             <h2 className="font-display text-3xl text-bone">{power.name}</h2>
           </div>

@@ -4,6 +4,7 @@ import Button from '../../Button';
 import { api } from '../../../lib/api';
 import { normalizeRules } from '../../../lib/tableRules';
 import QuickPoints from './QuickPoints';
+import TableControl from './TableControl';
 import { clockLabel, phaseAt } from '../../../lib/tiles/daylight';
 import { VISION_LABELS, VISION_RADII } from '../../../lib/tableRules';
 
@@ -39,9 +40,10 @@ const limitValue = (text, int = false) => {
 };
 const limitText = (value) => (value == null ? '' : String(value).replace('.', ','));
 
-// Regras da mesa: liga/desliga movimento, poderes e pegar itens, e limita o inventario
-// (peso maximo em kg e quantidade de itens), geral ou so para um jogador.
-function TableRules({ campaignId, rules, members, onRulesChange, notify }) {
+// Mais regras (usadas de vez em quando): quem mexe nas fichas, relogio e visao, e limites do
+// inventario (peso em kg e quantidade de itens), geral ou so para um jogador. O que os jogadores
+// podem fazer agora fica no Controle da mesa (TableControl), no topo do painel.
+function MoreRules({ campaignId, rules, members, onRulesChange, notify }) {
   const players = members.filter((m) => m.role !== 'master');
   const draftFrom = (r) => ({
     maxWeight: limitText(r.inventory?.maxWeight), maxItems: limitText(r.inventory?.maxItems),
@@ -83,17 +85,9 @@ function TableRules({ campaignId, rules, members, onRulesChange, notify }) {
     save({ ...rules, inventory: { maxWeight: limitValue(draft.maxWeight), maxItems: limitValue(draft.maxItems, true) }, players: nextPlayers }, 'Limites do inventário salvos.');
   }
 
-  const toggles = [['move', 'Movimento'], ['powers', 'Poderes e ataques'], ['pickup', 'Pegar itens']];
   return (
     <>
-      <div className="space-y-2 text-sm text-mist">
-        {toggles.map(([key, label]) => (
-          <label key={key} className="flex items-center gap-2">
-            <input type="checkbox" checked={rules[key] !== false} disabled={saving} onChange={(e) => save({ ...rules, [key]: e.target.checked })} className="accent-[var(--color-ember)]" /> {label} liberado
-          </label>
-        ))}
-      </div>
-      <p className="mt-4 font-bold text-bone">Quem mexe nas fichas</p>
+      <p className="font-bold text-bone">Quem mexe nas fichas</p>
       <p className="text-xs text-mist">Vale para as fichas mostradas nesta campanha. Fora dela, o jogador continua livre.</p>
       <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
         {[['stats', 'Vida, mana e sanidade'], ['powers', 'Ataques e magias']].map(([key, label]) => (
@@ -160,9 +154,9 @@ function TableRules({ campaignId, rules, members, onRulesChange, notify }) {
   );
 }
 
-function Section({ title, children, open = true }) {
+function Section({ title, children, open = true, id }) {
   return (
-    <details open={open} className="border-b-[3px] border-lead">
+    <details open={open} id={id} className="border-b-[3px] border-lead">
       <summary className="cursor-pointer list-none px-3 py-3 font-display text-xl text-bone marker:hidden">{title}</summary>
       <div className="px-3 pb-4">{children}</div>
     </details>
@@ -215,6 +209,32 @@ export default function GMPanel({ campaignId, scenes, scene, viewSceneId, onView
 
   return (
     <div className="h-full overflow-y-auto">
+      {pending.length > 0 && (
+        <Section title={`Decidir ataques (${pending.length})`}>
+          <ul className="space-y-2">
+            {pending.map((p) => {
+              const amount = amounts[p.rollId] ?? (p.kind === 'damage' ? p.total : '');
+              return (
+                <li key={p.rollId} className="border-[3px] border-lead bg-black/40 p-3">
+                  <p className="text-sm"><span className="font-bold text-bone">{p.characterName || p.userName}</span> <span className="text-mist">{p.kind === 'damage' ? 'causou dano em' : 'atacou'}</span> <span className="font-bold text-bone">{p.targetName}</span></p>
+                  <p className="text-sm text-mist">{p.label} · <span className="font-display text-xl text-ember tabular">{p.total}</span> <span className="tabular">(d{p.dice?.[0]?.sides} {p.dice?.[0]?.value})</span></p>
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    <input type="number" min="0" className="field !mt-0 !min-h-10 !w-20" placeholder="dano" value={amount} onChange={(e) => setAmounts({ ...amounts, [p.rollId]: e.target.value })} aria-label="Dano" />
+                    <Button className="!min-h-10 text-sm" disabled={busy} onClick={() => onResolve(p, 'hit', Number(amount || 0))}><Check size={15} /> Acertou</Button>
+                    <Button variant="ghost" className="!min-h-10 text-sm" disabled={busy} onClick={() => onResolve(p, 'miss', 0)}><X size={15} /> Errou</Button>
+                    <button type="button" className="ml-auto text-sm text-mist underline" onClick={() => onDismiss(p)}>ignorar</button>
+                  </div>
+                  {p.kind === 'attack' && <p className="mt-1 text-xs text-mist">Dica: espere o jogador rolar o dano, ou digite o dano você mesmo. O alvo só mostra “tomou dano”, sem número.</p>}
+                </li>
+              );
+            })}
+          </ul>
+        </Section>
+      )}
+
+      <Section title="Controle da mesa" id="controle-da-mesa">
+        <TableControl campaignId={campaignId} rules={rules} members={members} onRulesChange={onRulesChange} notify={notify} />
+      </Section>
       <Section title="Pontos: vida, sanidade, mana">
         <QuickPoints campaignId={campaignId} reloadKey={reloadKey} />
       </Section>
@@ -272,8 +292,8 @@ export default function GMPanel({ campaignId, scenes, scene, viewSceneId, onView
       </Section>
 
       {scene && (
-        <Section title="Modo da mesa">
-          <div className="grid gap-1" role="radiogroup" aria-label="Modo da mesa">
+        <Section title="Modo da cena">
+          <div className="grid gap-1" role="radiogroup" aria-label="Modo da cena">
             {MODES.map(([id, label, hint]) => (
               <button
                 key={id}
@@ -300,29 +320,6 @@ export default function GMPanel({ campaignId, scenes, scene, viewSceneId, onView
               <Button variant="ghost" className="!min-h-10 text-sm" disabled={busy} onClick={() => run(() => api.post(`/campaigns/${campaignId}/scenes/${scene.id}/combat/start`, { rollInitiative: true }), 'Iniciativa rolada de novo.')}>Rolar iniciativa de novo</Button>
             </div>
           )}
-        </Section>
-      )}
-
-      {pending.length > 0 && (
-        <Section title={`Decidir (${pending.length})`}>
-          <ul className="space-y-2">
-            {pending.map((p) => {
-              const amount = amounts[p.rollId] ?? (p.kind === 'damage' ? p.total : '');
-              return (
-                <li key={p.rollId} className="border-[3px] border-lead bg-black/40 p-3">
-                  <p className="text-sm"><span className="font-bold text-bone">{p.characterName || p.userName}</span> <span className="text-mist">{p.kind === 'damage' ? 'causou dano em' : 'atacou'}</span> <span className="font-bold text-bone">{p.targetName}</span></p>
-                  <p className="text-sm text-mist">{p.label} · <span className="font-display text-xl text-ember tabular">{p.total}</span> <span className="tabular">(d{p.dice?.[0]?.sides} {p.dice?.[0]?.value})</span></p>
-                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <input type="number" min="0" className="field !mt-0 !min-h-10 !w-20" placeholder="dano" value={amount} onChange={(e) => setAmounts({ ...amounts, [p.rollId]: e.target.value })} aria-label="Dano" />
-                    <Button className="!min-h-10 text-sm" disabled={busy} onClick={() => onResolve(p, 'hit', Number(amount || 0))}><Check size={15} /> Acertou</Button>
-                    <Button variant="ghost" className="!min-h-10 text-sm" disabled={busy} onClick={() => onResolve(p, 'miss', 0)}><X size={15} /> Errou</Button>
-                    <button type="button" className="ml-auto text-sm text-mist underline" onClick={() => onDismiss(p)}>ignorar</button>
-                  </div>
-                  {p.kind === 'attack' && <p className="mt-1 text-xs text-mist">Dica: espere o jogador rolar o dano, ou digite o dano você mesmo. O alvo só mostra “tomou dano”, sem número.</p>}
-                </li>
-              );
-            })}
-          </ul>
         </Section>
       )}
 
@@ -430,8 +427,8 @@ export default function GMPanel({ campaignId, scenes, scene, viewSceneId, onView
           )}
         </Section>
       )}
-      <Section title="Regras da mesa" open={false}>
-        <TableRules campaignId={campaignId} rules={normalizeRules(rules)} members={members} onRulesChange={onRulesChange} notify={notify} />
+      <Section title="Mais regras: fichas, hora, visão, inventário" open={false}>
+        <MoreRules campaignId={campaignId} rules={normalizeRules(rules)} members={members} onRulesChange={onRulesChange} notify={notify} />
       </Section>
     </div>
   );

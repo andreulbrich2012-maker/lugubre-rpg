@@ -13,7 +13,8 @@ import ItemIcon from '../icons/ItemIcon';
 import ContainerContents from './ContainerContents';
 import MonsterSprite from '../monsters/MonsterSprite';
 import { monsterLook } from '../../lib/monsters/classify';
-import { skyAt, clockLabel, phaseAt } from '../../lib/tiles/daylight';
+import { skyAt, clockLabel, phaseAt, resolveLight } from '../../lib/tiles/daylight';
+import { outsideTextureUrl, OUTSIDE_CELLS } from '../../lib/tiles/outside';
 import { Moon, Sun } from 'lucide-react';
 
 // Construcao 3D (estilo Stardew): fachada + telhado em perspectiva, desenhada uma vez no tamanho
@@ -90,6 +91,24 @@ function House({ building, tiles, light, open, cell, lazy = false }) {
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
+// Fora do mapa: mata fechada continuando em volta (o mapa nao acaba num preto). So visual: a
+// borda do mapa continua sendo a barreira invisivel. Mesma luz e estilo da cena.
+const OUT = 48; // celulas de mata em cada lado
+function OutsideForest({ cell, width, height, style, light }) {
+  const url = useMemo(() => outsideTextureUrl(style || 'padrao'), [style]);
+  const sky = resolveLight(light);
+  const pad = OUT * cell;
+  const box = { left: -pad, top: -pad, width: width + pad * 2, height: height + pad * 2 };
+  return (
+    <div className="pointer-events-none absolute" style={box} aria-hidden="true">
+      <div className="absolute inset-0" style={{ backgroundImage: url ? `url(${url})` : undefined, backgroundSize: `${OUTSIDE_CELLS * cell}px ${OUTSIDE_CELLS * cell}px`, backgroundPosition: `${pad}px ${pad}px`, imageRendering: 'pixelated' }} />
+      {sky.tintHex && <div className="absolute inset-0" style={{ background: sky.tintHex, mixBlendMode: 'multiply' }} />}
+      {/* nevoa leve que engrossa longe do mapa: a mata some aos poucos */}
+      <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse at center, transparent ${Math.max(40, 100 - (pad / Math.max(width, height)) * 100)}%, rgba(8,10,12,.55) 100%)` }} />
+    </div>
+  );
+}
+
 // Visao do jogador: escurece tudo fora de um circulo em volta do proprio personagem. Posicao
 // lida a cada quadro (o token anda sem re-render); raio em celulas do mapa.
 function VisionMask({ tokenRef, view, cell, radius }) {
@@ -145,6 +164,7 @@ export default function Board({
   onCreateInterior,
   onViewScene,
   onPatchItem,
+  rights,
   clock,
   onClockChange,
   visionCells = null,
@@ -614,6 +634,7 @@ export default function Board({
       >
         <div ref={shakeRef} className="absolute inset-0">
         <div className="absolute left-0 top-0 origin-top-left" style={{ width, height, transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}>
+          {isTiles && <OutsideForest cell={cell} width={width} height={height} style={scene.tiles.style} light={sceneLight} />}
           {isTiles ? (
             <TileMapCanvas map={litTiles} cellSize={cell} showGrid={Boolean(scene.show_grid)} viewport={vis} scale={view.z} buildingBlocks={farAway} className="absolute inset-0" />
           ) : scene?.map_url ? (
@@ -824,7 +845,7 @@ export default function Board({
                     {!isMaster && (
                       <>
                         <button type="button" autoFocus className="btn btn-lit mt-1 !min-h-9 w-full text-sm" disabled={Boolean(reason)} onClick={() => onPickup?.(it)}>
-                          <Hand size={15} /> {isBox ? 'Levar tudo' : 'Pegar'}
+                          <Hand size={15} /> {rights?.pickup === 'pedir' ? (isBox ? 'Pedir para levar tudo' : 'Pedir para pegar') : isBox ? 'Levar tudo' : 'Pegar'}
                         </button>
                         {reason && <p className="mt-1 text-xs text-ember">{reason}</p>}
                       </>

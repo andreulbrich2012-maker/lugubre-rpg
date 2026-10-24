@@ -760,3 +760,21 @@ create table if not exists campaign_map_grants (
   created_at timestamptz not null default now(),
   primary key (scene_id, character_id)
 );
+
+-- pedidos de acao ao mestre (regra 'pedir'): o jogador tenta pegar item, passar por porta ou atacar,
+-- o pedido fica aqui; aprovado, o servidor executa a acao original de novo (conferindo tudo na hora)
+create table if not exists campaign_action_requests (
+  id uuid primary key default uuid_generate_v4(),
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  scene_id uuid references campaign_scenes(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
+  character_id uuid references characters(id) on delete set null,
+  token_id uuid references campaign_tokens(id) on delete set null,
+  kind text not null check (kind in ('pickup', 'enter', 'exit', 'attack')),
+  payload jsonb not null default '{}',
+  summary text not null default '',
+  status text not null default 'pending' check (status in ('pending', 'approved', 'denied', 'expired')),
+  created_at timestamptz not null default now(),
+  decided_at timestamptz
+);
+create index if not exists campaign_action_requests_campaign_idx on campaign_action_requests (campaign_id, status, created_at);

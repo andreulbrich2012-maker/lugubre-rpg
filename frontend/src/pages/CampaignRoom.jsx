@@ -1,9 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fxFromRoll, fxFromHit } from '../lib/fx/sync';
-import { normalizeRules, playerRights, VISION_RADII } from '../lib/tableRules';
+import { normalizeRules, playerRights, rightBlock, VISION_RADII } from '../lib/tableRules';
 import { loadSummary } from '../lib/load';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Copy, Crown, Map as MapIcon, Maximize2, Swords, X } from 'lucide-react';
+import { Copy, Crown, Hourglass, Map as MapIcon, Maximize2, Pause, Play, SlidersHorizontal, Swords, X } from 'lucide-react';
 import WorldMapOverlay from '../components/vtt/WorldMapOverlay';
 import Alert from '../components/Alert';
 import Button from '../components/Button';
@@ -17,6 +17,8 @@ import ChatPanel from '../components/campaigns/room/ChatPanel';
 import DiceOverlay from '../components/campaigns/room/DiceOverlay';
 import GameMode, { requestGameFullscreen } from '../components/game/GameMode';
 import GMPanel from '../components/campaigns/room/GMPanel';
+import ActionRequests from '../components/campaigns/room/ActionRequests';
+import TableControl from '../components/campaigns/room/TableControl';
 import NotesPanel from '../components/campaigns/room/NotesPanel';
 import SheetsPanel from '../components/campaigns/room/SheetsPanel';
 import { useCampaignFeed } from '../hooks/useCampaignFeed';
@@ -66,6 +68,11 @@ export default function CampaignRoom() {
   const [targeting, setTargeting] = useState(null);
   const [pendingDamage, setPendingDamage] = useState(null);
   const [pending, setPending] = useState([]);
+  // pedidos ao mestre (modo "Pedir"): o mestre ve a fila; o jogador ve os proprios esperando
+  const [requests, setRequests] = useState([]);
+  const [myRequests, setMyRequests] = useState([]);
+  const [controlOpen, setControlOpen] = useState(false);
+  const askContext = useRef(new Map());
   const [effects, setEffects] = useState({});
   const [pings, setPings] = useState([]);
   // cursor do mestre visto pelos jogadores; o mestre escolhe se mostra (fica salvo neste navegador)
@@ -173,6 +180,7 @@ export default function CampaignRoom() {
   }, []);
 
   const stateRef = useRef({});
+  const decidedRef = useRef(null);
   stateRef.current = { isMaster, viewSceneId, myMember, sheet, sceneIds: scenes.map((s) => s.id), tokens, cell: scene?.grid_size || 70, userId: user?.id };
   // Animacoes de golpe/magia (lib/fx): o evento roll toca o ataque, o token:hit do mestre
   // toca o impacto; a semente e o rollId, entao todos veem as mesmas particulas.
@@ -226,6 +234,13 @@ export default function CampaignRoom() {
           reload.scenes = true;
           break;
         case 'rules:updated': setRules(normalizeRules(p.rules)); break;
+        case 'action:request':
+          if (master) setRequests((cur) => (cur.some((r) => r.id === p.id) ? cur : [...cur, p]));
+          break;
+        case 'action:decided':
+          setRequests((cur) => cur.filter((r) => r.id !== p.id));
+          if (!master && p.userId === stateRef.current.userId) decidedRef.current?.(p);
+          break;
         case 'token:hit':
           if (p.view === 'owner') {
             if (mySheet) setSheet((s) => ({ ...s, life_current: p.life_current }));
@@ -285,6 +300,28 @@ export default function CampaignRoom() {
 
   useCampaignFeed(id, applyEvents, { enabled: Boolean(room) });
 
+  // fila de pedidos: carrega ao abrir e confere a cada 30 s enquanto tem pedido (o servidor expira os velhos)
+  const loadRequests = useCallback(() => api.get(`/campaigns/${id}/action-requests`).then(({ data }) => {
+    if (stateRef.current.isMaster) setRequests(data); else setMyRequests(data);
+  }).catch(() => null), [id]);
+  useEffect(() => { if (room) loadRequests(); }, [room?.campaign?.id, loadRequests]); // eslint-disable-line react-hooks/exhaustive-deps
+  const waiting = requests.length + myRequests.length;
+  useEffect(() => {
+    if (!waiting) return undefined;
+    const t = setInterval(loadRequests, 30_000);
+    return () => clearInterval(t);
+  }, [waiting, loadRequests]);
+  const decide = useCallback(async (r, decision, always) => {
+    try {
+      await api.post(`/campaigns/${id}/action-requests/${r.id}`, { decision, always });
+      notify(decision === 'deny' ? 'Negado.' : always ? 'Permitido (e liberado de vez para este jogador).' : 'Permitido.');
+    } catch (err) {
+      notify(err.response?.data?.message || 'Não deu.', 'error');
+    } finally {
+      setRequests((cur) => cur.filter((x) => x.id !== r.id));
+    }
+  }, [id, notify]);
+
   // ---- mesa ----
   const turnTokenId = scene?.mode === 'combat' ? (scene.turn_state?.tokenId || scene.current_token_id || scene.initiative?.[scene.turn_index]?.tokenId) : null;
   const myToken = tokens.find((t) => t.kind === 'character' && sheet && t.character_id === sheet.id);
@@ -294,7 +331,7 @@ export default function CampaignRoom() {
   const canMove = useCallback((t) => {
     if (isMaster) return true;
     const mine = t.owner_id === user?.id || t.controlled_by === user?.id || (sheet && t.character_id === sheet.id);
-    if (!mine || !rights.move) return false;
+    if (!mine || rights.move === 'travado') return false;
     if (scene?.mode === 'exploration') return !rights.turn || rights.turn === t.id;
     return scene?.mode === 'combat' && t.id === turnTokenId;
   }, [isMaster, user?.id, sheet, scene?.mode, turnTokenId, rights]);
@@ -312,7 +349,7 @@ export default function CampaignRoom() {
     if (!scene || scene.mode === 'prep') return 'A mesa está em preparação.';
     if (!opts.content && item.pickable === false) return 'Este item não pode ser pego.';
     if (item.locked) return 'Está trancado.';
-    if (!rights.pickup) return 'O mestre não liberou pegar itens agora.';
+    if (rightBlock(rights, 'pickup')) return rightBlock(rights, 'pickup');
     if (scene.mode !== 'combat' && rights.turn && rights.turn !== myToken?.id) return 'Agora é a vez de outro personagem.';
     if (!myToken) return 'Coloque seu personagem no mapa primeiro.';
     if (scene.mode === 'combat') {
@@ -323,20 +360,31 @@ export default function CampaignRoom() {
     return null;
   }, [scene, myToken, isMyTurn, rights]);
 
+  // modo "Pedir": a acao virou pedido ao mestre (resposta 202); o resultado chega pelo feed
+  const asked = useCallback((data, context) => {
+    if (!data?.requested) return false;
+    if (context) askContext.current.set(data.request.id, context);
+    setMyRequests((cur) => (cur.some((r) => r.id === data.request.id) ? cur : [...cur, data.request]));
+    notify('Pedido enviado ao mestre…');
+    return true;
+  }, [notify]);
+
   // ---- portas, construcoes e itens (casas 3D com interior em outra cena) ----
   const enterBuilding = useCallback(async (b, tokenId) => {
     try {
       const { data } = await api.post(`/campaigns/${id}/scenes/${viewSceneId}/buildings/${b.id}/enter`, tokenId ? { tokenId } : {});
+      if (asked(data)) return;
       setViewSceneId(data.sceneId);
       loadScenes(true).catch(() => null);
     } catch (err) { notify(err.response?.data?.message || 'Não deu para entrar.', 'error'); }
-  }, [id, viewSceneId, loadScenes, notify]);
+  }, [id, viewSceneId, loadScenes, notify, asked]);
   const exitScene = useCallback(async (tokenId) => {
     try {
       const { data } = await api.post(`/campaigns/${id}/scenes/${viewSceneId}/exit`, tokenId ? { tokenId } : {});
+      if (asked(data)) return;
       setViewSceneId(data.sceneId);
     } catch (err) { notify(err.response?.data?.message || 'Não deu para sair.', 'error'); }
-  }, [id, viewSceneId, notify]);
+  }, [id, viewSceneId, notify, asked]);
   const patchBuilding = useCallback(async (b, patch) => {
     try {
       const { data } = await api.patch(`/campaigns/${id}/scenes/${viewSceneId}/buildings/${b.id}`, patch);
@@ -363,6 +411,7 @@ export default function CampaignRoom() {
   const pickup = useCallback(async (item, characterId, content) => {
     try {
       const { data } = await api.post(`/campaigns/${id}/scenes/${scene.id}/pickup`, { itemId: item.id, ...(characterId ? { characterId } : {}), ...(content ? { contentId: content.id } : {}) });
+      if (asked(data)) return;
       // some na hora para quem pegou; o evento scene:updated confirma para todos
       const without = (list) => (content
         ? list.map((it) => (it.id === item.id ? { ...it, contents: (it.contents || []).filter((c) => c.id !== content.id) } : it))
@@ -376,7 +425,7 @@ export default function CampaignRoom() {
       notify(err.response?.data?.message || 'Não deu para pegar.', 'error');
       loadScene(stateRef.current.viewSceneId).catch(() => null);
     }
-  }, [id, scene?.id, notify, loadScene]);
+  }, [id, scene?.id, notify, loadScene, asked]);
 
   const moveToken = useCallback(async (t, x, y) => {
     try {
@@ -449,13 +498,33 @@ export default function CampaignRoom() {
     const mana = Number(sheet?.mana_current ?? sheet?.mana ?? 0);
     if (power.type === 'spells' && cost > mana) { notify(`Mana insuficiente para ${power.name} (precisa de ${cost}).`, 'error'); return; }
     const r = await roll({ kind: 'attack', formula, label: power.name, characterId: sheet.id, powerName: power.name, targetTokenId: target.id });
-    if (!r) return;
+    if (!r || asked(r, { power, target })) return;
+    afterAttack(r, power, target);
+  }
+
+  // depois do ataque (na hora ou quando o mestre aprova o pedido): gasta a mana e libera o dano
+  function afterAttack(r, power, target) {
+    const cost = Number(power.manaCost || 0);
+    const mana = Number(stateRef.current.sheet?.mana_current ?? stateRef.current.sheet?.mana ?? 0);
     if (power.type === 'spells' && cost > 0) {
-      api.patch(`/campaigns/${id}/characters/${sheet.id}/vitals`, { mana_current: mana - cost, spell: power.name }).then(({ data }) => setSheet((s) => ({ ...s, ...data, mana: data.mana_current }))).catch(() => null);
+      api.patch(`/campaigns/${id}/characters/${stateRef.current.sheet.id}/vitals`, { mana_current: mana - cost, spell: power.name }).then(({ data }) => setSheet((s) => ({ ...s, ...data, mana: data.mana_current }))).catch(() => null);
     }
     const crit = r.dice?.[0]?.sides === 20 && r.dice[0].value >= Number(power.criticalValue || 20);
     setPendingDamage({ power, target, crit });
   }
+
+  // resposta do mestre a um pedido meu
+  decidedRef.current = (p) => {
+    setMyRequests((cur) => cur.filter((r) => r.id !== p.id));
+    const context = askContext.current.get(p.id);
+    askContext.current.delete(p.id);
+    if (p.status !== 'approved') { notify(p.message || 'O mestre não deixou.', 'error'); return; }
+    if (p.kind === 'attack' && p.result?.roll && context) afterAttack(p.result.roll, context.power, context.target);
+    if (p.kind === 'pickup') setSheetReload((n) => n + 1);
+    const got = p.result?.received;
+    const coins = got?.dracmas ? ` +${got.dracmas} dracmas na bolsa.` : '';
+    notify(p.kind === 'pickup' && got ? (got.kind === 'dracmas' ? `O mestre deixou:${coins}` : `O mestre deixou: ${got.name} foi para o inventário.${coins}`) : 'O mestre deixou.');
+  };
 
   async function rollDamage() {
     const { power, target, crit } = pendingDamage;
@@ -586,13 +655,32 @@ export default function CampaignRoom() {
                 <MapIcon size={15} /> {maps.length === 1 ? 'Abrir mapa' : 'Mapas'}
               </button>
               {mapsOpen && (
-                <span className="gothic-panel absolute left-0 top-full z-30 mt-1 flex w-60 flex-col rounded-md border-[3px] border-lead p-1">
+                <span className="gothic-panel !absolute left-0 top-full z-30 mt-1 flex w-60 flex-col rounded-md border-[3px] border-lead p-1">
                   {maps.map((m) => <button key={m.id || m.mapSceneId} type="button" className="rounded px-2 py-1.5 text-left text-sm text-bone hover:bg-glass" onClick={() => open(m)}>{m.name}</button>)}
                 </span>
               )}
             </span>
           );
         })()}
+        {isMaster && (
+          <span className="relative flex items-center gap-1">
+            <button type="button" className={`btn !min-h-8 px-2 text-sm ${rules.act ? 'btn-glass' : 'btn-lit'}`} onClick={() => api.put(`/campaigns/${id}/rules`, { ...rules, act: !rules.act }).then(({ data }) => { setRules(normalizeRules(data)); notify(data.act ? 'Mesa liberada.' : 'Mesa pausada: os jogadores esperam.'); }).catch((err) => notify(err.response?.data?.message || 'Não deu.', 'error'))} title={rules.act ? 'Pausar: ninguém anda nem age' : 'Liberar os jogadores'}>
+              {rules.act ? <><Pause size={15} /> Pausar jogadores</> : <><Play size={15} /> Mesa pausada · liberar</>}
+            </button>
+            <button type="button" className="btn btn-glass !min-h-8 px-2 text-sm" onClick={() => setControlOpen((v) => !v)} aria-expanded={controlOpen}>
+              <SlidersHorizontal size={15} /> Controle da mesa
+            </button>
+            {controlOpen && (
+              <span className="gothic-panel !absolute left-0 top-full z-40 mt-1 block max-h-[75svh] w-[min(380px,calc(100vw-1.5rem))] overflow-y-auto border-[3px] border-lead p-3">
+                <span className="mb-2 flex items-center justify-between">
+                  <span className="font-display text-xl text-bone">Controle da mesa</span>
+                  <button type="button" className="btn btn-glass !min-h-8 !w-8 !p-0" onClick={() => setControlOpen(false)} aria-label="Fechar"><X size={15} /></button>
+                </span>
+                <TableControl campaignId={id} rules={rules} members={room.members || []} onRulesChange={setRules} notify={notify} />
+              </span>
+            )}
+          </span>
+        )}
         {isMaster && room.campaign.invite_code && (
           <button type="button" className="ml-auto flex items-center gap-1 text-sm text-mist hover:text-bone" onClick={() => navigator.clipboard?.writeText(room.campaign.invite_code).then(() => notify('Código de convite copiado.'))}>
             Convite <span className="font-bold tracking-wider text-ember">{room.campaign.invite_code}</span> <Copy size={13} />
@@ -602,6 +690,17 @@ export default function CampaignRoom() {
 
       {worldMap && <WorldMapOverlay name={worldMap.name} sceneId={worldMap.id} tiles={worldMap.tiles} onClose={() => setWorldMap(null)} />}
 
+      {isMaster && <ActionRequests requests={requests} onDecide={decide} nameOf={(uid) => { const m = room.members?.find((x) => x.user_id === uid); return m?.shared_character?.character_name || m?.display_name || m?.name; }} />}
+      {!isMaster && rules.act === false && (
+        <div role="status" className="fixed bottom-36 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 border-[3px] border-[#a3182f] bg-[#3a0f18] px-3 py-1.5 text-sm font-bold text-[#ffc9d2] shadow-2xl">
+          <Pause size={15} /> O mestre pausou a mesa: espere ele liberar.
+        </div>
+      )}
+      {!isMaster && myRequests.length > 0 && (
+        <div role="status" className="fixed bottom-24 left-1/2 z-[60] flex -translate-x-1/2 items-center gap-2 border-[3px] border-[#a4781a] bg-[#2a1d08] px-3 py-1.5 text-sm text-[#ffe3a3] shadow-2xl">
+          <Hourglass size={15} className="animate-pulse" /> Esperando o mestre{myRequests.length > 1 ? ` (${myRequests.length} pedidos)` : `: ${myRequests[0].summary.replace(/^.*? quer /, '')}`}…
+        </div>
+      )}
       {notice && (
         <div role="status" className={`fixed left-1/2 top-20 z-[60] -translate-x-1/2 border-[3px] border-lead px-4 py-2 shadow-2xl ${notice.type === 'error' ? 'bg-[#2a0b12] text-red-100' : 'lit'}`}>{notice.text}</div>
       )}
@@ -730,7 +829,7 @@ export default function CampaignRoom() {
             {tabs.map(([key, label]) => (
               <button key={key} type="button" onClick={() => setTab(key)} aria-current={tab === key ? 'page' : undefined} className={`relative shrink-0 px-3 py-3 text-sm font-bold ${tab === key ? 'lit' : 'text-mist hover:text-bone'}`}>
                 {label}
-                {key === 'gm' && pending.length > 0 && <span className="ml-1 inline-grid h-5 min-w-5 place-items-center bg-[#a3182f] px-1 text-xs text-white tabular">{pending.length}</span>}
+                {key === 'gm' && pending.length + requests.length > 0 && <span className="ml-1 inline-grid h-5 min-w-5 place-items-center bg-[#a3182f] px-1 text-xs text-white tabular">{pending.length + requests.length}</span>}
               </button>
             ))}
           </nav>

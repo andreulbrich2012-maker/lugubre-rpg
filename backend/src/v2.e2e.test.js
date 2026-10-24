@@ -468,7 +468,7 @@ describe.skipIf(!hasDb)('API v2 com Postgres', () => {
     await player.api.patch(`${base()}/tokens/${tok.id}`, { x: 70 }).expect(200);
     expect((await player.api.post(`${base()}/rolls`, { formula: '1d20', kind: 'attack', characterId: playerCharacter.id }).expect(403)).body.message).toBe('O mestre travou poderes e ataques agora.');
     await player.api.post(`${base()}/rolls`, { formula: '1d20', kind: 'free' }).expect(201);
-    expect((await player.api.get(`${base()}/rules`).expect(200)).body.powers).toBe(false);
+    expect((await player.api.get(`${base()}/rules`).expect(200)).body.actions.attack).toBe('travado');
     await master.api.put(`${base()}/rules`, {}).expect(200);
   });
 

@@ -9,6 +9,7 @@ import { emitEvent, emitSplit, latestEventId, listEvents } from '../utils/events
 import { boolish, httpError, parseJson, requireDatabase } from '../utils/http.js';
 import { buildingDoor, buildingLook, contentSchema, dracmasToCoins, MAX_CONTENTS, playerItem, playerTiles, validateTiles } from '../utils/tiles.js';
 import { assertRight, inventoryLimits, normalizeRules, tableRulesSchema } from '../utils/tableRules.js';
+import { AskMaster, claimRequest, createRequest, listPending, REQUEST_ACTION, requestView, setRequestStatus } from '../utils/actionRequests.js';
 import { inventoryLimitError, roundKg, unitWeight } from '../utils/itemWeight.js';
 import { STATS_LOCKED } from '../utils/sheetLocks.js';
 import { parseDiceFormula, rollDiceFormula, SKILL_DEFINITIONS } from '../utils/rules.js';
@@ -336,7 +337,7 @@ export function registerCampaignV2Routes(router) {
   }
   router.use('/:id', (req, res, next) => {
     // recursos v2 dependem do Postgres
-    if (/^\/(events|notes|characters|scenes|npcs|tokens|rolls|ping|cursor|maps)(\/|$)/.test(req.path)) requireDatabase();
+    if (/^\/(events|notes|characters|scenes|npcs|tokens|rolls|ping|cursor|maps|action-requests)(\/|$)/.test(req.path)) requireDatabase();
     next();
   });
 
@@ -818,18 +819,26 @@ export function registerCampaignV2Routes(router) {
   router.post('/:id/rolls', async (req, res) => {
     const { master, member } = await requireCampaignMember(req.params.id, req.user);
     const body = rollSchema.parse(req.body);
+    await asking(res, req.params.id, req.user.id, () => doRoll({ campaignId: req.params.id, user: req.user, master, member }, body), (roll) => res.status(201).json(roll));
+  });
+
+  // Rolagem (tambem usada quando o mestre aprova um ataque pedido: approved = true).
+  async function doRoll({ campaignId, user, master, member }, body, approved = false) {
     if (body.secret && !master) throw httpError('Só o mestre pode fazer rolagens secretas.', 403);
     // combate: ataque/pericia so no proprio turno e 1 acao; dano so depois de um ataque no turno
     let combat = null;
+    let ask = false;
     if (!master && body.kind !== 'free') {
       // regras do mestre: poderes/ataques travados e "vez de alguem" fora do combate
       const mine = (await query(
         `${TOKEN_SELECT} where t.campaign_id = $1 and (t.controlled_by = $2 or ch.owner_id = $2)`,
-        [req.params.id, req.user.id]
+        [campaignId, user.id]
       )).rows.map((token) => token.id);
-      const inCombat = (await query(`select 1 from campaign_scenes where campaign_id = $1 and is_active and mode = 'combat'`, [req.params.id])).rowCount > 0;
-      assertRight(await loadRules(req.params.id), req.user.id, body.kind === 'attack' || body.kind === 'damage' ? 'powers' : null, { turnTokenIds: mine, inCombat });
-      combat = await playerCombatTurn(req.params.id, req.user.id);
+      const inCombat = (await query(`select 1 from campaign_scenes where campaign_id = $1 and is_active and mode = 'combat'`, [campaignId])).rowCount > 0;
+      const mode = assertRight(await loadRules(campaignId), user.id, body.kind === 'attack' || body.kind === 'damage' ? 'attack' : null, { turnTokenIds: mine, inCombat });
+      // modo 'pedir': so o ataque pede (o dano vem depois do ataque que o mestre ja deixou)
+      ask = mode === 'pedir' && body.kind === 'attack' && !approved;
+      combat = await playerCombatTurn(campaignId, user.id);
       if (combat) {
         const { state } = combat;
         if (body.kind === 'damage' && (!state.attacked || state.damage_rolled)) throw httpError('Role o ataque antes do dano neste turno.', 409);
@@ -838,7 +847,7 @@ export function registerCampaignV2Routes(router) {
     }
 
     let character = null;
-    if (body.characterId) character = await accessibleCharacter(req.params.id, body.characterId, req.user, master);
+    if (body.characterId) character = await accessibleCharacter(campaignId, body.characterId, user, master);
 
     let formula = body.formula;
     let label = body.label;
@@ -858,14 +867,21 @@ export function registerCampaignV2Routes(router) {
 
     let target = null;
     if (body.targetTokenId) {
-      target = await loadToken(req.params.id, body.targetTokenId);
+      target = await loadToken(campaignId, body.targetTokenId);
       if (target.hidden && !master) throw httpError('Token não encontrado.', 404);
+    }
+    if (ask) {
+      const who = character?.character_name || user.name;
+      throw new AskMaster({
+        kind: 'attack', sceneId: target?.scene_id || null, characterId: character?.id || null, payload: body,
+        summary: `${who} quer atacar ${target?.name || 'sem alvo'}${body.powerName ? ` com ${body.powerName}` : ''}`
+      });
     }
     const rollId = crypto.randomUUID();
     const roll = {
       rollId,
-      userId: req.user.id,
-      userName: req.user.name,
+      userId: user.id,
+      userName: user.name,
       characterId: character?.id || null,
       characterName: character?.character_name || null,
       label: label || body.powerName || formula,
@@ -887,19 +903,19 @@ export function registerCampaignV2Routes(router) {
       const { rows } = await query(
         `insert into messages (campaign_id, user_id, character_id, content, message_type, meta)
          values ($1,$2,$3,$4,'roll',$5) returning id`,
-        [req.params.id, req.user.id, character?.id || member?.shared_character_id || null, `${roll.label}: ${formula} = ${roll.total}`, JSON.stringify(roll)]
+        [campaignId, user.id, character?.id || member?.shared_character_id || null, `${roll.label}: ${formula} = ${roll.total}`, JSON.stringify(roll)]
       );
       roll.messageId = rows[0].id;
     }
-    await emitEvent(req.params.id, 'roll', roll, body.secret ? 'master' : 'all', req.user.id);
+    await emitEvent(campaignId, 'roll', roll, body.secret ? 'master' : 'all', user.id);
     if (combat) {
       const state = body.kind === 'damage'
         ? { ...combat.state, damage_rolled: true }
         : { ...combat.state, action_used: true, attacked: body.kind === 'attack' };
-      await emitCombat(req.params.id, await saveCombat(req.params.id, combat.scene.id, { turn_state: state }), req.user.id);
+      await emitCombat(campaignId, await saveCombat(campaignId, combat.scene.id, { turn_state: state }), user.id);
     }
-    res.status(201).json(roll);
-  });
+    return roll;
+  }
 
   // ===== acertos / dano / cura (so mestre) =====
   router.post('/:id/tokens/:tokenId/hit', async (req, res) => {
@@ -1147,18 +1163,30 @@ export function registerCampaignV2Routes(router) {
   router.post('/:id/scenes/:sceneId/buildings/:buildingId/enter', async (req, res) => {
     const { master } = await requireCampaignMember(req.params.id, req.user);
     const body = doorSchema.parse(req.body || {});
-    const scene = await loadScene(req.params.id, req.params.sceneId, master);
+    await asking(res, req.params.id, req.user.id, () => doEnter(req, master, req.params.sceneId, req.params.buildingId, body), (out) => res.json(out));
+  });
+
+  // req: so campaignId (req.params.id) e o usuario (req.user); approved = o mestre ja deixou
+  async function doEnter(req, master, sceneId, buildingId, body, approved = false) {
+    const scene = await loadScene(req.params.id, sceneId, master);
     const tiles = parseJson(scene.tiles, null);
-    const building = (tiles?.buildings || []).find((b) => b.id === req.params.buildingId);
+    const building = (tiles?.buildings || []).find((b) => b.id === buildingId);
     if (!building) throw httpError('Construção não encontrada.', 404);
     const token = await doorToken(req, scene, master, body);
     if (!master) {
       if (scene.mode === 'prep') throw httpError('A mesa está em preparação.', 409);
       if (building.locked) throw httpError('A porta está trancada.', 409);
-      assertRight(await loadRules(req.params.id), req.user.id, 'move', { turnTokenIds: [token.id], inCombat: scene.mode === 'combat' });
+      const mode = assertRight(await loadRules(req.params.id), req.user.id, 'doors', { turnTokenIds: [token.id], inCombat: scene.mode === 'combat' });
       const door = buildingDoor(tiles, building);
       const at = tokenCell(token, scene.grid_size || 70);
       if (Math.hypot(at.x - (door.x + 0.5), at.y - (door.y + 0.5)) > DOOR_REACH) throw httpError('Chegue mais perto da porta.', 409);
+      if (!building.interior) throw httpError('Esta construção ainda não tem interior.', 409);
+      if (mode === 'pedir' && !approved) {
+        throw new AskMaster({
+          kind: 'enter', sceneId: scene.id, tokenId: token.id, characterId: token.character_id || null,
+          payload: { buildingId: building.id, tokenId: token.id }, summary: `${token.name} quer entrar em ${building.name || 'uma construção'}`
+        });
+      }
     }
     if (!building.interior) throw httpError('Esta construção ainda não tem interior.', 409);
     const interior = (await query('select * from campaign_scenes where id = $1 and campaign_id = $2', [building.interior, req.params.id])).rows[0];
@@ -1168,23 +1196,33 @@ export function registerCampaignV2Routes(router) {
     // aparece logo dentro da porta (uma celula para dentro da sala)
     const spawn = { x: exitDoor.x, y: Math.max(0, exitDoor.y - 1) };
     const moved = await moveTokenToScene(req.params.id, token, interior, spawn, req.user.id);
-    res.json({ token: tokenView(moved, { master, userId: req.user.id }), sceneId: interior.id });
-  });
+    return { token: tokenView(moved, { master, userId: req.user.id }), sceneId: interior.id };
+  }
 
   router.post('/:id/scenes/:sceneId/exit', async (req, res) => {
     const { master } = await requireCampaignMember(req.params.id, req.user);
     const body = doorSchema.parse(req.body || {});
-    const scene = await loadScene(req.params.id, req.params.sceneId, master);
+    await asking(res, req.params.id, req.user.id, () => doExit(req, master, req.params.sceneId, body), (out) => res.json(out));
+  });
+
+  async function doExit(req, master, sceneId, body, approved = false) {
+    const scene = await loadScene(req.params.id, sceneId, master);
     if (!scene.parent_scene_id) throw httpError('Esta cena não é interior de uma construção.', 409);
     const parent = (await query('select * from campaign_scenes where id = $1 and campaign_id = $2', [scene.parent_scene_id, req.params.id])).rows[0];
     if (!parent) throw httpError('A cena de fora foi apagada.', 404);
     const token = await doorToken(req, scene, master, body);
     const inner = parseJson(scene.tiles, null);
     if (!master) {
-      assertRight(await loadRules(req.params.id), req.user.id, 'move', { turnTokenIds: [token.id], inCombat: scene.mode === 'combat' });
+      const mode = assertRight(await loadRules(req.params.id), req.user.id, 'doors', { turnTokenIds: [token.id], inCombat: scene.mode === 'combat' });
       const door = inner ? buildingDoor(inner, { x: 0, y: 0, w: inner.cols, h: inner.rows }) : null;
       const at = tokenCell(token, scene.grid_size || 70);
       if (door && Math.hypot(at.x - (door.x + 0.5), at.y - (door.y + 0.5)) > DOOR_REACH) throw httpError('Chegue mais perto da porta.', 409);
+      if (mode === 'pedir' && !approved) {
+        throw new AskMaster({
+          kind: 'exit', sceneId: scene.id, tokenId: token.id, characterId: token.character_id || null,
+          payload: { tokenId: token.id }, summary: `${token.name} quer sair de ${scene.name}`
+        });
+      }
     }
     const outer = parseJson(parent.tiles, null);
     const building = (outer?.buildings || []).find((b) => b.id === scene.parent_building_id);
@@ -1192,8 +1230,8 @@ export function registerCampaignV2Routes(router) {
     // aparece do lado de fora, na frente da porta
     const spawn = { x: door.x, y: Math.min((outer?.rows || door.y + 2) - 1, door.y + 1) };
     const moved = await moveTokenToScene(req.params.id, token, parent, spawn, req.user.id);
-    res.json({ token: tokenView(moved, { master, userId: req.user.id }), sceneId: parent.id });
-  });
+    return { token: tokenView(moved, { master, userId: req.user.id }), sceneId: parent.id };
+  }
 
   // ===== pegar item do mapa =====
   // Tudo numa transacao com a cena travada (FOR UPDATE): dois jogadores clicando juntos,
@@ -1201,12 +1239,16 @@ export function registerCampaignV2Routes(router) {
   router.post('/:id/scenes/:sceneId/pickup', async (req, res) => {
     const { master } = await requireCampaignMember(req.params.id, req.user);
     const body = pickupSchema.parse(req.body);
+    await asking(res, req.params.id, req.user.id, () => doPickup(req, master, req.params.sceneId, body), (out) => res.status(201).json(out));
+  });
+
+  async function doPickup(req, master, sceneId, body, approved = false) {
     if (master && !body.characterId) throw httpError('Escolha para qual personagem entregar o item.');
     const client = await pool.connect();
     let result;
     try {
       await client.query('begin');
-      const scene = (await client.query('select * from campaign_scenes where id = $1 and campaign_id = $2 for update', [req.params.sceneId, req.params.id])).rows[0];
+      const scene = (await client.query('select * from campaign_scenes where id = $1 and campaign_id = $2 for update', [sceneId, req.params.id])).rows[0];
       if (!scene || (!master && !(await visibleToPlayers(scene)))) throw httpError('Cena não encontrada.', 404);
       if (scene.mode === 'prep') throw httpError('A mesa está em preparação.', 409);
       const tiles = parseJson(scene.tiles, null);
@@ -1241,7 +1283,7 @@ export function registerCampaignV2Routes(router) {
           (Number(token.y) + (Number(token.size || 1) * grid) / 2) / grid - (item.y + 0.5)
         );
         const token = mine.sort((a, b) => distance(a) - distance(b))[0];
-        assertRight(rules, req.user.id, 'pickup', { turnTokenIds: [token.id], inCombat: scene.mode === 'combat' });
+        const mode = assertRight(rules, req.user.id, 'pickup', { turnTokenIds: [token.id], inCombat: scene.mode === 'combat' });
         if (scene.mode === 'combat') {
           const state = parseJson(scene.turn_state, {});
           if (state.tokenId !== token.id) throw httpError('Não é o seu turno.', 409);
@@ -1249,6 +1291,14 @@ export function registerCampaignV2Routes(router) {
           combatState = { ...state, action_used: true };
         }
         if (distance(token) > PICKUP_RANGE + 1e-6) throw httpError('Chegue mais perto para pegar.', 409);
+        if (mode === 'pedir' && !approved) {
+          const what = (it) => (it.dracmas > 0 ? `${it.dracmas} dracmas` : `${it.name}${it.quantity > 1 ? ` (${it.quantity})` : ''}`);
+          throw new AskMaster({
+            kind: 'pickup', sceneId: scene.id, tokenId: token.id, characterId: token.character_id,
+            payload: { itemId: item.id, ...(content ? { contentId: content.id } : {}), ...(body.characterId ? { characterId: body.characterId } : {}) },
+            summary: `${token.name} quer pegar ${content ? `${what(content)} de ${item.name}` : what(item)}`
+          });
+        }
         characterId = token.character_id;
       } else if (!(await sharedInCampaign(req.params.id, characterId))) {
         throw httpError('Esse personagem não está nesta campanha.', 404);
@@ -1325,10 +1375,79 @@ export function registerCampaignV2Routes(router) {
     await emitEvent(req.params.id, 'message:created', { message: { ...result.message, account_name: req.user.name, character_name: result.character.character_name } }, 'all', req.user.id);
     await emitEvent(req.params.id, 'character:updated', { characterId: result.character.id }, 'all', req.user.id);
     if (result.combatState) await emitCombat(req.params.id, updatedScene, req.user.id);
-    res.status(201).json({
+    return {
       item: master ? result.item : playerItem(result.item),
       received: result.received,
       character: { id: result.character.id, inventory: result.inventory, wallet: result.wallet }
-    });
+    };
+  }
+
+  // ===== pedidos ao mestre (modo 'pedir') =====
+  // Erro AskMaster vira pedido: 202 { requested, request } para o jogador e evento para o mestre.
+  async function asking(res, campaignId, userId, fn, done) {
+    let out;
+    try {
+      out = await fn();
+    } catch (error) {
+      if (!error.askMaster) throw error;
+      const request = await createRequest(campaignId, userId, error.askMaster);
+      return res.status(202).json({ requested: true, request, message: 'Pedido enviado ao mestre…' });
+    }
+    return done(out);
+  }
+
+  router.get('/:id/action-requests', async (req, res) => {
+    const { master } = await requireCampaignMember(req.params.id, req.user);
+    const list = await listPending(req.params.id);
+    res.json(master ? list : list.filter((r) => r.userId === req.user.id));
+  });
+
+  const decideSchema = z.object({ decision: z.enum(['approve', 'deny']), always: boolish.optional().default(false) });
+  router.post('/:id/action-requests/:requestId', async (req, res) => {
+    await assertCampaignMaster(req.params.id, req.user);
+    if (!z.string().uuid().safeParse(req.params.requestId).success) throw httpError('Pedido não encontrado.', 404);
+    const body = decideSchema.parse(req.body || {});
+    const claimed = await claimRequest(req.params.id, req.params.requestId, body.decision === 'approve' ? 'approved' : 'denied');
+    if (!claimed.row) {
+      if (claimed.missing) throw httpError('Pedido não encontrado.', 404);
+      throw httpError(claimed.status === 'expired' ? 'O pedido expirou.' : 'Esse pedido já foi decidido.', claimed.status === 'expired' ? 410 : 409);
+    }
+    const row = claimed.row;
+    const view = requestView(row);
+    if (body.decision === 'deny') {
+      await emitEvent(req.params.id, 'action:decided', { ...view, message: 'O mestre não deixou.' }, row.user_id, req.user.id);
+      return res.json({ request: view });
+    }
+    // "permitir sempre": a excecao deste jogador vira livre para esta acao
+    if (body.always) {
+      const rules = await loadRules(req.params.id);
+      const action = REQUEST_ACTION[row.kind];
+      const own = rules.players[row.user_id] || {};
+      const next = normalizeRules({ ...rules, players: { ...rules.players, [row.user_id]: { ...own, actions: { ...(own.actions || {}), [action]: 'livre' } } } });
+      await query('update campaigns set table_rules = $1, updated_at = now() where id = $2', [JSON.stringify(next), req.params.id]);
+      await emitEvent(req.params.id, 'rules:updated', { rules: next }, 'all', req.user.id);
+    }
+    // o servidor refaz a acao como o jogador, conferindo alcance, turno e regras de agora
+    const requester = (await query('select id, name, email, role from users where id = $1', [row.user_id])).rows[0];
+    const asPlayer = { params: { id: req.params.id }, user: { ...requester, role: 'player' } };
+    const payload = parseJson(row.payload, {});
+    let result;
+    try {
+      if (!requester) throw httpError('O jogador saiu da campanha.', 409);
+      const member = await requireCampaignMember(req.params.id, asPlayer.user);
+      if (member.master) throw httpError('Esse pedido é do mestre.', 409);
+      if (row.kind === 'pickup') result = await doPickup(asPlayer, false, row.scene_id, payload, true);
+      else if (row.kind === 'enter') result = await doEnter(asPlayer, false, row.scene_id, payload.buildingId, { tokenId: payload.tokenId }, true);
+      else if (row.kind === 'exit') result = await doExit(asPlayer, false, row.scene_id, { tokenId: payload.tokenId }, true);
+      else result = { roll: await doRoll({ campaignId: req.params.id, user: asPlayer.user, master: false, member: member.member }, rollSchema.parse(payload), true) };
+    } catch (error) {
+      if (error.askMaster) throw error;
+      await setRequestStatus(row.id, 'denied');
+      const message = error.status ? error.message : 'Não deu certo.';
+      await emitEvent(req.params.id, 'action:decided', { ...view, status: 'denied', failed: true, message: `O mestre deixou, mas não deu: ${message}` }, row.user_id, req.user.id);
+      throw httpError(`Não deu: ${message}`, error.status && error.status < 500 ? 409 : 500);
+    }
+    await emitEvent(req.params.id, 'action:decided', { ...view, result: row.kind === 'attack' ? { roll: result.roll } : { sceneId: result.sceneId || null, received: result.received || null } }, row.user_id, req.user.id);
+    res.json({ request: view, result });
   });
 }

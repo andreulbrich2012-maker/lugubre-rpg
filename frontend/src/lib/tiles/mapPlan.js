@@ -143,7 +143,8 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
       const x0 = px(a.rect[0]); const y0 = py(a.rect[1]); const x1 = px(num(a.rect[0]) + num(a.rect[2])); const y1 = py(num(a.rect[1]) + num(a.rect[3]));
       for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) cells.push([x, y, Math.max(Math.abs(x - (x0 + x1) / 2) / ((x1 - x0) / 2 + 0.5), Math.abs(y - (y0 + y1) / 2) / ((y1 - y0) / 2 + 0.5))]);
     } else {
-      const poly = pts(a.points);
+      // vertice na borda do mapa vai alem dela: o balanço da borda nao deixa faixa sem preencher
+      const poly = pts(a.points).map(([x, y]) => [x <= 0 ? -AMP - 2 : x >= C - 1 ? C + AMP + 1 : x, y <= 0 ? -AMP - 2 : y >= R - 1 ? R + AMP + 1 : y]);
       if (poly.length < 3) return cells;
       const xs = poly.map((p) => p[0]); const ys = poly.map((p) => p[1]);
       const cx = xs.reduce((s, v) => s + v, 0) / xs.length; const cy = ys.reduce((s, v) => s + v, 0) / ys.length;
@@ -171,7 +172,7 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     for (const [x, y, d] of cells) {
       switch (a.type) {
         case 'floresta': forest[y * C + x] = 2; break;
-        case 'bosque': forest[y * C + x] = Math.max(forest[y * C + x], 1); break;
+        case 'bosque': forest[y * C + x] = 1; break; // mancha rala, ate dentro da floresta
         case 'montanha': G[y][x] = 'é'; forest[y * C + x] = 3; if (rnd() < 0.05) setO(x, y, 'Þ'); break;
         case 'rocha': G[y][x] = 'é'; forest[y * C + x] = 3; if (rnd() < 0.08) setO(x, y, 'o'); break;
         case 'campo': G[y][x] = rnd() < 0.5 ? 'g' : 'á'; forest[y * C + x] = 0; if (rnd() < 0.05) setO(x, y, 'f'); break;
@@ -201,14 +202,31 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     if (a.type === 'ritual' && cells.length) {
       const cx = Math.round(cells.reduce((s, c) => s + c[0], 0) / cells.length); const cy = Math.round(cells.reduce((s, c) => s + c[1], 0) / cells.length);
       setO(cx, cy, '`');
-      const r = Math.max(2, Math.round(Math.sqrt(cells.length / Math.PI) * 0.7));
+      // raio minimo (~5% do mapa) e anel aberto em volta: o circulo de pedras aparece de verdade
+      const r = Math.max(3, Math.round(Math.min(C, R) * 0.04), Math.round(Math.sqrt(cells.length / Math.PI) * 0.7));
+      for (let yy = cy - r - 3; yy <= cy + r + 3; yy++) for (let xx = cx - r - 3; xx <= cx + r + 3; xx++) if (inside(xx, yy) && Math.hypot(xx - cx, (yy - cy) / 0.8) <= r + 3) { forest[yy * C + xx] = 0; lock[yy * C + xx] = Math.max(lock[yy * C + xx], 1); if ('TAb'.includes(O[yy][xx])) O[yy][xx] = ' '; }
       for (let k = 0; k < 8; k++) setO(Math.round(cx + Math.cos((k / 8) * Math.PI * 2) * r), Math.round(cy + Math.sin((k / 8) * Math.PI * 2) * r * 0.8), 'Ä');
     }
   }
 
   // ---- linhas (rios, estradas, cercas) ----
-  const line = (list, fn) => {
+  // ponta de rio/estrada a menos de 8% da borda vai ate a borda (IA fraca para em 917, 884...)
+  const toEdge = (list) => {
     const p = pts(list);
+    if (p.length < 2) return p;
+    const snap = ([x, y]) => {
+      const mx = Math.max(2, Math.round(C * 0.08)); const my = Math.max(2, Math.round(R * 0.08));
+      const d = [[x, 0, x], [C - 1 - x, 1, x], [y, 2, y], [R - 1 - y, 3, y]].sort((a, b) => a[0] - b[0])[0];
+      if (d[1] === 0 && x < mx) return [0, y];
+      if (d[1] === 1 && C - 1 - x < mx) return [C - 1, y];
+      if (d[1] === 2 && y < my) return [x, 0];
+      if (d[1] === 3 && R - 1 - y < my) return [x, R - 1];
+      return [x, y];
+    };
+    return [snap(p[0]), ...p.slice(1, -1), snap(p[p.length - 1])];
+  };
+  const line = (list, fn, edge = false) => {
+    const p = edge ? toEdge(list) : pts(list);
     for (let i = 0; i + 1 < p.length; i++) {
       const [x0, y0] = p[i]; const [x1, y1] = p[i + 1];
       const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0), 1);
@@ -218,7 +236,7 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
   const brush = (x, y, w, fn) => { const h0 = -Math.floor((w - 1) / 2); for (let dy = h0; dy < h0 + w; dy++) for (let dx = h0; dx < h0 + w; dx++) fn(x + dx, y + dy); };
   for (const r of Array.isArray(plan.rivers) ? plan.rivers : []) {
     const w = Math.max(1, Math.min(6, Math.round(num(r?.width, 3))));
-    line(r?.points, (x, y) => brush(x, y, w, (a, b) => { if (inside(a, b) && G[b][a] !== 'W' && G[b][a] !== '~') { G[b][a] = '0'; O[b][a] = ' '; forest[b * C + a] = 0; lock[b * C + a] = 1; } }));
+    line(r?.points, (x, y) => brush(x, y, w, (a, b) => { if (inside(a, b) && G[b][a] !== 'W' && G[b][a] !== '~') { G[b][a] = '0'; O[b][a] = ' '; forest[b * C + a] = 0; lock[b * C + a] = 1; } }), true);
   }
   const ROAD = { estrada: ';', pedra: 'c', trilha: 'û', terra: ',', cais: '-' };
   for (const r of Array.isArray(plan.roads) ? plan.roads : []) {
@@ -228,7 +246,7 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
       if (!inside(a, b)) return;
       forest[b * C + a] = 0; lock[b * C + a] = 1; O[b][a] = ' ';
       if (WATER.has(G[b][a]) || G[b][a] === '-') G[b][a] = '-'; else if (G[b][a] !== 'c' && G[b][a] !== ';') G[b][a] = ch;
-    }));
+    }), ch !== '-');
   }
   const FENCE = { cerca: ['o', '+'], muro: ['g', 'ç'], sebe: ['g', 'ñ'], palicada: ['o', 'Æ'] };
   for (const f of Array.isArray(plan.fences) ? plan.fences : []) {
@@ -238,6 +256,28 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
       if (layer === 'o') setO(x, y, ch); else G[y][x] = ch;
       lock[y * C + x] = 1; forest[y * C + x] = 0;
     });
+  }
+
+  // cerca/paliçada/muro fechado (1o ponto ~ ultimo): dentro dele e chao aberto, sem mata
+  for (const f of Array.isArray(plan.fences) ? plan.fences : []) {
+    const p = pts(f?.points);
+    if (p.length < 4) continue;
+    const [ax, ay] = p[0]; const [bx, by] = p[p.length - 1];
+    if (Math.hypot(ax - bx, ay - by) > Math.max(3, C * 0.04)) continue;
+    const xs = p.map((q) => q[0]); const ys = p.map((q) => q[1]);
+    for (let y = Math.min(...ys); y <= Math.max(...ys); y++) for (let x = Math.min(...xs); x <= Math.max(...xs); x++) {
+      let inP = false;
+      for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+        const [xi, yi] = p[i]; const [xj, yj] = p[j];
+        if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi || 1e-9) + xi) inP = !inP;
+      }
+      if (inP && inside(x, y)) { forest[y * C + x] = 0; if (G[y][x] === 'é' || G[y][x] === 'P') G[y][x] = '.'; }
+    }
+  }
+  // bairros e pracas com uma margem sem mata (nao ficam ilhas dentro da floresta)
+  for (const a of areas) {
+    if (a.type !== 'bairro' && a.type !== 'praca') continue;
+    for (const [x, y] of shapeCells(a)) for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (inside(x + dx, y + dy) && forest[(y + dy) * C + x + dx] === 2) forest[(y + dy) * C + x + dx] = 0;
   }
 
   // ---- construcoes: no lugar pedido ou no espaco livre mais perto ----
@@ -275,6 +315,8 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
   for (const b of (Array.isArray(plan.buildings) ? plan.buildings : []).slice(0, MAX_BUILDINGS)) {
     // moinho de vento fica melhor como o objeto grande com pas
     if (/moinho/.test(strip(b?.type ?? b?.tipo))) { extraObjects.push({ type: 'moinho', x: b.x, y: b.y }); continue; }
+    // portao: a abertura na cerca ja e automatica; vira duas tochas na entrada
+    if (/portao/.test(strip(b?.type ?? b?.tipo)) && (plan.fences || []).length) { extraObjects.push({ type: 'tocha', x: num(b.x) - SCALE * 0.01, y: b.y }, { type: 'tocha', x: num(b.x) + SCALE * 0.01, y: b.y }); continue; }
     const d = pickDesign(b || {}, rnd);
     if (!d) continue;
     const cx = px(b.x); const cy = py(b.y);
@@ -322,7 +364,17 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
   for (const o of [...extraObjects, ...(Array.isArray(plan.objects) ? plan.objects : [])]) {
     const ch = PLAN_OBJECTS[strip(o?.type ?? o?.tipo)];
     if (!ch) continue;
-    const x = px(o.x); const y = py(o.y);
+    let x = px(o.x); let y = py(o.y);
+    // caiu na agua (moinho na beira do rio, poco...): vai para a margem seca mais perto
+    if (inside(x, y) && WATER.has(G[y][x]) && ch !== 'Ù') {
+      let best = null;
+      for (let r = 1; r <= 6 && !best; r++) for (let dy = -r; dy <= r && !best; dy++) for (let dx = -r; dx <= r && !best; dx++) {
+        const X = x + dx; const Y = y + dy;
+        if (inside(X, Y) && !WATER.has(G[Y][X]) && G[Y][X] !== '-' && lock[Y * C + X] !== 2 && O[Y][X] === ' ') best = [X, Y];
+      }
+      if (!best) continue;
+      [x, y] = best;
+    }
     if (!inside(x, y) || lock[y * C + x] === 2 || WATER.has(G[y][x]) && ch !== 'Ù') continue;
     setO(x, y, ch); lock[y * C + x] = 1; forest[y * C + x] = 0;
     // objeto grande (moinho, tenda, fonte...): abre uma clareira em volta
@@ -423,7 +475,7 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     const x = px(m?.x); const y = py(m?.y); const name = String(m?.name ?? m?.nome ?? '').trim().slice(0, 40);
     if (name && !isSolid(map, x, y) && !buildings.some((b) => x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h)) monsters.push({ name, x, y, hp: Math.max(1, Math.min(500, Math.round(num(m.hp, 10)))) });
   }
-  const asked = (Array.isArray(plan.buildings) ? plan.buildings : []).filter((b) => !/moinho/.test(strip(b?.type ?? b?.tipo))).length;
+  const asked = (Array.isArray(plan.buildings) ? plan.buildings : []).filter((b) => !/moinho|portao/.test(strip(b?.type ?? b?.tipo))).length;
   const placed = buildings.filter((b) => !b.auto).length;
   if (asked > placed) warnings.push(`${asked - placed} construção(ões) não couberam no mapa e ficaram de fora.`);
   return { map, warnings, monsters, name: String(plan.name ?? plan.nome ?? '').slice(0, 80), notes: String(plan.notes ?? plan.notas ?? '').slice(0, 300) };

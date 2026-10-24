@@ -28,7 +28,7 @@ const buildingSchema = z.object({
   w: z.number().int().min(3).max(80),
   h: z.number().int().min(3).max(80),
   name: z.string().trim().max(60).optional().default(''),
-  roof: z.enum(['telha', 'palha', 'ardosia', 'madeira']).optional().default('telha')
+  roof: z.enum(['telha', 'telha-azul', 'palha', 'palha-escura', 'ardosia', 'ardosia-verde', 'madeira', 'madeira-escura']).optional().default('telha')
 });
 const extrasSchema = z.object({
   items: z.array(itemSchema).max(60, 'No máximo 60 itens no mapa.').optional().default([]),

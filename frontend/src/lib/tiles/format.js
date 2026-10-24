@@ -18,7 +18,7 @@ const PRINTABLE = /^[\x20-\x7e\u00a1-\u00ff]*$/;
 export const MAX_ITEMS = 60;
 export const MAX_BUILDINGS = 30;
 export const ITEM_CATEGORIES = ['Achados', 'Armas', 'Armaduras', 'Poções', 'Tesouro', 'Livros', 'Ingredientes', 'Outros'];
-export const ROOF_TYPES = ['telha', 'palha', 'ardosia', 'madeira'];
+export const ROOF_TYPES = ['telha', 'telha-azul', 'palha', 'palha-escura', 'ardosia', 'ardosia-verde', 'madeira', 'madeira-escura'];
 export const LIGHTS = ['dia', 'entardecer', 'noite'];
 export const DECORS = ['nenhuma', 'pouca', 'normal', 'muita'];
 // Ambiente so entra no mapa quando foge do padrao (dia / normal): mapa antigo continua igual.
@@ -80,7 +80,7 @@ export function repairBuildings(list, cols, rows) {
     let id = ID_RE.test(String(raw.id ?? '')) ? String(raw.id) : shortId();
     while (ids.has(id)) id = shortId();
     ids.add(id);
-    const roof = String(raw.roof ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const roof = String(raw.roof ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, '-');
     buildings.push({ id, x, y, w, h, name: text(raw.name, 60) || 'Construção', roof: ROOF_TYPES.includes(roof) ? roof : 'telha' });
   }
   return { buildings, dropped };

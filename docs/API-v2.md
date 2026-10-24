@@ -270,7 +270,7 @@ Regras do servidor: `cols`/`rows` entre 4 e 80; 1 ou 2 camadas (nome `a-z_`); ca
 
 Campos opcionais (validados em `backend/src/utils/tiles.js`; nada de tabela nova, tudo dentro do jsonb `tiles`):
 - `items` (até 60) — itens pegáveis: `id` (`[A-Za-z0-9_-]{1,40}`, único), `x`/`y` (célula dentro do mapa), `name` (1–60), `description` (≤200), `quantity` (inteiro 1–999, padrão 1), `weight` (0–1000, padrão 0), `category` (`Achados` padrão, `Armas`, `Armaduras`, `Poções`, `Tesouro`, `Livros`, `Ingredientes`, `Outros`), `dracmas` (inteiro; se > 0 o item é dinheiro e vai para a bolsa). Vários itens podem estar na mesma célula (um baú).
-- `buildings` (até 30) — construções com telhado: `id`, `x`, `y`, `w`, `h` (≥3, retângulo inteiro dentro do mapa, incluindo as paredes), `name` (≤60), `roof` (`telha` padrão, `palha`, `ardosia`, `madeira`). O telhado esconde o interior; cada cliente decide quando mostrar (clique, token dentro, mestre com "ver interiores").
+- `buildings` (até 30) — construções com telhado: `id`, `x`, `y`, `w`, `h` (≥3, retângulo inteiro dentro do mapa, incluindo as paredes), `name` (≤60), `roof` (`telha` padrão, `telha-azul`, `palha`, `palha-escura`, `ardosia`, `ardosia-verde`, `madeira`, `madeira-escura`). O telhado esconde o interior; cada cliente decide quando mostrar (clique, token dentro, mestre com "ver interiores").
 - `light` — ciclo de luz da cena: `dia`, `entardecer` ou `noite` (sem o campo = dia).
 - `decor` — quanta decoração automática (tufos, flores, pedrinhas) o desenho espalha: `nenhuma`, `pouca`, `normal` ou `muita` (sem o campo = normal).
 

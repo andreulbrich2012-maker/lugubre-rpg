@@ -79,7 +79,7 @@ COMO FAZER UM MAPA BOM
 
 CONSTRUÇÕES COM TELHADO ("buildings", até ${MAX_BUILDINGS})
 - Para cada casa/taverna/capela com paredes, registre o retângulo INTEIRO incluindo as paredes:
-  {"id": "b1", "x": coluna do canto esquerdo, "y": linha de cima, "w": largura, "h": altura, "name": "nome curto", "roof": "telha" | "palha" | "ardosia" | "madeira"}
+  {"id": "b1", "x": coluna do canto esquerdo, "y": linha de cima, "w": largura, "h": altura, "name": "nome curto", "roof": "telha" | "telha-azul" | "palha" | "palha-escura" | "ardosia" | "ardosia-verde" | "madeira" | "madeira-escura"}
 - O retângulo bate exatamente com as paredes da grade (w e h ≥ 3). Masmorras, cavernas e ruínas sem teto NÃO entram em "buildings".
 
 ITENS PEGÁVEIS ("items", até ${MAX_ITEMS})

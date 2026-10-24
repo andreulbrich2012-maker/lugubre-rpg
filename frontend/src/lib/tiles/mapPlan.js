@@ -102,8 +102,9 @@ export function pickDesign(b, rnd = Math.random) {
 }
 
 export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
-  const C = Math.max(16, Math.min(MAX_SIZE, Math.round(num(plan.cols, cols))));
-  const R = Math.max(12, Math.min(MAX_SIZE, Math.round(num(plan.rows, rows))));
+  // tamanho dito pela IA (foto: proporcao da imagem e escala das casas) vale, ate 300 blocos
+  const C = Math.max(16, Math.min(MAX_SIZE, Math.round(num(plan.cols, 0) > 0 ? Math.min(300, num(plan.cols)) : num(cols, 64))));
+  const R = Math.max(12, Math.min(MAX_SIZE, Math.round(num(plan.rows, 0) > 0 ? Math.min(300, num(plan.rows)) : num(rows, 48))));
   const rnd = rng(seed);
   const base = BASE[strip(plan.base)] || '.';
   const G = Array.from({ length: R }, () => Array(C).fill(base));
@@ -185,7 +186,8 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
   const districts = []; // areas de bairro: o sistema enche de casas
   const sea = new Uint8Array(C * R); // 1 = celula de mar
   for (const a of areas) {
-    const cells = shapeCells(a);
+    let cells = shapeCells(a);
+    if (a.type === 'terra' && cells.length >= C * R * 0.06) { a.big = true; if (Array.isArray(a.rect)) cells = shapeCells({ type: 'terra', points: [[a.rect[0], a.rect[1]], [num(a.rect[0]) + num(a.rect[2]), a.rect[1]], [num(a.rect[0]) + num(a.rect[2]), num(a.rect[1]) + num(a.rect[3])], [a.rect[0], num(a.rect[1]) + num(a.rect[3])]] }); }
     const cemetery = [];
     for (const [x, y, d] of cells) {
       const i0 = y * C + x;
@@ -205,7 +207,10 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
           break;
         case 'neve': G[y][x] = '*'; break;
         case 'areia': G[y][x] = ':'; forest[y * C + x] = 0; break;
-        case 'terra': G[y][x] = ','; forest[y * C + x] = 0; break;
+        case 'terra':
+          // terra grande (chao da vila, cais, patio) vira chao batido em manchas; a pequena (feira) e cheia
+          G[y][x] = !a.big || wob(x, y, 8) * 0.8 + rnd() * 0.2 - d * 0.25 > 0.3 ? ',' : 'g';
+          forest[y * C + x] = 0; break;
         case 'pantano': {
           // manchas de agua parada e lama no meio do capim (ruido), mais ralas na borda da area
           const n = wob(x, y, 5) * 0.7 + wob(x * 2, y * 2, 6) * 0.3 - Math.max(0, d - 0.6) * 0.6;
@@ -301,7 +306,7 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     let p = (Array.isArray(list) ? list : []).filter(Array.isArray).map((q) => [num(q[0]), num(q[1])]);
     if (!e || p.length < 2) return p;
     const [ax, at] = e;
-    if (Math.abs(p[p.length - 1][ax] - at) < SCALE * 0.02) return p;
+    if (Math.abs(p[p.length - 1][ax] - at) < SCALE * 0.03 || Math.abs(p[0][ax] - at) < SCALE * 0.03) return p;
     // corta do fim os trechos que andam mais no outro eixo (indo para outra borda)
     while (p.length > 2) {
       const [a, b] = p.slice(-2);

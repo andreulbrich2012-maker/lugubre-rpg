@@ -128,4 +128,14 @@ describe('plano de mapa', () => {
     expect(foto.map.buildings.length).toBe(1);
     expect(texto.map.buildings.length).toBeGreaterThan(8);
   });
+  it('exit na borda de onde o rio ja vem nao corta o rio (riacho que desce do norte ate o lago)', () => {
+    const r = planToMap({ rivers: [{ points: [[800, 0], [820, 500], [815, 860]], width: 2, exit: 'norte' }] }, { cols: 60, rows: 40 });
+    expect(r.map.layers.ground[33]).toContain('0');
+  });
+
+  it('cols/rows do plano (foto) definem o tamanho, ate 300', () => {
+    const r = planToMap({ cols: 66, rows: 46, buildings: [{ type: 'casa', x: 500, y: 500 }] }, { cols: 200, rows: 182 });
+    expect([r.map.cols, r.map.rows]).toEqual([66, 46]);
+    expect(planToMap({ cols: 5000, rows: 900 }, { cols: 60, rows: 40 }).map.cols).toBe(300);
+  });
 });

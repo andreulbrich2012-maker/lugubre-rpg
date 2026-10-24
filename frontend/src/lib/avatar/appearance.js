@@ -186,25 +186,39 @@ const PALETTES = [
   ['ameixa', 'carvao', 'prata'], ['ferrugem', 'linho', 'couro-escuro'], ['petroleo', 'osso', 'cobre'], ['carvao', 'sangue', 'aco'],
   ['oliva', 'camurca', 'ferro'], ['ocre', 'couro', 'ouro'], ['chumbo', 'carmesim', 'ferro-negro'], ['jade', 'linho', 'bronze']
 ];
-const CHANCE = { torso: 1, legs: 1, feet: 0.95, head: 0.45, face: 0.15, ears: 0.25, neck: 0.3, back: 0.35, waist: 0.6, arms: 0.3, hands: 0.35, knees: 0.15, held: 0.6 };
+// Roupa sempre; acessorio com moderacao (no maximo 3) e quase nunca tapando o rosto.
+const CHANCE = { head: 0.3, face: 0.08, ears: 0.25, neck: 0.25, back: 0.3, waist: 0.5, arms: 0.2, hands: 0.25, knees: 0.1, held: 0.5 };
+const MAX_ACCESSORIES = 3;
 
 export function randomAppearance(rand = Math.random, raceId) {
   const r = (n) => Math.floor(rand() * n);
   const any = (list) => list[r(list.length)];
   const race = RACE_BY_ID[raceId] || any(RACES);
-  let app = applyRace(defaultAppearance(race.id), race.id);
+  // parte do personagem base da raca: tracos e proporcoes ja fazem sentido
+  const app = defaultAppearance(race.id);
   app.body = race.body || any(BUILDS).id;
-  app.skin = rand() < 0.8 ? any(race.skins) : any(SKINS).id;
+  app.skin = rand() < 0.85 ? any(race.skins) : any(SKINS).id;
   const hc = any(HAIR_COLORS).id;
   app.hair = { style: race.hair && rand() < 0.7 ? race.hair : any(HAIRS).id, color: hc };
-  app.beard = { style: race.beard || (rand() < 0.35 ? any(BEARDS).id : 'nenhuma'), color: hc };
+  app.beard = { style: race.beard || (rand() < 0.3 ? any(BEARDS).id : 'nenhuma'), color: hc };
   app.eyes = { style: race.eyes && rand() < 0.6 ? race.eyes : any(EYE_STYLES).id, color: race.eyeColor || any(EYE_COLORS).id };
   const pal = any(PALETTES);
-  app.layers = {};
-  for (const { id: slot } of SLOTS) {
-    if (rand() > (CHANCE[slot] ?? 0.3) || !ITEMS[slot].length) continue;
+  const color = (k) => (rand() < 0.9 ? pal[(k + r(2)) % 3] : any(COLORS).id);
+  const pickItem = (slot) => {
     const item = any(ITEMS[slot]);
-    app.layers[slot] = { id: item.id, colors: item.channels.map((c, k) => (rand() < 0.75 ? pal[(k + r(2)) % 3] : any(COLORS).id)) };
+    app.layers[slot] = { id: item.id, colors: item.channels.map((c, k) => color(k)) };
+    return item;
+  };
+  for (const slot of ['torso', 'legs', 'feet']) if (ITEMS[slot].length && (slot !== 'feet' || rand() < 0.95)) pickItem(slot);
+  let extra = 0;
+  for (const { id: slot } of SLOTS) {
+    if (['torso', 'legs', 'feet'].includes(slot) || !ITEMS[slot].length) continue;
+    if (extra >= MAX_ACCESSORIES) { delete app.layers[slot]; continue; }
+    if (rand() > (CHANCE[slot] ?? 0.2)) { delete app.layers[slot]; continue; }
+    let item = pickItem(slot);
+    // capacete fechado/capuz escondem o cabelo: so de vez em quando
+    if (item.hides?.includes('hair') && rand() < 0.75) item = pickItem(slot);
+    extra++;
   }
   return repairAppearance(app);
 }

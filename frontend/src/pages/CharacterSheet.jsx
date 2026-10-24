@@ -8,6 +8,7 @@ import CharacterSheetMobile from '../components/character-sheet/CharacterSheetMo
 import CharacterSheetLoading from '../components/character-sheet/CharacterSheetLoading';
 import AppearancePanel from '../components/avatar/AppearancePanel';
 import ItemIcon from '../components/icons/ItemIcon';
+import SpellIcon from '../components/icons/SpellIcon';
 import { ITEM_ICONS } from '../lib/icons/items.js';
 import { WEAPON_ICONS } from '../lib/icons/weapons.js';
 
@@ -852,7 +853,7 @@ function PowerCard({ item, field, editing, index, onRoll, onEdit, onDelete, onUp
           <div className="min-w-0">
             <div className="flex items-start gap-3">
               <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden border-[3px] border-lead bg-glass text-sm font-bold text-bone" style={isSpell && primordialByName[item.element] ? { background: `color-mix(in srgb, ${primordialByName[item.element].color} 75%, #000)` } : undefined}>
-                {item.image ? <img src={item.image} alt={`Imagem de ${item.name}`} className="h-full w-full object-cover" /> : (isSpell ? String(item.element || 'Ér').slice(0, 2) : 'AT')}
+                {item.image ? <img src={item.image} alt={`Imagem de ${item.name}`} className="h-full w-full object-cover" /> : <SpellIcon power={{ ...item, type: isSpell ? 'magia' : 'poder' }} size={48} />}
               </div>
               <div className="min-w-0 flex-1">
                 <h4 className="break-words font-display text-2xl leading-tight text-bone">{item.name}</h4>

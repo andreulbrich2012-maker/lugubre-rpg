@@ -60,7 +60,7 @@ Você vai continuar o projeto **Lúgubre RPG** com o André, que é o dono. Ante
   5. `npx vercel deploy --prod --yes`.
   6. Se o schema mudou, abra https://lugubre-rpg.vercel.app/admin?sec=system com o André logado como admin: primeiro "Baixar cópia de segurança", depois "Atualizar banco".
 
-  O `.vercelignore` impede o envio de `.env`. Publicar sem pedir só quando o André mandar publicar.
+  O `.vercelignore` impede o envio de `.env`. **Você publica sozinho: ao fim de cada etapa aprovada, faça o deploy completo.**
 - **Commits** terminam com: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`
 - **Comentários no código** em português **sem acentos**, explicando o porquê. Textos da interface em português **com acentos**.
 - **Decisões de produto:**
@@ -230,4 +230,12 @@ O mapa salvo é um **rascunho grosso**. O sistema desenha bordas, transições e
 9. Animações (seção F).
 10. Modo jogo.
 
-**Em cada etapa:** commit e push na `pixelart-wip`, PNGs ou GIFs conferidos e testes passando. Escreva o resumo e os caminhos das imagens em `docs/RELATORIO-PIXELART.md`. Mostre as imagens ao André antes de seguir para a próxima etapa. Só publique na `master` e na Vercel quando o André pedir, seguindo a seção 3.
+**Em cada etapa:** commit e push na `pixelart-wip`, PNGs ou GIFs conferidos e testes passando. Escreva o resumo e os caminhos das imagens em `docs/RELATORIO-PIXELART.md`. Mostre as imagens ao André. **Depois de cada etapa, publique tudo, sem esperar pedido:**
+1. Testes passando nos três comandos.
+2. `git checkout master && git merge pixelart-wip && git push origin master`, e volte para a `pixelart-wip`.
+3. `npx vercel deploy --prod --yes`. Se ainda não estiver logado, rode antes `npx vercel login` com o André e `npx vercel link --yes --project lugubre-rpg`.
+4. Se o schema ou os seeds mudaram, abra https://lugubre-rpg.vercel.app/admin?sec=system no navegador logado como admin (o André entra na conta dele), clique em **Baixar cópia de segurança**, confira o número de registros, guarde o arquivo e só então clique em **Atualizar banco**. O número de registros nunca pode diminuir.
+5. Abra o site no ar e confira se a mudança apareceu e se as campanhas e fichas antigas continuam lá.
+6. Diga ao André, em poucas linhas, o que foi para o ar.
+
+Se algo der errado no deploy, o site anterior continua no ar: nunca apague dados para "consertar".

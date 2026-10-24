@@ -1,9 +1,11 @@
-// Desenho dos mapas em <canvas>. Os sprites viram um atlas uma vez so (por quadro
-// nos animados) e cada celula e um drawImage: rapido ate 80x80 a 4 fps.
+// Desenho dos mapas em <canvas>. O chao e os objetos sao renderizados (compose.js) em pedacos
+// cacheados (chunks.js) e cada quadro so cola os pedacos da vista: mapa de ate 1000x1000
+// celulas sem canvas gigante. Objetos animados vem do atlas de sprites a cada quadro.
 import { SIZE, TILES, getTile, tileImages } from './catalog.js';
 import { roofPixels } from './roofs.js';
-import { renderTerrain, renderObjects, terrainFrames, isAnimatedObject, lightSources, LIGHT_TINT } from './compose.js';
-import { applyStyle } from './styles.js';
+import { renderRegion, terrainFrames, isAnimatedObject, LIGHT_TINT, NIGHT_LIGHT } from './compose.js';
+import { applyStyle, styleHex } from './styles.js';
+import { chunkLayout, chunkRect, visibleChunks, pickLod, diffLayers, dirtyChunks } from './chunks.js';
 
 export const FRAME_MS = 250; // ~4 fps: pixel art animada mais rapido que isso parece tremida
 
@@ -103,54 +105,332 @@ export function roofCanvas(b, canvas = document.createElement('canvas'), style) 
   return canvas;
 }
 
+function makeCanvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w));
+  c.height = Math.max(1, Math.round(h));
+  return c;
+}
+
 function toCanvas(img, style) {
   applyStyle(img, style);
-  const c = document.createElement('canvas');
-  c.width = img.w;
-  c.height = img.h;
+  const c = makeCanvas(img.w, img.h);
   c.getContext('2d').putImageData(new ImageData(img.data, img.w, img.h), 0, 0);
   return c;
 }
 
-// Camadas pre-renderizadas por mapa (chave = o objeto layers: pegar item troca so "items" e
-// nao refaz o chao). Terreno: um canvas por quadro de agua/lava, feito na primeira vez que precisa.
-const layerCache = new WeakMap();
-function sceneLayers(map, beautify) {
-  const decor = map.decor || 'normal';
-  const style = map.style || 'padrao';
-  let c = layerCache.get(map.layers);
-  if (!c || c.beautify !== beautify || c.decor !== decor || c.cols !== map.cols || c.style !== style) {
-    const animated = [];
-    map.layers.objects.forEach((row, y) => [...row].forEach((ch, x) => {
-      const t = getTile(ch);
-      if (t && isAnimatedObject(t)) animated.push([x, y, t]);
-    }));
-    c = { beautify, decor, style, cols: map.cols, frames: terrainFrames(map), terrain: [], objects: null, animated, lights: lightSources(map) };
-    layerCache.set(map.layers, c);
+// ---------- miniatura (1 px por celula) ----------
+// Cor media de cada bloco (chao) e do objeto por cima: mapa inteiro de longe sem renderizar nada
+// e "tapa-buraco" enquanto os pedacos de perto ainda estao sendo feitos.
+const avgCache = new Map();
+function avgColor(code) {
+  let c = avgCache.get(code);
+  if (c === undefined) {
+    const t = getTile(code);
+    c = null;
+    if (t) {
+      const px = rasterize(tileImages(t)[0], t.palette);
+      let r = 0; let g = 0; let b = 0; let n = 0;
+      for (let i = 0; i < px.length; i += 4) if (px[i + 3]) { r += px[i]; g += px[i + 1]; b += px[i + 2]; n++; }
+      if (n) c = [r / n, g / n, b / n, n / (SIZE * SIZE)];
+    }
+    avgCache.set(code, c);
   }
   return c;
 }
+function overviewPixel(data, i, groundCode, objCode) {
+  const g = avgColor(groundCode) || [40, 34, 48, 1];
+  let r = g[0]; let gg = g[1]; let b = g[2];
+  const o = objCode && objCode !== ' ' ? avgColor(objCode) : null;
+  if (o && getTile(objCode)?.layer === 'objects') {
+    const a = Math.min(0.8, 0.25 + o[3]);
+    r += (o[0] - r) * a; gg += (o[1] - gg) * a; b += (o[2] - b) * a;
+  }
+  data[i] = r; data[i + 1] = gg; data[i + 2] = b; data[i + 3] = 255;
+}
+function fillOverview(map, x0, y0, w, h, style) {
+  const img = { w, h, data: new Uint8ClampedArray(w * h * 4) };
+  const G = map.layers.ground;
+  const O = map.layers.objects;
+  for (let y = 0; y < h; y++) {
+    const gr = G[y0 + y] || '';
+    const or = O?.[y0 + y] || '';
+    for (let x = 0; x < w; x++) overviewPixel(img.data, (y * w + x) * 4, gr[x0 + x], or[x0 + x]);
+  }
+  return applyStyle(img, style);
+}
 
-// light: 'dia' | 'entardecer' | 'noite' (map.light). roofs: desenha todos os telhados (previa do editor).
-// map.style: estilo global (styles.js), aplicado uma vez nas camadas cacheadas; a luz vem por cima.
-export function drawMap(ctx, map, { cellSize = 48, time = 0, showGrid = false, roofs = false, beautify = true } = {}) {
-  const L = sceneLayers(map, beautify);
-  const { canvas: img, index } = getAtlas(L.style);
+// ---------- desenho em pedacos (mapa grande) ----------
+// Um MapRenderer por <TileMapCanvas>: guarda os pedacos ja feitos (canvas por pedaco, por nivel
+// de detalhe e por quadro de agua), refaz so os pedacos que a pintura sujou (diffLayers) e
+// joga fora os mais antigos quando passa do limite de memoria (LRU por bytes).
+export const DEFAULT_BUDGET_BYTES = 320 * 1024 * 1024;
+
+export class MapRenderer {
+  constructor({ budgetBytes = DEFAULT_BUDGET_BYTES } = {}) {
+    this.budget = budgetBytes;
+    this.reset();
+  }
+
+  reset() {
+    this.sig = '';
+    this.map = null;
+    this.L = null;
+    this.entries = new Map(); // `${res}|${i}|${j}` -> pedaco (ordem de insercao = LRU)
+    this.meta = new Map(); // `${i}|${j}` -> { animTerrain, animated, lights }
+    this.bytes = 0;
+    this.drawId = 0;
+    this.overview = null;
+    this.frames = 1;
+  }
+
+  dispose() { this.reset(); }
+
+  get stats() {
+    let canvases = 0;
+    for (const e of this.entries.values()) canvases += e.frames.filter(Boolean).length;
+    return { chunks: this.entries.size, canvases, bytes: this.bytes, layout: this.L };
+  }
+
+  sync(map, beautify) {
+    const style = map.style || 'padrao';
+    const decor = map.decor || 'normal';
+    const sig = `${map.cols}x${map.rows}|${style}|${decor}|${beautify}`;
+    if (sig !== this.sig) {
+      this.reset();
+      this.sig = sig;
+      this.map = map;
+      this.style = style;
+      this.decor = decor;
+      this.beautify = beautify;
+      this.L = chunkLayout(map.cols, map.rows);
+      this.frames = terrainFrames(map);
+      return;
+    }
+    if (map.layers === this.map.layers) { this.map = map; return; }
+    const segs = diffLayers(this.map.layers, map.layers);
+    this.map = map;
+    if (!segs.length) return;
+    // quadros de agua: tile animado novo pode mudar o ciclo (so cresce; sobrar e inofensivo)
+    const rowsTouched = { layers: { ground: segs.map(([y]) => map.layers.ground[y] || '') } };
+    const f = terrainFrames(rowsTouched);
+    if (f > 1) { const gcd = (a, b) => (b ? gcd(b, a % b) : a); this.frames = (this.frames * f) / gcd(this.frames, f); }
+    const dirty = dirtyChunks(this.L, segs);
+    for (const key of dirty) {
+      this.meta.delete(key);
+      for (const res of [8, 16]) {
+        const e = this.entries.get(`${res}|${key}`);
+        if (!e) continue;
+        e.stale = true;
+        e.frames.forEach((c, k) => { if (c && k) this.bytes -= c.width * c.height * 4; });
+        e.frames = [e.frames[0]];
+      }
+    }
+    if (this.overview) {
+      const ctx = this.overview.getContext('2d');
+      for (const [y, x0, x1] of segs) {
+        const w = x1 - x0 + 1;
+        const img = fillOverview(map, x0, y, w, 1, this.style);
+        ctx.putImageData(new ImageData(img.data, w, 1), x0, y);
+      }
+    }
+  }
+
+  getOverview() {
+    if (!this.overview) {
+      const { cols, rows } = this.map;
+      const img = fillOverview(this.map, 0, 0, cols, rows, this.style);
+      const c = makeCanvas(cols, rows);
+      c.getContext('2d').putImageData(new ImageData(img.data, cols, rows), 0, 0);
+      this.overview = c;
+    }
+    return this.overview;
+  }
+
+  // Dados do pedaco: agua animada (com a folga: espuma do vizinho entra), objetos animados e luzes.
+  chunkMeta(i, j) {
+    const key = `${i}|${j}`;
+    let m = this.meta.get(key);
+    if (m) return m;
+    const { x, y, w, h } = chunkRect(this.L, i, j);
+    const map = this.map;
+    const G = map.layers.ground;
+    const O = map.layers.objects;
+    let animTerrain = false;
+    const py0 = Math.max(0, y - 2); const py1 = Math.min(map.rows, y + h + 2);
+    const px0 = Math.max(0, x - 2); const px1 = Math.min(map.cols, x + w + 2);
+    for (let yy = py0; yy < py1 && !animTerrain; yy++) {
+      const row = G[yy] || '';
+      for (let xx = px0; xx < px1; xx++) { const t = getTile(row[xx]); if (t?.frames && t.frames.length > 1) { animTerrain = true; break; } }
+    }
+    const animated = [];
+    const lights = [];
+    for (let yy = y; yy < y + h; yy++) {
+      const grow = G[yy] || '';
+      const orow = O?.[yy] || '';
+      for (let xx = x; xx < x + w; xx++) {
+        const gt = getTile(grow[xx]);
+        if (gt?.light) lights.push([xx, yy, gt.light]);
+        else if (grow[xx] === 'J') lights.push([xx, yy, NIGHT_LIGHT]);
+        const ot = getTile(orow[xx]);
+        if (!ot) continue;
+        if (ot.light) lights.push([xx, yy, ot.light]);
+        if (isAnimatedObject(ot)) animated.push([xx, yy, ot]);
+      }
+    }
+    m = { animTerrain, animated, lights };
+    this.meta.set(key, m);
+    return m;
+  }
+
+  renderChunk(i, j, res, frame) {
+    const { x, y, w, h } = chunkRect(this.L, i, j);
+    const img = renderRegion(this.map, x, y, w, h, { frame, beautify: this.beautify, decor: this.decor });
+    let c = toCanvas(img, this.style);
+    if (res < SIZE) {
+      const d = makeCanvas(w * res, h * res);
+      const dctx = d.getContext('2d');
+      dctx.imageSmoothingEnabled = true;
+      dctx.imageSmoothingQuality = 'medium';
+      dctx.drawImage(c, 0, 0, d.width, d.height);
+      c.width = 0; // libera a memoria do canvas grande ja
+      c = d;
+    }
+    return c;
+  }
+
+  // Pedaco pronto para desenhar (refaz se sujou e houver tempo). Devolve { canvas, pending }.
+  chunkCanvas(i, j, res, frame, canRender) {
+    const key = `${res}|${i}|${j}`;
+    let e = this.entries.get(key);
+    if (e) { this.entries.delete(key); this.entries.set(key, e); } // LRU: usado agora vai para o fim
+    let pending = false;
+    if (!e || e.stale) {
+      if (canRender()) {
+        const c = this.renderChunk(i, j, res, 0);
+        if (e) e.frames.forEach((old) => { if (old) this.bytes -= old.width * old.height * 4; });
+        e = { i, j, res, frames: [c], stale: false };
+        this.bytes += c.width * c.height * 4;
+        this.entries.set(key, e);
+      } else pending = true;
+    }
+    if (!e) return { canvas: null, pending };
+    e.used = this.drawId;
+    let canvas = e.frames[0];
+    if (frame > 0 && !e.stale) {
+      if (!e.frames[frame] && canRender()) {
+        const c = this.renderChunk(i, j, res, frame);
+        e.frames[frame] = c;
+        this.bytes += c.width * c.height * 4;
+      }
+      if (e.frames[frame]) canvas = e.frames[frame];
+      else pending = true;
+    }
+    return { canvas, pending };
+  }
+
+  evict() {
+    if (this.bytes <= this.budget) return;
+    for (const [key, e] of this.entries) {
+      if (this.bytes <= this.budget) break;
+      if (e.used === this.drawId) continue;
+      for (const c of e.frames) if (c) { this.bytes -= c.width * c.height * 4; c.width = 0; }
+      this.entries.delete(key);
+    }
+    // ainda acima (tudo na tela): solta os quadros de agua alem do primeiro
+    if (this.bytes > this.budget) {
+      for (const e of this.entries.values()) {
+        for (let k = 1; k < e.frames.length; k++) if (e.frames[k]) { this.bytes -= e.frames[k].width * e.frames[k].height * 4; e.frames[k].width = 0; e.frames[k] = null; }
+      }
+    }
+  }
+}
+
+// Renderizador "de passagem" para quem chama drawMap sem guardar um (previa pequena): um por
+// objeto layers, como o cache antigo.
+const looseRenderers = new WeakMap();
+function looseRenderer(map) {
+  let r = looseRenderers.get(map.layers);
+  if (!r) { r = new MapRenderer(); looseRenderers.set(map.layers, r); }
+  return r;
+}
+
+// Desenha o mapa (ou so a vista) no ctx. cellSize = px do ctx por celula; view = celulas
+// {x0, y0, x1, y1} a desenhar (padrao: o mapa todo); offset = px do ctx subtraidos (canvas que
+// cobre so a vista). light: 'dia' | 'entardecer' | 'noite' (map.light). roofs: desenha todos os
+// telhados (previa do editor). map.style: estilo global aplicado uma vez em cada pedaco.
+// budgetMs: tempo maximo renderizando pedacos novos nesta chamada (sempre faz pelo menos um);
+// o que faltar aparece na miniatura e volta { pending: true } para chamar de novo logo.
+// Devolve { pending, animated } (animated: tem agua/fogo/luz na vista e vale redesenhar a 4 fps).
+export function drawMap(ctx, map, {
+  cellSize = 48, time = 0, showGrid = false, roofs = false, beautify = true,
+  view, offset, renderer, budgetMs = 40, animate = true, buildingBlocks = false
+} = {}) {
+  const R = renderer || looseRenderer(map);
+  R.sync(map, beautify);
+  R.drawId++;
   const { cols, rows } = map;
+  const L = R.L;
   const s = cellSize;
-  // tique ciclico do terreno: a agua (tile.cycle) anda sempre para frente; os blocos de
-  // vai-e-volta viram ciclo dentro do compose (tileFrame), entao nada "pula"
-  const f = L.frames > 1 ? Math.floor(Math.max(0, time) / FRAME_MS) % L.frames : 0;
-  if (!L.terrain[f]) L.terrain[f] = toCanvas(renderTerrain(map, { frame: f, beautify, decor: L.decor }), L.style);
-  if (!L.objects) L.objects = toCanvas(renderObjects(map, { beautify }), L.style);
+  const ox = offset?.x || 0;
+  const oy = offset?.y || 0;
+  const v = view || { x0: 0, y0: 0, x1: cols, y1: rows };
+  const vx0 = Math.max(0, Math.floor(v.x0)); const vy0 = Math.max(0, Math.floor(v.y0));
+  const vx1 = Math.min(cols, Math.ceil(v.x1)); const vy1 = Math.min(rows, Math.ceil(v.y1));
+  // borda de pixel inteira e compartilhada entre vizinhos: sem fresta entre pedacos
+  const X = (cx) => Math.round(cx * s) - ox;
+  const Y = (cy) => Math.round(cy * s) - oy;
   ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, cols * s, rows * s);
-  ctx.drawImage(L.terrain[f], 0, 0, cols * s, rows * s);
-  ctx.drawImage(L.objects, 0, 0, cols * s, rows * s);
-  // so os objetos animados sao redesenhados a cada quadro (fora de fase entre si)
-  for (const [x, y, t] of L.animated) {
-    const e = index[t.code];
-    ctx.drawImage(img, frameIndex(time, e.count, cellHash(x, y) % 4) * SIZE, e.y, SIZE, SIZE, x * s, y * s, s, s);
+  ctx.clearRect(X(vx0), Y(vy0), X(vx1) - X(vx0), Y(vy1) - Y(vy0));
+  const lod = pickLod(s, L.single);
+  let pending = false;
+  let animated = false;
+  const visible = lod === 'overview' ? [] : visibleChunks(L, { x0: vx0, y0: vy0, x1: vx1, y1: vy1 });
+
+  if (lod === 'overview') {
+    ctx.drawImage(R.getOverview(), vx0, vy0, vx1 - vx0, vy1 - vy0, X(vx0), Y(vy0), X(vx1) - X(vx0), Y(vy1) - Y(vy0));
+    if (buildingBlocks) {
+      // de longe as construcoes viram blocos da cor do telhado (o Board nao monta mil casas)
+      for (const b of map.buildings || []) {
+        if (b.x >= vx1 || b.y >= vy1 || b.x + b.w <= vx0 || b.y + b.h <= vy0) continue;
+        ctx.fillStyle = styleHex(b.colors?.roof || '#8a4a3a', R.style);
+        ctx.fillRect(X(b.x), Y(b.y), X(b.x + b.w) - X(b.x), Y(b.y + b.h) - Y(b.y));
+      }
+    }
+  } else {
+    const res = lod;
+    const start = performance.now();
+    let made = 0;
+    const canRender = () => {
+      if (made > 0 && performance.now() - start > budgetMs) return false;
+      made++;
+      return true;
+    };
+    const tick = Math.floor(Math.max(0, time) / FRAME_MS);
+    const { canvas: atlasImg, index } = getAtlas(R.style);
+    for (const [i, j] of visible) {
+      const meta = R.chunkMeta(i, j);
+      const anim = animate && res === SIZE && meta.animTerrain && R.frames > 1;
+      if (anim) animated = true;
+      const f = anim ? tick % R.frames : 0;
+      const { x, y, w, h } = chunkRect(L, i, j);
+      const got = R.chunkCanvas(i, j, res, f, canRender);
+      if (got.pending) pending = true;
+      if (got.canvas) ctx.drawImage(got.canvas, X(x), Y(y), X(x + w) - X(x), Y(y + h) - Y(y));
+      else {
+        // ainda nao feito: a miniatura tapa o buraco
+        ctx.drawImage(R.getOverview(), x, y, w, h, X(x), Y(y), X(x + w) - X(x), Y(y + h) - Y(y));
+      }
+    }
+    // objetos animados (fogo, tocha, portal) da vista, fora de fase entre si
+    for (const [i, j] of visible) {
+      for (const [x, y, t] of R.chunkMeta(i, j).animated) {
+        const e = index[t.code];
+        if (!e) continue;
+        if (animate) animated = true;
+        ctx.drawImage(atlasImg, frameIndex(animate ? time : 0, e.count, cellHash(x, y) % 4) * SIZE, e.y, SIZE, SIZE, X(x), Y(y), X(x + 1) - X(x), Y(y + 1) - Y(y));
+      }
+    }
   }
 
   // ciclo de luz: o ceu multiplica a cor; as fontes de luz somam brilho (mais forte a noite)
@@ -160,46 +440,57 @@ export function drawMap(ctx, map, { cellSize = 48, time = 0, showGrid = false, r
     ctx.save();
     ctx.globalCompositeOperation = 'multiply';
     ctx.fillStyle = tintHex;
-    ctx.fillRect(0, 0, cols * s, rows * s);
+    ctx.fillRect(X(vx0), Y(vy0), X(vx1) - X(vx0), Y(vy1) - Y(vy0));
     ctx.restore();
   }
-  const sources = tintHex ? L.lights : L.lights.filter(([x, y]) => map.layers.ground[y][x] !== 'J');
-  if (sources.length) {
+  if (lod !== 'overview') {
+    // luzes dos pedacos da vista e dos vizinhos (o brilho passa da borda)
+    const reach = 3;
+    const near = visibleChunks(L, { x0: vx0 - reach, y0: vy0 - reach, x1: vx1 + reach, y1: vy1 + reach });
     const strength = light === 'noite' ? 1.4 : light === 'entardecer' ? 0.9 : 0.5;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (const [x, y, color] of sources) {
-      const flick = 0.85 + 0.15 * Math.sin(time / 180 + cellHash(x, y));
-      const cx = (x + 0.5) * s;
-      const cy = (y + 0.5) * s;
-      const r = s * (light === 'noite' ? 2.6 : 1.8);
-      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-      const [cr, cg, cb] = hexToRgb(color);
-      g.addColorStop(0, `rgba(${cr},${cg},${cb},${Math.min(0.9, 0.3 * strength * flick).toFixed(3)})`);
-      g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
-      ctx.fillStyle = g;
-      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    const r = s * (light === 'noite' ? 2.6 : 1.8);
+    let saved = false;
+    for (const [i, j] of near) {
+      for (const [x, y, color] of R.chunkMeta(i, j).lights) {
+        if (!tintHex && map.layers.ground[y][x] === 'J') continue;
+        if (x < vx0 - reach || y < vy0 - reach || x >= vx1 + reach || y >= vy1 + reach) continue;
+        if (!saved) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; saved = true; }
+        if (animate) animated = true;
+        const flick = 0.85 + 0.15 * Math.sin(time / 180 + cellHash(x, y));
+        const cx = (x + 0.5) * s - ox;
+        const cy = (y + 0.5) * s - oy;
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+        const [cr, cg, cb] = hexToRgb(color);
+        g.addColorStop(0, `rgba(${cr},${cg},${cb},${Math.min(0.9, 0.3 * strength * flick).toFixed(3)})`);
+        g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+        ctx.fillStyle = g;
+        ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+      }
     }
-    ctx.restore();
+    if (saved) ctx.restore();
   }
 
   if (roofs) {
     for (const b of map.buildings || []) {
-      const key = `${b.w}x${b.h}:${b.roof}:${L.style}`;
-      if (!roofCache.has(key)) roofCache.set(key, roofCanvas(b, undefined, L.style));
+      if (b.x >= vx1 || b.x + b.w <= vx0 || b.y >= vy1 + 6 || b.y + b.h <= vy0) continue;
+      const key = `${b.w}x${b.h}:${b.roof}:${R.style}`;
+      if (!roofCache.has(key)) roofCache.set(key, roofCanvas(b, undefined, R.style));
       const rc = roofCache.get(key);
-      ctx.drawImage(rc, b.x * s, b.y * s, b.w * s, (rc.height / SIZE) * s);
+      ctx.drawImage(rc, X(b.x), Y(b.y), b.w * s, (rc.height / SIZE) * s);
     }
   }
 
-  if (showGrid) {
+  if (showGrid && s >= 6) {
     ctx.strokeStyle = 'rgba(0,0,0,0.35)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let x = 1; x < cols; x++) { ctx.moveTo(x * s + 0.5, 0); ctx.lineTo(x * s + 0.5, rows * s); }
-    for (let y = 1; y < rows; y++) { ctx.moveTo(0, y * s + 0.5); ctx.lineTo(cols * s, y * s + 0.5); }
+    for (let x = Math.max(1, vx0); x <= Math.min(cols - 1, vx1); x++) { ctx.moveTo(X(x) + 0.5, Y(vy0)); ctx.lineTo(X(x) + 0.5, Y(vy1)); }
+    for (let y = Math.max(1, vy0); y <= Math.min(rows - 1, vy1); y++) { ctx.moveTo(X(vx0), Y(y) + 0.5); ctx.lineTo(X(vx1), Y(y) + 0.5); }
     ctx.stroke();
   }
+
+  R.evict();
+  return { pending, animated, lod };
 }
 
 const previewCache = new Map();

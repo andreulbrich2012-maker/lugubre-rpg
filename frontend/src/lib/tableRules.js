@@ -6,15 +6,21 @@ const cleanLimit = (value, int = false) => {
   if (!Number.isFinite(n) || n < 0) return null;
   return int ? Math.floor(n) : Math.round(n * 100) / 100;
 };
+// mesmo padrao do servidor: mesa sem limite salvo usa 30 kg e 9 itens (null salvo = sem limite)
+export const DEFAULT_INVENTORY = { maxWeight: 30, maxItems: 9 };
 function normalizeInventory(raw, keepMissing = false) {
   const r = raw && typeof raw === 'object' ? raw : {};
   const out = {};
   for (const [key, int] of [['maxWeight', false], ['maxItems', true]]) {
-    if (keepMissing && !(key in r)) continue;
+    if (!(key in r)) {
+      if (!keepMissing) out[key] = DEFAULT_INVENTORY[key];
+      continue;
+    }
     out[key] = cleanLimit(r[key], int);
   }
   return out;
 }
+const sheetRule = (value) => (value === 'jogador' ? 'jogador' : 'mestre');
 
 export function normalizeRules(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
@@ -25,7 +31,7 @@ export function normalizeRules(raw) {
       return [id, Object.keys(inv).length ? { ...rest, inventory: inv } : rest];
     }))
     : {};
-  return { move: r.move !== false, powers: r.powers !== false, pickup: r.pickup !== false, turn: r.turn || null, inventory: normalizeInventory(r.inventory), players };
+  return { move: r.move !== false, powers: r.powers !== false, pickup: r.pickup !== false, turn: r.turn || null, inventory: normalizeInventory(r.inventory), sheet: { stats: sheetRule(r.sheet?.stats), powers: sheetRule(r.sheet?.powers) }, players };
 }
 
 export function playerRights(rules, userId) {
@@ -42,4 +48,9 @@ export function inventoryLimits(rules, userId) {
     maxWeight: 'maxWeight' in own ? own.maxWeight : r.inventory.maxWeight,
     maxItems: 'maxItems' in own ? own.maxItems : r.inventory.maxItems
   };
+}
+
+// Quem mexe na ficha compartilhada: { stats, powers } com 'mestre' ou 'jogador'.
+export function sheetRights(rules) {
+  return normalizeRules(rules).sheet;
 }

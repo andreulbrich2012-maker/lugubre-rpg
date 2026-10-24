@@ -349,16 +349,16 @@ describe.skipIf(!hasDb)('API v2 com Postgres', () => {
 
     // limites do mestre: peso (armadura de placas pesa 20 kg) e quantidade de itens
     const startWeight = (await sheet()).inventory.reduce((sum, it) => sum + Number(it.weight || 0) * Number(it.quantity ?? 1), 0);
-    await master.api.put(`${base()}/rules`, { inventory: { maxWeight: Math.floor(startWeight) + 5 } }).expect(200);
+    await master.api.put(`${base()}/rules`, { inventory: { maxWeight: Math.floor(startWeight) + 5, maxItems: null } }).expect(200);
     expect((await player.api.get(`${base()}/rules`).expect(200)).body.inventory).toEqual({ maxWeight: Math.floor(startWeight) + 5, maxItems: null });
     expect((await pick({ itemId: 'placas' }).expect(409)).body.message).toBe(`Mochila cheia: passa do peso máximo (${Math.floor(startWeight) + 5} kg) que o mestre definiu.`);
-    await master.api.put(`${base()}/rules`, { inventory: { maxItems: startCount }, players: { [player.user.id]: { inventory: { maxWeight: 1000 } } } }).expect(200);
+    await master.api.put(`${base()}/rules`, { inventory: { maxItems: startCount, maxWeight: null }, players: { [player.user.id]: { inventory: { maxWeight: 1000 } } } }).expect(200);
     expect((await pick({ itemId: 'placas' }).expect(409)).body.message).toBe(`Mochila cheia: passa do máximo de ${startCount} itens que o mestre definiu.`);
     // dinheiro de dentro da mochila nao ocupa espaco: vai para a bolsa
     const { body: coins } = await pick({ itemId: 'mochila', contentId: 'moedas' }).expect(201);
     expect(coins.received).toMatchObject({ kind: 'dracmas', dracmas: 12 });
     // excecao do jogador: sem limite de itens so para ele
-    await master.api.put(`${base()}/rules`, { inventory: { maxItems: startCount }, players: { [player.user.id]: { inventory: { maxItems: null } } } }).expect(200);
+    await master.api.put(`${base()}/rules`, { inventory: { maxItems: startCount, maxWeight: null }, players: { [player.user.id]: { inventory: { maxItems: null } } } }).expect(200);
     const { body: armor } = await pick({ itemId: 'placas' }).expect(201);
     expect(armor.received).toMatchObject({ kind: 'item', name: 'Armadura de placas', weight: 20 });
 
@@ -524,5 +524,94 @@ describe.skipIf(!hasDb)('API v2 com Postgres', () => {
     await seedRules(pool, markdown, { force: true });
     expect((await request(app).get('/api/rules/caos')).body.body_md).not.toContain('Nota do admin.');
     await admin.put('/api/admin/rules-meta', { version: '0.5 Beta' }).expect(200);
+  });
+  it('mestre edita a ficha compartilhada: vitais, atributos, inventario, mochila e permissoes', async () => {
+    const url = `${base()}/master/characters/${playerCharacter.id}`;
+    const { body: overview } = await master.api.get(`${base()}/master/characters`).expect(200);
+    expect(overview.find((c) => c.id === playerCharacter.id)).toMatchObject({ character_name: 'Heroína V2', life_max: 30 });
+    await player.api.get(`${base()}/master/characters`).expect(403);
+
+    const { body: start } = await player.api.get(`${base()}/events`).expect(200);
+    const { body: edited } = await master.api.patch(url, { lifeMax: 40, lifeCurrent: 35, attributes: { forca: 5, inventado: 9 }, level: 3, conditions: ['Envenenado'], notes: 'Deve 10 dracmas', wallet: { gold: 2 } }).expect(200);
+    expect(edited.character).toMatchObject({ life_max: 40, life_current: 35, level: 3, conditions: ['Envenenado'], notes: 'Deve 10 dracmas', wallet_total_dracmas: 1000 });
+    expect(edited.character.attributes.forca).toBe(5);
+    expect(edited.character.attributes).not.toHaveProperty('inventado');
+    expect((await master.api.patch(url, { lifeCurrent: 999 }).expect(200)).body.character.life_current).toBe(40);
+    const playerEvents = await eventsAfter(player.api, start.cursor);
+    expect(playerEvents.some((ev) => ev.type === 'character:updated' && ev.payload.characterId === playerCharacter.id)).toBe(true);
+    expect(playerEvents.find((ev) => ev.type === 'character:master-edit').payload.summary).toMatch(/vida/);
+    const { body: own } = await player.api.get(`/api/characters/${playerCharacter.id}`).expect(200);
+    expect(own.life_max).toBe(40);
+
+    // inventario: dar, guardar na mochila, tirar, editar, remover parte e tudo
+    const { body: bag } = await master.api.post(`${url}/inventory`, { name: 'Mochila de couro', container: true, weight: 1 }).expect(201);
+    const { body: rope } = await master.api.post(`${url}/inventory`, { name: 'Corda', quantity: 3 }).expect(201);
+    expect(rope.item.weight).toBeGreaterThan(0); // peso sugerido pelo nome
+    let { body: moved } = await master.api.post(`${url}/inventory/${rope.item.id}/move`, { containerId: bag.item.id }).expect(200);
+    let inv = moved.character.inventory;
+    expect(inv.find((it) => it.id === bag.item.id).contents.map((it) => it.id)).toEqual([rope.item.id]);
+    expect(inv.some((it) => it.id === rope.item.id)).toBe(false);
+    await master.api.post(`${url}/inventory/${bag.item.id}/move`, { containerId: bag.item.id }).expect(409);
+    const { body: put } = await master.api.put(`${url}/inventory/${rope.item.id}`, { quantity: 5 }).expect(200);
+    expect(put.character.inventory.find((it) => it.id === bag.item.id).contents[0]).toMatchObject({ name: 'Corda', quantity: 5 });
+    ({ body: moved } = await master.api.post(`${url}/inventory/${rope.item.id}/move`, { containerId: null }).expect(200));
+    inv = moved.character.inventory;
+    expect(inv.find((it) => it.id === bag.item.id).contents).toEqual([]);
+    expect(inv.find((it) => it.id === rope.item.id).quantity).toBe(5);
+    expect((await master.api.del(`${url}/inventory/${rope.item.id}?quantity=2`).expect(200)).body.character.inventory.find((it) => it.id === rope.item.id).quantity).toBe(3);
+    const { body: removed } = await master.api.del(`${url}/inventory/${rope.item.id}`).expect(200);
+    expect(removed.character.inventory.some((it) => it.id === rope.item.id)).toBe(false);
+    await master.api.del(`${url}/inventory/nao-existe`).expect(404);
+
+    // limite da mesa: o mestre passa por cima, mas recebe aviso
+    await master.api.put(`${base()}/rules`, { inventory: { maxItems: 1 } }).expect(200);
+    const { body: over } = await master.api.post(`${url}/inventory`, { name: 'Tocha' }).expect(201);
+    expect(over.warning).toMatch(/acima do limite/);
+    await master.api.put(`${base()}/rules`, {}).expect(200);
+    await master.api.del(`${url}/inventory/${over.item.id}`).expect(200);
+    await master.api.del(`${url}/inventory/${bag.item.id}`).expect(200);
+
+    // ataques
+    const { body: withAttack } = await master.api.post(`${url}/powers`, { type: 'attacks', name: 'Mordida', damage: '1d6' }).expect(201);
+    const attack = withAttack.character.attacks.find((p) => p.name === 'Mordida');
+    expect((await master.api.put(`${url}/powers/attacks/${attack.id}`, { damage: '2d6' }).expect(200)).body.character.attacks.find((p) => p.id === attack.id).damage).toBe('2d6');
+    await master.api.del(`${url}/powers/attacks/${attack.id}`).expect(200);
+
+    // pontos rapidos (varios de uma vez, delta relativo e limitado ao maximo)
+    const { body: points } = await master.api.post(`${base()}/master/points`, { characterIds: [playerCharacter.id], vital: 'life', delta: -5 }).expect(200);
+    expect(points[0].life_current).toBe(35);
+    expect((await master.api.post(`${base()}/master/points`, { characterIds: [playerCharacter.id], vital: 'mana', delta: 999 }).expect(200)).body[0].mana).toBe(10);
+    await player.api.post(`${base()}/master/points`, { characterIds: [playerCharacter.id], vital: 'life', delta: 1 }).expect(403);
+
+    // regra da mesa: com 'mestre' (padrao) o dono nao mexe em vitais nem poderes da ficha compartilhada
+    expect((await player.api.get(`${base()}/rules`).expect(200)).body.sheet).toEqual({ stats: 'mestre', powers: 'mestre' });
+    expect((await player.api.patch(`/api/characters/${playerCharacter.id}/play`, { lifeCurrent: 1 }).expect(403)).body.message).toBe('Só o mestre mexe na vida, mana e sanidade nesta campanha.');
+    await player.api.patch(`${base()}/characters/${playerCharacter.id}/vitals`, { life_current: 1 }).expect(403);
+    await player.api.post(`/api/characters/${playerCharacter.id}/powers`, { type: 'attacks', name: 'Soco', damage: '1d4' }).expect(403);
+    // lancar uma magia na mesa ainda gasta a mana dela
+    await master.api.post(`${url}/powers`, { type: 'spells', name: 'Faísca', damage: '1d4', manaCost: 2 }).expect(201);
+    expect((await player.api.patch(`${base()}/characters/${playerCharacter.id}/vitals`, { mana_current: 8, spell: 'Faísca' }).expect(200)).body.mana_current).toBe(8);
+    await player.api.patch(`${base()}/characters/${playerCharacter.id}/vitals`, { mana_current: 7, spell: 'Faísca' }).expect(403);
+    await player.api.patch(`/api/characters/${playerCharacter.id}/play`, { wallet: { bronze: 3 } }).expect(200); // o resto continua livre
+    await master.api.put(`${base()}/rules`, { sheet: { stats: 'jogador', powers: 'jogador' } }).expect(200);
+    expect((await player.api.patch(`/api/characters/${playerCharacter.id}/play`, { lifeCurrent: 20 }).expect(200)).body.life_current).toBe(20);
+    const { body: punched } = await player.api.post(`/api/characters/${playerCharacter.id}/powers`, { type: 'attacks', name: 'Soco', damage: '1d4' }).expect(201);
+    await player.api.del(`/api/characters/${playerCharacter.id}/powers/attacks/${punched.attacks.find((p) => p.name === 'Soco').id}`).expect(200);
+    await master.api.put(`${base()}/rules`, {}).expect(200);
+    expect((await master.api.get(`${base()}/rules`).expect(200)).body.inventory).toEqual({ maxWeight: 30, maxItems: 9 });
+
+    // historico do mestre
+    const { body: log } = await master.api.get(`${url}/log`).expect(200);
+    expect(log.length).toBeGreaterThan(5);
+
+    // proibido: quem nao e mestre (nem o dono por esta rota) e ficha nao compartilhada
+    await other.api.patch(url, { lifeCurrent: 1 }).expect(403);
+    await player.api.patch(url, { lifeCurrent: 1 }).expect(403);
+    await other.api.post(`${url}/inventory`, { name: 'Pedra' }).expect(403);
+    const hidden = await createCharacter(player.api, 'Ficha escondida');
+    await master.api.patch(`${base()}/master/characters/${hidden.id}`, { lifeCurrent: 1 }).expect(403);
+    await master.api.post(`${base()}/master/characters/${hidden.id}/inventory`, { name: 'Pedra' }).expect(403);
+    expect((await player.api.get(`/api/characters/${hidden.id}`).expect(200)).body.life_current).toBe(30);
+    await master.api.patch(url, { lifeMax: 30, lifeCurrent: 30, level: 1, conditions: [], notes: '', wallet: {} }).expect(200);
   });
 });

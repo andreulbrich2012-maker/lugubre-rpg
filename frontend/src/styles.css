@@ -440,3 +440,13 @@ button.d20:not(:disabled):hover { filter: drop-shadow(0 0 22px rgb(var(--light) 
   font-weight: 700;
 }
 @media (prefers-reduced-motion: reduce) { .vtt-gm-cursor { transition: none; } }
+
+/* mapa-item: foto do mapa sobre pergaminho, pinos numerados e balao ao clicar */
+.worldmap-parchment { background: radial-gradient(ellipse at center, #e8d6ae 0%, #d6bf8e 60%, #b8995e 100%); border: 4px solid #5a3e22; border-radius: 6px; box-shadow: 0 0 0 3px #2a1c14, inset 0 0 60px rgb(90 60 20 / .55), 0 30px 80px rgb(0 0 0 / .7); }
+.worldmap-photo { border: 6px solid #6a4a2a; box-shadow: 0 0 0 2px #2a1c14, 0 10px 28px rgb(40 24 10 / .55); filter: sepia(.18) saturate(.92) contrast(1.04); }
+.worldmap-vignette { background: radial-gradient(ellipse at center, transparent 55%, rgb(60 36 14 / .45) 100%); }
+.worldmap-name { font-family: var(--font-display, serif); font-size: clamp(1rem, 2vw, 1.6rem); color: #3a2a1c; background: #e8d6ae; border: 2px solid #6a4a2a; padding: .1rem .7rem; box-shadow: 0 3px 10px rgb(0 0 0 / .45); letter-spacing: .06em; white-space: nowrap; z-index: 4; }
+.worldmap-num { display: inline-grid; place-items: center; min-width: 1.5rem; height: 1.5rem; border-radius: 999px; background: #2a1c14; color: #f2e0b4; font-weight: 700; font-size: .75rem; border: 2px solid #b8894a; }
+.worldmap-pin { position: absolute; transform: translate(-50%, -50%); z-index: 5; min-width: 1.75rem; height: 1.75rem; padding: 0 .3rem; border-radius: 999px; background: #2a1c14; color: #f2e0b4; font-weight: 800; font-size: .8rem; border: 2px solid #d6a65f; box-shadow: 0 2px 6px rgb(0 0 0 / .6); cursor: pointer; transition: transform .12s; }
+.worldmap-pin.is-active, .worldmap-pin:hover { background: #d6a65f; color: #2a1c14; transform: translate(-50%, -50%) scale(1.18); }
+.worldmap-note { position: absolute; z-index: 6; width: 260px; padding: .6rem .8rem; background: #efe0bb; color: #3a2a1c; border: 2px solid #7a5e3a; border-radius: 4px; box-shadow: 0 8px 24px rgb(0 0 0 / .5); }

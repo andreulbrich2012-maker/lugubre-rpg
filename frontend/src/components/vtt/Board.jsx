@@ -4,8 +4,9 @@ import TileMapCanvas from './TileMapCanvas';
 import Crack from '../glass/Crack';
 import { buildingAt, isSolid, PICKUP_RANGE, tokenBuilding, tokenItemDistance } from '../../lib/tiles/format';
 import { detectBuildings } from '../../lib/tiles/compose';
-import { buildingPixels, doorCol, MATERIALS, ROOF_STYLE_OPTIONS, DESIGN_BY_ID } from '../../lib/buildings';
+import { buildingPixels, doorCell, MATERIALS, ROOF_STYLE_OPTIONS, DESIGN_BY_ID, FACINGS } from '../../lib/buildings';
 import { getTile } from '../../lib/tiles/catalog';
+import { chunkLayout, pickLod } from '../../lib/tiles/chunks';
 import AvatarSprite from '../avatar/AvatarSprite';
 import FxLayer from '../fx/FxLayer';
 import ItemIcon from '../icons/ItemIcon';
@@ -16,17 +17,61 @@ import { monsterLook } from '../../lib/monsters/classify';
 // Construcao 3D (estilo Stardew): fachada + telhado em perspectiva, desenhada uma vez no tamanho
 // nativo (16 px/celula) e ampliada nitida pelo CSS. z-index pela linha de baixo da pegada:
 // token atras (ao norte) fica escondido pela casa, token na frente passa por cima.
-function House({ building, tiles, light, open, cell }) {
+// Pixels das casas guardados fora do componente (mapa grande: a casa sai e volta da vista ao
+// andar e nao precisa ser redesenhada). LRU pequeno: o resto refaz quando voltar.
+const HOUSE_CACHE = new Map();
+const HOUSE_CACHE_MAX = 400;
+function housePixels(building, tiles, light) {
+  let byTiles = HOUSE_CACHE.get(building);
+  const hit = byTiles && byTiles.tiles === tiles && byTiles.light === light ? byTiles.img : null;
+  if (hit) { HOUSE_CACHE.delete(building); HOUSE_CACHE.set(building, byTiles); return hit; }
+  const img = buildingPixels(building, tiles, { light });
+  HOUSE_CACHE.delete(building);
+  HOUSE_CACHE.set(building, { tiles, light, img });
+  if (HOUSE_CACHE.size > HOUSE_CACHE_MAX) HOUSE_CACHE.delete(HOUSE_CACHE.keys().next().value);
+  return img;
+}
+
+function peekHouse(building, tiles, light) {
+  const e = HOUSE_CACHE.get(building);
+  return e && e.tiles === tiles && e.light === light ? e.img : null;
+}
+// Fila de casas a desenhar: no maximo ~10 ms por vez (mapa grande: centenas de casas entram na
+// vista de uma vez ao aproximar; sem fila a tela travava quase 1 s).
+const houseQueue = [];
+let houseTimer = 0;
+function pumpHouses() {
+  houseTimer = 0;
+  const t = performance.now();
+  while (houseQueue.length && performance.now() - t < 10) houseQueue.shift()();
+  if (houseQueue.length) houseTimer = setTimeout(pumpHouses, 0);
+}
+function requestHouse(job) {
+  houseQueue.push(job);
+  if (!houseTimer) houseTimer = setTimeout(pumpHouses, 0);
+  return () => { const i = houseQueue.indexOf(job); if (i >= 0) houseQueue.splice(i, 1); };
+}
+
+function House({ building, tiles, light, open, cell, lazy = false }) {
   const ref = useRef(null);
-  const img = useMemo(() => buildingPixels(building, tiles, { light }), [building, tiles, light]);
+  const [lazyImg, setLazyImg] = useState(() => (lazy ? peekHouse(building, tiles, light) : null));
+  const eager = useMemo(() => (lazy ? null : housePixels(building, tiles, light)), [lazy, building, tiles, light]);
+  useEffect(() => {
+    if (!lazy) return undefined;
+    const hit = peekHouse(building, tiles, light);
+    if (hit) { setLazyImg(hit); return undefined; }
+    return requestHouse(() => setLazyImg(housePixels(building, tiles, light)));
+  }, [lazy, building, tiles, light]);
+  const img = lazy ? lazyImg : eager;
   useEffect(() => {
     const c = ref.current;
-    if (!c) return;
+    if (!c || !img) return;
     c.width = img.width;
     c.height = img.height;
     c.getContext('2d').putImageData(new ImageData(img.data, img.width, img.height), 0, 0);
   }, [img]);
   const k = cell / 16;
+  if (!img) return null;
   return (
     <div
       className={`vtt-house ${open ? 'is-open' : ''}`}
@@ -92,6 +137,20 @@ export default function Board({
     }
   }, []);
   const [view, setView] = useState({ x: 0, y: 0, z: 1 });
+  // tamanho da area da mesa (para saber o que aparece: mapa grande desenha so a vista)
+  const [vsize, setVsize] = useState({ w: 1200, h: 800 });
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return undefined;
+    const read = () => setVsize((cur) => (cur.w === el.clientWidth && cur.h === el.clientHeight ? cur : { w: el.clientWidth, h: el.clientHeight }));
+    read();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // zoom minimo: mapa enorme (1000x1000) precisa caber inteiro na tela
+  const minZoom = Math.min(0.15, Math.min(vsize.w / width, vsize.h / height) * 0.9);
   const [local, setLocal] = useState({});
   const localRef = useRef(local);
   localRef.current = local;
@@ -188,9 +247,8 @@ export default function Board({
       // porta de uma construcao com interior: entra na outra cena (o servidor confere tranca e regras)
       for (const b of buildings) {
         if (!b.interior) continue;
-        const dx = b.x + doorCol(b, scene.tiles);
-        const dy = b.y + b.h - 1;
-        if (Math.hypot(dx + 0.5 - cx, dy + 0.5 - cy) > 1.6) continue;
+        const dc = doorCell(b, scene.tiles);
+        if (Math.hypot(dc.x + 0.5 - cx, dc.y + 0.5 - cy) > 1.6) continue;
         e.preventDefault();
         if (b.locked && !isMaster) { setNotice(`${b.name || 'Construção'}: a porta está trancada.`); return; }
         onEnterBuilding?.(b, isMaster ? myToken.id : undefined);
@@ -253,9 +311,12 @@ export default function Board({
   const fit = useCallback(() => {
     const el = viewportRef.current;
     if (!el || !width) return;
-    const z = clamp(Math.min(el.clientWidth / width, el.clientHeight / height), 0.2, 2);
+    const fitZ = Math.min(el.clientWidth / width, el.clientHeight / height);
+    // mapa de ate 200 celulas abre como antes (zoom minimo 0.2); maior que isso cabe inteiro
+    const huge = width / cell > 200 || height / cell > 200;
+    const z = clamp(fitZ, huge ? Math.min(0.2, fitZ) : 0.2, 2);
     setView({ z, x: (el.clientWidth - width * z) / 2, y: (el.clientHeight - height * z) / 2 });
-  }, [width, height]);
+  }, [width, height, cell]);
   useEffect(() => { fit(); }, [scene?.id, fit]);
 
   // Camera do modo jogo: cada pixel da arte vira 4 px de tela (inteiro = nitido) e o
@@ -408,7 +469,7 @@ export default function Board({
     const mx = event.clientX - rect.left;
     const my = event.clientY - rect.top;
     setView((v) => {
-      const z = clamp(v.z * (event.deltaY < 0 ? 1.12 : 1 / 1.12), 0.15, 4);
+      const z = clamp(v.z * (event.deltaY < 0 ? 1.12 : 1 / 1.12), minZoom, 4);
       return { z, x: mx - ((mx - v.x) / v.z) * z, y: my - ((my - v.y) / v.z) * z };
     });
   }
@@ -418,7 +479,7 @@ export default function Board({
     const mx = el.clientWidth / 2;
     const my = el.clientHeight / 2;
     setView((v) => {
-      const z = clamp(v.z * f, 0.15, 4);
+      const z = clamp(v.z * f, minZoom, 4);
       return { z, x: mx - ((mx - v.x) / v.z) * z, y: my - ((my - v.y) / v.z) * z };
     });
   }
@@ -479,6 +540,24 @@ export default function Board({
     if (pos !== d.start) onMove(d.token, pos.x, pos.y, { final: true });
   }
 
+  // O que aparece na tela (px do mapa) + folga: itens, tokens e casas fora disso nem sao montados
+  // (mapa de 1000x1000 com milhares de casas). De muito longe as casas viram blocos no proprio canvas.
+  const vis = { x: -view.x / view.z, y: -view.y / view.z, w: vsize.w / view.z, h: vsize.h / view.z };
+  const margin = Math.max(cell * 4, Math.max(vis.w, vis.h) * 0.25);
+  const inView = (x0, y0, x1, y1) => x1 > vis.x - margin && x0 < vis.x + vis.w + margin && y1 > vis.y - margin && y0 < vis.y + vis.h + margin;
+  const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+  const farAway = Boolean(isTiles && pickLod(cell * view.z * dpr, chunkLayout(scene.tiles.cols, scene.tiles.rows).single) === 'overview');
+  const shownItems = visibleItems.filter((it) => inView(it.x * cell, it.y * cell, (it.x + 1) * cell, (it.y + 1) * cell));
+  // casas: o telhado sobe ate ~6 celulas acima da pegada
+  const shownBuildings = farAway ? [] : buildings.filter((b) => inView(b.x * cell, (b.y - 6) * cell, (b.x + b.w) * cell, (b.y + b.h) * cell));
+  const fxArea = width * height > 4096 * 4096 ? { x: vis.x - margin, y: vis.y - margin, w: vis.w + margin * 2, h: vis.h + margin * 2 } : undefined;
+  // de longe o pixel do efeito cresce (dobrando) para o canvas da janela nao passar de ~2048 px
+  let fxPixel;
+  if (fxArea) {
+    fxPixel = Math.max(1, cell / 16);
+    while (Math.max(fxArea.w, fxArea.h) / fxPixel > 2048) fxPixel *= 2;
+  }
+
   const reveals = scene?.fog_reveals || [];
   const fogOn = scene?.fog_enabled;
   const sortedTokens = useMemo(() => [...tokens].sort((a, b) => (a.kind === 'marker' ? 0 : 1) - (b.kind === 'marker' ? 0 : 1)), [tokens]);
@@ -500,7 +579,7 @@ export default function Board({
         <div ref={shakeRef} className="absolute inset-0">
         <div className="absolute left-0 top-0 origin-top-left" style={{ width, height, transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}>
           {isTiles ? (
-            <TileMapCanvas map={scene.tiles} cellSize={cell} showGrid={Boolean(scene.show_grid)} className="absolute inset-0" />
+            <TileMapCanvas map={scene.tiles} cellSize={cell} showGrid={Boolean(scene.show_grid)} viewport={vis} scale={view.z} buildingBlocks={farAway} className="absolute inset-0" />
           ) : scene?.map_url ? (
             <img src={scene.map_url} alt="" draggable={false} className="absolute inset-0 h-full w-full select-none object-fill" />
           ) : (
@@ -517,7 +596,7 @@ export default function Board({
             />
           )}
 
-          {visibleItems.map((it) => (
+          {shownItems.map((it) => (
             <button
               key={it.id}
               type="button"
@@ -533,6 +612,8 @@ export default function Board({
 
           {sortedTokens.map((t) => {
             const pos = local[t.id] || { x: t.x, y: t.y };
+            const keep = t.id === selectedId || t.id === myTokenId || t.id === activeTokenId || drag.current?.token?.id === t.id;
+            if (!keep && !inView(pos.x, pos.y, pos.x + (t.size || 1) * cell, pos.y + (t.size || 1) * cell)) return null;
             const hiddenInside = !isMaster && t.id !== myTokenId && isTiles && (() => {
               const b = tokenBuilding(tilesWithRoofs, { ...t, ...pos }, cell);
               return b && !roofOpen(b);
@@ -580,11 +661,11 @@ export default function Board({
             );
           })}
 
-          {buildings.map((b) => (
-            <House key={b.id} building={b} tiles={scene.tiles} light={scene.tiles.light || 'dia'} cell={cell} open={roofOpen(b)} />
+          {shownBuildings.map((b) => (
+            <House key={b.id} building={b} tiles={scene.tiles} light={scene.tiles.light || 'dia'} cell={cell} open={roofOpen(b)} lazy={buildings.length > 60} />
           ))}
 
-          <FxLayer ref={fxRef} width={width} height={height} cell={cell} onFrame={onFxFrame} className="pointer-events-none absolute left-0 top-0" style={{ zIndex: 900 }} />
+          <FxLayer ref={fxRef} width={width} height={height} cell={cell} area={fxArea} pixel={fxPixel} onFrame={onFxFrame} className="pointer-events-none absolute left-0 top-0" style={{ zIndex: 900 }} />
 
           {fogOn && (
             <svg className="pointer-events-none absolute inset-0" width={width} height={height} aria-hidden="true">
@@ -637,6 +718,11 @@ export default function Board({
                 </select>
               </label>
             </div>
+            <label className="mt-2 block text-xs text-mist">Porta virada para
+              <select className="field !mt-1 py-1 text-sm" value={b.facing || 'sul'} onChange={(e) => onPatchBuilding?.(b, { facing: e.target.value })}>
+                {FACINGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+            </label>
             <div className="mt-2 grid grid-cols-3 gap-2">
               {[['roof', 'Telhado'], ['wall', 'Parede'], ['accent', 'Detalhes']].map(([k, l]) => (
                 <label key={k} className="text-xs text-mist">{l}

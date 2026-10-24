@@ -7,11 +7,12 @@
 //  style: id de STYLES (styles.js), estilo global de cor do mapa}
 // Funcoes puras: sempre devolvem um mapa novo (o desfazer guarda as versoes antigas).
 import { DEFAULT_GROUND, EMPTY_OBJECT, getTile } from './catalog.js';
+import { DESIGN_BY_ID } from '../buildings/designs.js';
 import { STYLE_IDS } from './styles.js';
 import { roundKg, suggestWeight } from '../itemWeight.js';
 
 export const MIN_SIZE = 4;
-export const MAX_SIZE = 80;
+export const MAX_SIZE = 1000; // mapas grandes (vila, regiao, reino inteiro); 1 celula = 1 passo (~1,5 m). O render e em pedacos (render.js)
 export const LAYERS = ['ground', 'objects'];
 
 const emptyCode = (layer) => (layer === 'ground' ? DEFAULT_GROUND : EMPTY_OBJECT);
@@ -19,9 +20,9 @@ const clampSize = (n) => Math.min(MAX_SIZE, Math.max(MIN_SIZE, Math.round(Number
 // ASCII imprimivel + Latin-1 (codigos dos blocos novos: á, ç, Ô...).
 const PRINTABLE = /^[\x20-\x7e\u00a1-\u00ff]*$/;
 
-export const MAX_ITEMS = 60;
+export const MAX_ITEMS = 2000;
 export const MAX_CONTENTS = 30;
-export const MAX_BUILDINGS = 30;
+export const MAX_BUILDINGS = 3000;
 export const ITEM_CATEGORIES = ['Achados', 'Armas', 'Armaduras', 'Poções', 'Tesouro', 'Livros', 'Ingredientes', 'Outros'];
 export const ROOF_TYPES = ['telha', 'telha-azul', 'palha', 'palha-escura', 'ardosia', 'ardosia-verde', 'madeira', 'madeira-escura'];
 export const LIGHTS = ['dia', 'entardecer', 'noite'];
@@ -120,7 +121,10 @@ export function repairBuildings(list, cols, rows) {
   const buildings = [];
   const ids = new Set();
   let dropped = 0;
-  for (const raw of Array.isArray(list) ? list : []) {
+  for (const raw0 of Array.isArray(list) ? list : []) {
+    // projeto do catalogo: o tamanho vem do projeto (a IA so diz o canto e o id)
+    const design = DESIGN_BY_ID[String(raw0?.design ?? '').trim().toLowerCase()];
+    const raw = design ? { ...raw0, design: design.id, w: design.w, h: design.h, name: raw0.name || design.name } : raw0;
     const [x, y, w, h] = ['x', 'y', 'w', 'h'].map((k) => Math.floor(Number(raw?.[k])));
     const ok = x >= 0 && y >= 0 && w >= 3 && h >= 3 && x + w <= cols && y + h <= rows;
     if (!ok || buildings.length >= MAX_BUILDINGS) { dropped++; continue; }
@@ -130,7 +134,7 @@ export function repairBuildings(list, cols, rows) {
     const roof = String(raw.roof ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, '-');
     const b = { id, x, y, w, h, name: text(raw.name, 60) || 'Construção', roof: ROOF_TYPES.includes(roof) ? roof : 'telha' };
     // campos opcionais (fachada, porta, interior, projeto do catalogo e trocas do mestre)
-    for (const k of ['wall', 'design', 'material', 'roofStyle']) if (typeof raw[k] === 'string' && /^[a-z0-9-]{1,60}$/.test(raw[k])) b[k] = raw[k];
+    for (const k of ['wall', 'design', 'material', 'roofStyle', 'facing']) if (typeof raw[k] === 'string' && /^[a-z0-9-]{1,60}$/.test(raw[k])) b[k] = raw[k];
     if (typeof raw.locked === 'boolean') b.locked = raw.locked;
     if (typeof raw.interior === 'string') b.interior = raw.interior;
     if (raw.door && Number.isInteger(raw.door.x) && Number.isInteger(raw.door.y)) b.door = { x: raw.door.x, y: raw.door.y };
@@ -164,13 +168,13 @@ export function emptyMap(cols = 16, rows = 12) {
 export function cloneMap(map) {
   return {
     cols: map.cols, rows: map.rows, layers: { ground: [...map.layers.ground], objects: [...map.layers.objects] },
-    items: (map.items || []).map((it) => ({ ...it })), buildings: (map.buildings || []).map((b) => ({ ...b })),
+    items: (map.items || []).map((it) => ({ ...it })), buildings: (map.buildings || []).map((b) => ({ ...b })), ...(map.pois ? { pois: map.pois.map((p) => ({ ...p })) } : {}),
     ...ambience(map)
   };
 }
 
 export function serializeMap(map) {
-  return JSON.stringify({ cols: map.cols, rows: map.rows, layers: map.layers, items: map.items || [], buildings: map.buildings || [], ...ambience(map) });
+  return JSON.stringify({ cols: map.cols, rows: map.rows, layers: map.layers, items: map.items || [], buildings: map.buildings || [], ...(map.pois?.length ? { pois: map.pois } : {}), ...ambience(map) });
 }
 
 export function validateMap(map) {
@@ -209,6 +213,26 @@ export function validateMap(map) {
 // Conserta qualquer coisa parecida com um mapa (IA, colagem, versao antiga):
 // corta/completa linhas, troca codigo desconhecido pelo vazio e move bloco que veio
 // na camada errada (IA costuma por parede em "objects"). Devolve {map, warnings}.
+// Pontos principais do mapa (legenda numerada do mapa-item): dentro do mapa, nome curto, max 99.
+export function repairPois(list, cols, rows) {
+  const out = [];
+  const ids = new Set();
+  for (const raw of Array.isArray(list) ? list : []) {
+    const x = Math.floor(Number(raw?.x)); const y = Math.floor(Number(raw?.y));
+    const name = String(raw?.name ?? raw?.nome ?? '').trim().slice(0, 60);
+    if (!name || !(x >= 0 && y >= 0 && x < cols && y < rows) || out.length >= 99) continue;
+    let id = /^[A-Za-z0-9_-]{1,40}$/.test(String(raw?.id ?? '')) ? String(raw.id) : `p${out.length + 1}`;
+    while (ids.has(id)) id = `p${out.length + 1}-${ids.size}`;
+    ids.add(id);
+    const p = { id, x, y, name };
+    const note = String(raw?.note ?? raw?.description ?? raw?.descricao ?? '').trim().slice(0, 300);
+    if (note) p.note = note;
+    if (raw?.hidden === true) p.hidden = true;
+    out.push(p);
+  }
+  return out;
+}
+
 export function repairMap(input, { cols, rows } = {}) {
   const warnings = [];
   const toRows = (v) => (Array.isArray(v) ? v.map((r) => String(r ?? '')) : typeof v === 'string' ? v.split(/\r?\n/) : []);
@@ -251,7 +275,15 @@ export function repairMap(input, { cols, rows } = {}) {
   const bd = repairBuildings(input?.buildings, c, r);
   map.items = it.items;
   map.buildings = bd.buildings;
+  // construcao do catalogo ocupa a pegada: objetos embaixo dela saem
+  if (bd.buildings.some((b) => b.design)) {
+    const oo = map.layers.objects.map((row) => [...row]);
+    for (const b of bd.buildings) if (b.design) for (let y = b.y; y < b.y + b.h; y++) for (let x = b.x; x < b.x + b.w; x++) oo[y][x] = EMPTY_OBJECT;
+    map.layers.objects = oo.map((row) => row.join(''));
+  }
   Object.assign(map, ambience(input));
+  const pois = repairPois(input?.pois, c, r);
+  if (pois.length) map.pois = pois;
   if (it.dropped) warnings.push(`${it.dropped} item(ns) fora do mapa ou sem nome foram descartados.`);
   if (bd.dropped) warnings.push(`${bd.dropped} construção(ões) fora do mapa ou pequenas demais foram descartadas.`);
   return { map, warnings };
@@ -267,6 +299,7 @@ export function resizeMap(map, cols, rows) {
     cols: c, rows: r, layers: { ground: fit(map.layers.ground, 'ground'), objects: fit(map.layers.objects, 'objects') },
     items: (map.items || []).filter((it) => it.x < c && it.y < r),
     buildings: (map.buildings || []).filter((b) => b.x + b.w <= c && b.y + b.h <= r),
+    ...(map.pois ? { pois: map.pois.filter((p) => p.x < c && p.y < r) } : {}),
     ...ambience(map)
   };
 }

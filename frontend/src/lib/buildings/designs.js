@@ -234,11 +234,31 @@ export function buildingSpec(b) {
   if (b.roofStyle && b.roofStyle !== d.defaults.roofStyle && STYLE_ROOF_COLOR[b.roofStyle]) colors.roof = STYLE_ROOF_COLOR[b.roofStyle];
   if (b.material && b.material !== d.defaults.material) colors.wall = MATERIAL_WALL_COLOR[b.material] || PALETTES[0].wall;
   Object.assign(colors, b.colors || {});
-  return {
+  return orient({
     ...d.spec,
     w: d.w,
     h: d.h,
     colors,
     volumes: (d.spec.volumes || []).map((v, i) => ({ ...v, ...(b.door && i === d.spec.volumes.findIndex((x) => x.door !== false) ? { doorAt: (b.door.x - b.x) * S + 7.5 - v.x } : {}), material: v.material === 'vidro' ? 'vidro' : material, roofStyle: v.roofStyle === 'vidro' ? 'vidro' : roofStyle }))
-  };
+  }, b.facing);
+}
+
+// Para onde a porta da construcao esta virada. A camera e sempre de cima-sul (3/4), entao:
+// sul = porta na fachada; norte = fachada sem porta (a porta fica atras); leste/oeste = porta
+// no canto da fachada daquele lado e o telhado "gira" (frontal vira empena e vice-versa).
+export const FACINGS = [['sul', 'Sul (para baixo)'], ['norte', 'Norte (para cima)'], ['leste', 'Leste (direita)'], ['oeste', 'Oeste (esquerda)']];
+export function orient(spec, facing) {
+  if (!facing || facing === 'sul' || !spec?.volumes?.length) return spec;
+  const di = spec.volumes.findIndex((v) => v.door !== false);
+  const volumes = spec.volumes.map((v, i) => {
+    const out = { ...v };
+    if (facing === 'norte') { out.door = false; out.porch = 0; }
+    else if (i === di) { out.doorAt = facing === 'leste' ? v.w - 11 : 10; out.porch = 0; }
+    if (facing !== 'norte' && v.w <= 112 && (v.roof === 'frente' || v.roof === 'empena')) {
+      out.roof = v.roof === 'frente' ? 'empena' : 'frente';
+      if (out.roof === 'empena') out.pitch = out.pitch || 0.7;
+    }
+    return out;
+  });
+  return { ...spec, volumes };
 }

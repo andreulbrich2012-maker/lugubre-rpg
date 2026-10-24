@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check, Copy, Eraser, Gem, Grid3x3, Hand, Home, PaintBucket, Paintbrush,
-  Building2, Pipette, Redo2, RotateCcw, Save, Sparkles, Square, Trash2, Undo2, Wrench, X, ZoomIn, ZoomOut
+  Building2, ChevronDown, ChevronUp, MapPin, Pipette, Redo2, RotateCcw, Save, Sparkles, Square, Trash2, Undo2, Wrench, X, ZoomIn, ZoomOut
 } from 'lucide-react';
 import TileMapCanvas from './TileMapCanvas';
+import useScrollView from './useScrollView';
 import ContainerContents from './ContainerContents';
 import { TILES, CATEGORIES, DEFAULT_GROUND, EMPTY_OBJECT, getTile } from '../../lib/tiles/catalog';
 import { renderTilePreview } from '../../lib/tiles/render';
@@ -15,12 +16,16 @@ import {
 import { DESIGN_BY_ID } from '../../lib/buildings';
 import BuildingSprite from '../buildings/BuildingSprite';
 import DesignPicker from '../buildings/DesignPicker';
+import MapPreview from '../buildings/MapPreview';
+import { generateVillage, VILLAGE_SIZES } from '../../lib/buildings/village';
 import { ROOFS, ROOF_LABEL } from '../../lib/tiles/roofs';
 import { STYLES } from '../../lib/tiles/styles';
-import { buildMapPrompt, parseMapResponse } from '../../lib/tiles/aiPrompt';
+import { parseMapResponse } from '../../lib/tiles/aiPrompt';
+import { buildPlanPrompt } from '../../lib/tiles/planPrompt';
 
 const HISTORY = 50;
-const ZOOMS = [16, 24, 32, 40, 48, 64];
+// 2-12: mapa grande (ate 1000x1000) inteiro na tela; de longe vira miniatura (cor media por celula)
+const ZOOMS = [2, 4, 8, 12, 16, 24, 32, 40, 48, 64];
 const TOOLS = [
   { id: 'brush', label: 'Pincel', icon: Paintbrush },
   { id: 'bucket', label: 'Balde', icon: PaintBucket },
@@ -30,13 +35,15 @@ const TOOLS = [
   { id: 'design', label: 'Construção pronta (catálogo)', icon: Building2 },
   { id: 'building', label: 'Construção (arraste um retângulo)', icon: Home },
   { id: 'item', label: 'Colocar item', icon: Gem },
+  { id: 'poi', label: 'Marcar ponto principal', icon: MapPin },
   { id: 'pan', label: 'Mover a vista', icon: Hand }
 ];
-const TABS = [['pintar', 'Pintar'], ['construcoes', 'Construções'], ['itens', 'Itens'], ['ambiente', 'Ambiente']];
+const TABS = [['pintar', 'Pintar'], ['construcoes', 'Construções'], ['itens', 'Itens'], ['pontos', 'Pontos'], ['ambiente', 'Ambiente']];
 const TAB_TOOLS = {
   pintar: ['brush', 'bucket', 'rect', 'eraser', 'picker', 'pan'],
   construcoes: ['design', 'building', 'pan'],
   itens: ['item', 'pan'],
+  pontos: ['poi', 'pan'],
   ambiente: ['pan']
 };
 
@@ -53,10 +60,12 @@ function YesNo({ label, value, onChange }) {
   );
 }
 
+// o plano da IA vem em porcentagem: o tamanho so decide quantas celulas (vila cabe bem do medio para cima)
 const SIZES = [
-  { id: 'p', label: 'Pequeno', cols: 16, rows: 12 },
-  { id: 'm', label: 'Médio', cols: 24, rows: 16 },
-  { id: 'g', label: 'Grande', cols: 32, rows: 22 }
+  { id: 'p', label: 'Pequeno', cols: 32, rows: 24 },
+  { id: 'm', label: 'Médio', cols: 64, rows: 48 },
+  { id: 'g', label: 'Grande', cols: 100, rows: 80 },
+  { id: 'e', label: 'Enorme', cols: 140, rows: 120 }
 ];
 const EXAMPLES = [
   'Taverna à beira da estrada',
@@ -123,9 +132,12 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
   const [size, setSize] = useState({ cols: map.cols, rows: map.rows });
   const [rect, setRect] = useState(null);
   const stroke = useRef(null);
+  // parte visivel da area com rolagem: o mapa grande so desenha (e so monta casas/itens) ali
+  const [scrollRef, scrollView] = useScrollView();
 
   const [description, setDescription] = useState('');
   const [aiSize, setAiSize] = useState('m');
+  const [fromImage, setFromImage] = useState(false);
   const [aiError, setAiError] = useState('');
   const [aiInfo, setAiInfo] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -137,12 +149,14 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
   const [aiItems, setAiItems] = useState(true);
   const [aiMonsters, setAiMonsters] = useState(false);
   const [monsters, setMonsters] = useState([]);
+  const [vopt, setVopt] = useState({ size: 'vila', seed: 1, river: true, lake: true, farm: true, cemetery: true, style: 'padrao' });
+  const village = useMemo(() => (mode === 'vila' ? generateVillage(vopt) : null), [mode, vopt]);
   // cada aba liga a ferramenta certa: menos botoes na tela
-  const goTab = (t) => { setTab(t); setTool(t === 'construcoes' ? 'design' : t === 'itens' ? 'item' : 'brush'); };
+  const goTab = (t) => { setTab(t); setTool(t === 'construcoes' ? 'design' : t === 'itens' ? 'item' : t === 'pontos' ? 'poi' : 'brush'); };
 
   const code = selected[layer];
   const aiDims = SIZES.find((x) => x.id === aiSize);
-  const prompt = useMemo(() => buildMapPrompt({ description, cols: aiDims.cols, rows: aiDims.rows, items: aiItems, monsters: aiMonsters }), [description, aiDims, aiItems, aiMonsters]);
+  const prompt = useMemo(() => buildPlanPrompt({ description, fromImage, items: aiItems, monsters: aiMonsters }), [description, fromImage, aiItems, aiMonsters]);
   const groups = useMemo(() => CATEGORIES
     .map((cat) => [cat, TILES.filter((t) => t.category === cat && t.layer === layer)])
     .filter(([, list]) => list.length), [layer]);
@@ -227,6 +241,12 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
       if (d) commit(placeDesign(map, x, y, d));
       return;
     }
+    if (tool === 'poi') {
+      const list = map.pois || [];
+      if (list.length >= 99 || list.some((p) => p.x === x && p.y === y)) return;
+      commit({ ...map, pois: [...list, { id: `p${Date.now().toString(36)}`, x, y, name: `Ponto ${list.length + 1}` }] });
+      return;
+    }
     if (tool === 'item') {
       if (itemAt(map, x, y)) return;
       commit(addItem(map, x, y, { name: 'Item achado' }));
@@ -307,6 +327,57 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
   };
   const h = history.current;
 
+  if (mode === 'vila' && village) {
+    const toggle = (k, label) => (
+      <label key={k} className="flex items-center gap-2 text-sm text-mist">
+        <input type="checkbox" checked={vopt[k]} onChange={(e) => setVopt((o) => ({ ...o, [k]: e.target.checked }))} /> {label}
+      </label>
+    );
+    const vmap = { ...village.map, ...(vopt.style !== 'padrao' ? { style: vopt.style } : {}) };
+    return (
+      <div className="mx-auto flex max-w-5xl flex-col gap-4 p-3 text-bone sm:p-6">
+        <header className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-3xl">Gerar vila pronta</h2>
+            <p className="text-mist">Escolha o tamanho e o que ela tem; cada “Outra vila” sorteia um arranjo novo. Depois dá para ajustar tudo à mão.</p>
+          </div>
+          {onCancel && <button type="button" className="btn btn-glass" onClick={onCancel}><X size={18} /> Fechar</button>}
+        </header>
+        <section className="gothic-panel flex flex-col gap-3 rounded-md p-4">
+          <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Tamanho da vila">
+            {VILLAGE_SIZES.map((v) => (
+              <button key={v.id} type="button" role="radio" aria-checked={vopt.size === v.id} onClick={() => setVopt((o) => ({ ...o, size: v.id }))}
+                className={`rounded-md border-[3px] border-lead px-3 py-1.5 text-sm font-bold ${vopt.size === v.id ? 'lit' : 'bg-glass text-mist hover:text-bone'}`}>
+                {v.name} <span className="font-normal opacity-75">{v.cols}×{v.rows}</span>
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-4">
+            {toggle('river', 'Rio com ponte')}{toggle('lake', 'Lago')}{toggle('farm', 'Fazenda')}{toggle('cemetery', 'Cemitério')}
+            <label className="text-sm text-mist">Estilo
+              <select className="field ml-2 inline-block w-auto py-1 text-sm" value={vopt.style} onChange={(e) => setVopt((o) => ({ ...o, style: e.target.value }))}>
+                {STYLES.map((st) => <option key={st.id} value={st.id}>{st.name}</option>)}
+              </select>
+            </label>
+          </div>
+          <p className="text-sm text-mist">{village.map.buildings.length} construções · {village.notes}</p>
+          <div className="max-h-[60vh] overflow-auto rounded-md border-[3px] border-lead bg-abyss">
+            <MapPreview map={vmap} cellSize={Math.max(6, Math.min(16, Math.floor(900 / vmap.cols)))} />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className="btn btn-lit" onClick={() => { loadMap(vmap); setAiInfo({ name: village.name, notes: village.notes }); onSave?.(vmap, { name: village.name, notes: village.notes }); }}><Save size={18} /> Usar esta vila</button>
+            <button type="button" className="btn btn-glass" onClick={() => setVopt((o) => ({ ...o, seed: o.seed + 1 }))}><RotateCcw size={18} /> Outra vila</button>
+            <button type="button" className="btn btn-glass" onClick={() => { loadMap(vmap); setMode('manual'); }}><Wrench size={18} /> Ajustar à mão</button>
+          </div>
+        </section>
+        <div className="flex flex-wrap gap-4 text-sm">
+          <button type="button" className="text-mist underline hover:text-bone" onClick={() => setMode('ai')}>Prefiro descrever para uma IA</button>
+          <button type="button" className="text-mist underline hover:text-bone" onClick={() => setMode('manual')}>Prefiro desenhar à mão</button>
+        </div>
+      </div>
+    );
+  }
+
   if (mode === 'ai') {
     return (
       <div className="mx-auto flex max-w-3xl flex-col gap-4 p-3 text-bone sm:p-6">
@@ -339,6 +410,7 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
           </div>
 
           <div className="flex flex-wrap gap-4">
+            <YesNo label="Tenho uma foto/desenho de mapa" value={fromImage} onChange={(v) => { setFromImage(v); setResult(null); setPasted(''); }} />
             <YesNo label="Itens para pegar?" value={aiItems} onChange={(v) => { setAiItems(v); setResult(null); setPasted(''); }} />
             <YesNo label="Monstros no mapa?" value={aiMonsters} onChange={(v) => { setAiMonsters(v); setResult(null); setPasted(''); }} />
           </div>
@@ -349,7 +421,7 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
           <button type="button" className="btn btn-lit min-h-14 text-lg" onClick={copyPrompt}>
             {copied ? <Check size={22} /> : <Copy size={22} />} {copied ? 'Copiado! Agora cole na IA' : 'Copiar prompt'}
           </button>
-          <p className="text-mist">Cole no ChatGPT, Gemini ou Claude e copie a resposta inteira.</p>
+          <p className="text-mist">{fromImage ? 'Cole no ChatGPT, Gemini ou Claude JUNTO com a imagem do mapa (anexe a foto) e copie a resposta inteira.' : 'Cole no ChatGPT, Gemini ou Claude e copie a resposta inteira.'}</p>
           {aiError && <p role="alert" className="text-sm text-ember">{aiError}</p>}
           <details className="text-sm">
             <summary className="cursor-pointer text-mist hover:text-bone">Ver o prompt</summary>
@@ -371,7 +443,7 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
                 {result.warnings.map((w) => <p key={w} className="text-sm text-ember">{w}</p>)}
               </div>
               <div className="max-h-[55vh] overflow-auto rounded-md border-[3px] border-lead bg-abyss">
-                <TileMapCanvas map={result.map} cellSize={Math.max(12, Math.min(28, Math.floor(680 / result.map.cols)))} roofs />
+                <MapPreview map={result.map} cellSize={Math.max(6, Math.min(28, Math.floor(860 / result.map.cols)))} />
               </div>
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="btn btn-lit" onClick={() => applyResult(true)}><Save size={18} /> Usar este mapa</button>
@@ -382,15 +454,23 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
           )}
         </section>
 
-        <button type="button" className="self-start text-sm text-mist underline hover:text-bone" onClick={() => setMode('manual')}>
-          Prefiro desenhar à mão
-        </button>
+        <div className="flex flex-wrap gap-4 text-sm">
+          <button type="button" className="text-mist underline hover:text-bone" onClick={() => setMode('vila')}>Gerar uma vila pronta (sem IA)</button>
+          <button type="button" className="text-mist underline hover:text-bone" onClick={() => setMode('manual')}>Prefiro desenhar à mão</button>
+        </div>
       </div>
     );
   }
 
   const items = map.items || [];
   const buildings = map.buildings || [];
+  // recorte pela vista (com folga); de muito longe as casas viram blocos no canvas
+  const sv = scrollView || { x: 0, y: 0, w: 1600, h: 1000 };
+  const pad = Math.max(zoom * 6, 400);
+  const near = (x0, y0, x1, y1) => x1 * zoom > sv.x - pad && x0 * zoom < sv.x + sv.w + pad && y1 * zoom > sv.y - pad && y0 * zoom < sv.y + sv.h + pad;
+  const far = zoom < 6;
+  const shownBuildings = far ? [] : buildings.filter((b) => near(b.x, b.y - 6, b.x + b.w, b.y + b.h));
+  const shownItems = items.filter((it) => near(it.x, it.y, it.x + 1, it.y + 1));
 
   return (
     <div className="flex flex-col gap-4 text-bone">
@@ -429,27 +509,32 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
             </div>
           </div>
 
-          <div className="max-h-[70vh] overflow-auto rounded-md border-[3px] border-lead bg-abyss">
+          <div ref={scrollRef} className="max-h-[70vh] overflow-auto rounded-md border-[3px] border-lead bg-abyss">
             <div className="relative w-max">
               <TileMapCanvas
                 map={map}
                 cellSize={zoom}
                 showGrid={showGrid}
+                viewport={scrollView || undefined}
+                buildingBlocks={far}
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
                 onPointerCancel={onPointerUp}
                 style={{ touchAction: tool === 'pan' ? 'auto' : 'none', cursor: tool === 'pan' ? 'grab' : 'crosshair' }}
               />
-              {buildings.filter((b) => b.design).sort((a, b) => a.y + a.h - b.y - b.h).map((b) => (
+              {shownBuildings.filter((b) => b.design).sort((a, b) => a.y + a.h - b.y - b.h).map((b) => (
                 <BuildingSprite key={`s-${b.id}`} building={b} tiles={map} scale={zoom / 16} placed className="pointer-events-none" />
               ))}
-              {buildings.map((b) => (
+              {shownBuildings.map((b) => (
                 <div key={b.id} className={`pointer-events-none absolute ${b.design ? '' : 'border-2 border-dashed border-ember/70'}`} style={{ left: b.x * zoom, top: b.y * zoom, width: b.w * zoom, height: b.h * zoom }}>
                   <span className="absolute left-0 top-0 bg-abyss/85 px-1 text-[10px] font-bold text-ember">{b.name}</span>
                 </div>
               ))}
-              {items.map((it) => (
+              {(map.pois || []).map((p, i) => (
+                <span key={p.id} className="worldmap-pin pointer-events-none" style={{ left: (p.x + 0.5) * zoom, top: (p.y + 0.5) * zoom, opacity: p.hidden ? 0.55 : 1 }}>{i + 1}</span>
+              ))}
+              {shownItems.map((it) => (
                 <span key={it.id} className="vtt-loot pointer-events-none" title={it.name} style={{ left: it.x * zoom, top: it.y * zoom, width: zoom, height: zoom }} />
               ))}
               {rectBox && <div className="pointer-events-none absolute border-2 border-ember" style={{ ...rectBox, background: 'rgb(var(--light) / .2)' }} />}
@@ -491,6 +576,32 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
               ))}
             </div>
           </section>}
+
+          {tab === 'pontos' && (
+            <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
+              <h3 className="font-display text-xl">Pontos principais <span className="text-sm text-mist">({(map.pois || []).length}/99)</span></h3>
+              <p className="text-sm text-mist">Clique no mapa para marcar. Eles aparecem numerados no mapa que os jogadores recebem (item “Mapa de…”), com esta legenda.</p>
+              <ol className="flex max-h-[26rem] flex-col gap-2 overflow-y-auto pr-1">
+                {(map.pois || []).map((p, i, list) => {
+                  const set = (patch) => commit({ ...map, pois: list.map((q) => (q.id === p.id ? { ...q, ...patch } : q)) });
+                  const move = (d) => { const next = [...list]; const j = i + d; if (j < 0 || j >= next.length) return; [next[i], next[j]] = [next[j], next[i]]; commit({ ...map, pois: next }); };
+                  return (
+                    <li key={p.id} className="rounded-md border-2 border-lead bg-glass p-2">
+                      <div className="flex items-center gap-1">
+                        <span className="worldmap-num">{i + 1}</span>
+                        <input className="field min-w-0 py-1 text-sm" aria-label="Nome do ponto" value={p.name} maxLength={60} onChange={(e) => set({ name: e.target.value || ' ' })} />
+                        <button type="button" className="btn btn-glass !min-h-8 !w-8 !p-0" onClick={() => move(-1)} aria-label="Subir"><ChevronUp size={14} /></button>
+                        <button type="button" className="btn btn-glass !min-h-8 !w-8 !p-0" onClick={() => move(1)} aria-label="Descer"><ChevronDown size={14} /></button>
+                        <button type="button" className="btn btn-glass !min-h-8 !w-8 !p-0" onClick={() => commit({ ...map, pois: list.filter((q) => q.id !== p.id) })} aria-label={`Apagar ${p.name}`}><Trash2 size={14} /></button>
+                      </div>
+                      <input className="field mt-1 py-1 text-xs" placeholder="Descrição curta (aparece na legenda)" value={p.note || ''} maxLength={300} onChange={(e) => set({ note: e.target.value })} />
+                      <label className="mt-1 flex items-center gap-2 text-xs text-mist"><input type="checkbox" checked={Boolean(p.hidden)} onChange={(e) => set({ hidden: e.target.checked })} /> Só o mestre vê</label>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          )}
 
           {tab === 'ambiente' && <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
             <h3 className="font-display text-xl">Ambiente</h3>
@@ -597,6 +708,7 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
 
           <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
             <button type="button" className="btn btn-glass" onClick={() => setMode('ai')}><Sparkles size={18} /> Criar com IA</button>
+            <button type="button" className="btn btn-glass" onClick={() => setMode('vila')}><Building2 size={18} /> Gerar vila pronta</button>
             {aiInfo && (
               <div className="text-sm text-mist">
                 {aiInfo.name && <p className="text-bone">{aiInfo.name}</p>}

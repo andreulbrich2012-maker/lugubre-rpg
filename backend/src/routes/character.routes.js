@@ -13,6 +13,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { applyRaceModifiers, baseAttributes, baseSkills, calculateDefense, calculateDodge, rollDiceFormula } from '../utils/rules.js';
 import { imageReferenceSchema } from '../utils/images.js';
 import { roundKg, unitWeight } from '../utils/itemWeight.js';
+import { assertSheetUnlocked, POWERS_LOCKED, sheetLocks } from '../utils/sheetLocks.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -26,16 +27,18 @@ const itemShape = {
   description: z.string().optional().default(''),
   defenseBonus: z.coerce.number().default(0),
   // icone pixel art escolhido a mao (frontend/src/lib/icons); sem ele o icone sai do nome
-  icon: z.string().regex(/^[a-z0-9_-]{1,60}$/).optional()
+  icon: z.string().regex(/^[a-z0-9_-]{1,60}$/).optional(),
+  // mapa-item: abre o mapa completo desta cena (so o lado de fora, com os pontos principais)
+  mapSceneId: z.string().uuid().optional()
 };
 // mochila/bau no inventario: guarda itens dentro (1 nivel so, max 30)
-const itemSchema = z.object({
+export const itemSchema = z.object({
   ...itemShape,
   container: z.boolean().optional(),
   contents: z.array(z.object(itemShape)).max(30, 'No máximo 30 itens dentro de um recipiente.').optional()
 });
 
-const powerSchema = z.object({
+export const powerSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1),
   damage: z.string().min(1),
@@ -49,7 +52,7 @@ const powerSchema = z.object({
   description: z.string().optional().default('')
 });
 
-const walletSchema = z.object({
+export const walletSchema = z.object({
   bronze: z.coerce.number().default(0),
   silver: z.coerce.number().default(0),
   platinum: z.coerce.number().default(0),
@@ -62,7 +65,7 @@ const diceSettingsSchema = z.object({
 
 // Aparencia do boneco em pixel art (frontend/src/lib/avatar/appearance.js). O front conserta
 // qualquer versao velha (repairAppearance); aqui so garante que e um objeto pequeno.
-const appearanceSchema = z.record(z.any())
+export const appearanceSchema = z.record(z.any())
   .refine((value) => JSON.stringify(value).length <= 8000, 'Aparência grande demais.')
   .nullable();
 
@@ -93,12 +96,12 @@ const characterSchema = z.object({
   appearance: appearanceSchema.optional()
 });
 
-async function skillKeys() {
+export async function skillKeys() {
   const result = await tryQuery('select "key" from skills where deleted_at is null order by name');
   return result?.rows?.map((skill) => skill.key) || (await getLocalCatalog('skills')).map((skill) => skill.key);
 }
 
-function parseJsonField(value, fallback) {
+export function parseJsonField(value, fallback) {
   if (value == null) return fallback;
   if (typeof value !== 'string') return value;
   try {
@@ -108,16 +111,16 @@ function parseJsonField(value, fallback) {
   }
 }
 
-function toJson(value) {
+export function toJson(value) {
   return JSON.stringify(value ?? null);
 }
 
 // null no SQL (e nao o json "null") quando a ficha ainda nao tem aparencia.
-function appearanceJson(value) {
+export function appearanceJson(value) {
   return value && typeof value === 'object' ? JSON.stringify(value) : null;
 }
 
-function normalizeSkillTraining(skills = {}, keys = []) {
+export function normalizeSkillTraining(skills = {}, keys = []) {
   return Object.fromEntries(keys.map((key) => {
     const rounded = Math.round(Number(skills?.[key] || 0) / 5) * 5;
     return [key, Math.max(0, Math.min(15, rounded))];
@@ -125,7 +128,7 @@ function normalizeSkillTraining(skills = {}, keys = []) {
 }
 
 // Peso 0 ou ausente vira o peso sugerido pelo nome/categoria (utils/itemWeight.js).
-function normalizeItem(item) {
+export function normalizeItem(item) {
   const parsed = itemSchema.parse(item);
   const { contents, container, ...rest } = parsed;
   const normalized = {
@@ -147,7 +150,7 @@ function normalizeItem(item) {
   return normalized;
 }
 
-function normalizePower(power) {
+export function normalizePower(power) {
   const parsed = powerSchema.parse(power);
   return {
     ...parsed,
@@ -163,7 +166,7 @@ function normalizePower(power) {
   };
 }
 
-function normalizeWallet(wallet) {
+export function normalizeWallet(wallet) {
   const parsed = walletSchema.parse(wallet || {});
   return {
     bronze: Math.max(0, Number(parsed.bronze || 0)),
@@ -173,7 +176,7 @@ function normalizeWallet(wallet) {
   };
 }
 
-function clampCurrent(value, max) {
+export function clampCurrent(value, max) {
   const safeMax = Math.max(0, Number(max ?? 0));
   const safeValue = Math.max(0, Number(value || 0));
   return Math.min(safeValue, safeMax);
@@ -188,7 +191,7 @@ function walletTotal(wallet) {
   return Number(wallet?.bronze || 0) + Number(wallet?.silver || 0) * 10 + Number(wallet?.platinum || 0) * 100 + Number(wallet?.gold || 0) * 500;
 }
 
-function powerField(value) {
+export function powerField(value) {
   if (['attack', 'attacks', 'ataque', 'ataques'].includes(value)) return 'attacks';
   if (['spell', 'spells', 'magia', 'magias'].includes(value)) return 'spells';
   return null;
@@ -246,7 +249,7 @@ function characterSnapshot(row) {
   };
 }
 
-async function recordCharacterSave(row, label = 'Salvamento') {
+export async function recordCharacterSave(row, label = 'Salvamento') {
   if (!row?.id) return [];
   const result = await tryQuery(
     'insert into character_saves (character_id, label, snapshot) values ($1, $2, $3) returning id, label, saved_at',
@@ -399,6 +402,7 @@ async function findOwnedCharacter(id, ownerId) {
 }
 
 async function persistPlayLists(req, row, payload, label = 'Ajuste de jogo') {
+  await assertSheetUnlocked(row, req.user.id, { attacks: payload.attacks, spells: payload.spells });
   const inventory = payload.inventory ?? parseJsonField(row.inventory, []);
   const attacks = payload.attacks ?? parseJsonField(row.attacks, []);
   const spells = payload.spells ?? parseJsonField(row.spells, []);
@@ -534,6 +538,7 @@ router.post('/:id/powers', async (req, res) => {
   const row = await findOwnedCharacter(req.params.id, req.user.id);
   if (!row) return res.status(404).json({ message: 'Ficha nao encontrada.' });
   const body = z.object({ type: z.string().default('attacks') }).passthrough().parse(req.body);
+  if ((await sheetLocks(row.id, req.user.id)).powers) return res.status(403).json({ message: POWERS_LOCKED });
   let source = body;
   if (body.powerId) {
     const library = await tryQuery('select * from power_library where id = $1 and deleted_at is null', [body.powerId]);
@@ -600,6 +605,8 @@ router.put('/:id', async (req, res) => {
   const current = await findOwnedCharacter(req.params.id, req.user.id);
   if (!current) return res.status(404).json({ message: 'Ficha não encontrada.' });
   const data = await normalizeCharacter(req.body, parseJsonField(current.skills, null) || req.body.skills);
+  // ficha mostrada numa campanha com a regra 'mestre': vitais e poderes so pelo mestre
+  await assertSheetUnlocked(current, req.user.id, { life_current: data.lifeCurrent, life_max: data.lifeMax, sanity_current: data.sanityCurrent, sanity_max: data.sanityMax, mana: data.mana, mana_max: data.manaMax, attacks: data.attacks, spells: data.spells });
   const result = await tryQuery(
     `update characters set player_name=$1, character_name=$2, photo=$3, race_id=$4, class_id=$5,
      origin_id=$6, origin=$7, level=$8, life_current=$9, life_max=$10, sanity_current=$11, sanity_max=$12,
@@ -713,6 +720,10 @@ router.patch('/:id/play', async (req, res) => {
     wallet: normalizeWallet(body.wallet ?? parseJsonField(row.wallet, {})),
     diceSettings: normalizeDiceSettings(body.diceSettings ?? parseJsonField(row.dice_settings, {}))
   };
+  await assertSheetUnlocked(row, req.user.id, {
+    life_current: payload.lifeCurrent, life_max: payload.lifeMax, sanity_current: payload.sanityCurrent, sanity_max: payload.sanityMax,
+    mana: payload.mana, mana_max: payload.manaMax, ...(body.attacks ? { attacks: payload.attacks } : {}), ...(body.spells ? { spells: payload.spells } : {})
+  });
   const updatedResult = await tryQuery(
     `update characters set life_current=$1, life_max=$2, sanity_current=$3, sanity_max=$4,
      mana=$5, mana_max=$6, defense=$7, skills=$8, skill_bonuses=$9, inventory=$10, attacks=$11, spells=$12, wallet=$13, dice_settings=$14, updated_at=now()

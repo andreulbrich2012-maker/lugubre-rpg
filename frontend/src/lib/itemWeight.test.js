@@ -49,6 +49,9 @@ describe('peso sugerido dos itens', () => {
     const rules = normalizeRules({ inventory: { maxWeight: 30, maxItems: 10 }, players: { u1: { inventory: { maxWeight: null } } } });
     expect(inventoryLimits(rules, 'u1')).toEqual({ maxWeight: null, maxItems: 10 });
     expect(inventoryLimits(rules, 'u2')).toEqual({ maxWeight: 30, maxItems: 10 });
-    expect(normalizeRules({}).inventory).toEqual({ maxWeight: null, maxItems: null });
+    // mesa sem limite salvo: padrao 30 kg e 9 itens; null salvo = sem limite
+    expect(normalizeRules({}).inventory).toEqual({ maxWeight: 30, maxItems: 9 });
+    expect(normalizeRules({ inventory: { maxWeight: null, maxItems: null } }).inventory).toEqual({ maxWeight: null, maxItems: null });
+    expect(normalizeRules({}).sheet).toEqual({ stats: 'mestre', powers: 'mestre' });
   });
 });

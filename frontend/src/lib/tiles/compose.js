@@ -14,6 +14,7 @@ import { rasterize, cellHash } from './render.js';
 import { wallVariant, wallPixels, FACE_SHADOW } from './walls.js';
 import { riverStone, sparkle, FOAM_HEX } from './water.js';
 import { applyStyle } from './styles.js';
+import { isFence, fenceMask, fenceSprite } from './fences.js';
 
 // ---------- terrenos que se misturam (resto e "construido": borda reta) ----------
 // Ordem = precedencia: quem vem depois cobre a borda de quem vem antes.
@@ -32,6 +33,9 @@ const hash = (x, y, salt = 0) => cellHash(x * 31 + salt * 977, y * 17 + salt * 1
 const rand = (x, y, salt) => (hash(x, y, salt) % 10000) / 10000;
 
 // Ruido de valor suave (bordas irregulares e arredondadas, sem serrilhado de grade).
+// Cantos da grade guardados por "sal" (pixels vizinhos caem na mesma celula da grade): mesmo
+// resultado, bem menos hash (era o mais caro do render de mapa grande).
+const VN_CACHE = Array.from({ length: 32 }, () => ({ ix: NaN, iy: NaN, a: 0, b: 0, c: 0, d: 0 }));
 function valueNoise(x, y, scale, salt) {
   const fx = x / scale;
   const fy = y / scale;
@@ -41,10 +45,16 @@ function valueNoise(x, y, scale, salt) {
   const ty = fy - iy;
   const sx = tx * tx * (3 - 2 * tx);
   const sy = ty * ty * (3 - 2 * ty);
-  const a = rand(ix, iy, salt);
-  const b = rand(ix + 1, iy, salt);
-  const c = rand(ix, iy + 1, salt);
-  const d = rand(ix + 1, iy + 1, salt);
+  const m = salt >= 0 && salt < 32 ? VN_CACHE[salt] : null;
+  let a; let b; let c; let d;
+  if (m && m.ix === ix && m.iy === iy) { a = m.a; b = m.b; c = m.c; d = m.d; }
+  else {
+    a = rand(ix, iy, salt);
+    b = rand(ix + 1, iy, salt);
+    c = rand(ix, iy + 1, salt);
+    d = rand(ix + 1, iy + 1, salt);
+    if (m) { m.ix = ix; m.iy = iy; m.a = a; m.b = b; m.c = c; m.d = d; }
+  }
   return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
 }
 const borderNoise = (x, y) => valueNoise(x, y, 11, 1) * 0.6 + valueNoise(x, y, 5, 2) * 0.3 + valueNoise(x, y, 2, 3) * 0.1;
@@ -234,6 +244,8 @@ const ROCK = ['#2a1c2e', '#524866', '#6d627c', '#8a7f8e'].map(hexRgb);
 function waterEdges(img, terr, map, frame) {
   const { w: W, h: H } = img;
   const { cols, rows } = map;
+  // origem do pedaco (mapa recortado em render.js): o hash usa a posicao absoluta, sem emenda
+  const OX = map.origin?.x || 0; const OY = map.origin?.y || 0; const PX = OX * SIZE; const PY = OY * SIZE;
   const ground = map.layers.ground;
   const code = (cx, cy) => ground[cy]?.[cx];
   const waterOf = new Uint8Array(BLEND_ORDER.length + 1); // 1 agua clara, 2 agua escura (funda/mar)
@@ -259,7 +271,7 @@ function waterEdges(img, terr, map, frame) {
       if (c) {
         const d = toLand[i];
         // manchas largas de profundidade (ruido do mapa, nao do bloco): quebram a repeticao
-        const deepN = valueNoise(px, py, 23, 12) * 0.7 + valueNoise(px, py, 9, 13) * 0.3;
+        const deepN = valueNoise(px + PX, py + PY, 23, 12) * 0.7 + valueNoise(px + PX, py + PY, 9, 13) * 0.3;
         if (deepN > 0.62) tint(img, px, py, RING, (deepN - 0.62) * 0.55);
         else if (deepN < 0.38) scaleRgb(img, px, py, 1 - (0.38 - deepN) * 0.45);
         if (c === 2 && toLight[i] < 4) {
@@ -271,9 +283,9 @@ function waterEdges(img, terr, map, frame) {
         }
         if (d >= 7) continue;
         // fase da onda muda ao longo da margem (trechos diferentes nao batem juntos)
-        const ph = Math.floor(valueNoise(px, py, 9, 4) * 8);
+        const ph = Math.floor(valueNoise(px + PX, py + PY, 9, 4) * 8);
         const wave = lap[(frame + ph) & 3];
-        const n = rand(px, py, 5);
+        const n = rand(px + PX, py + PY, 5);
         if (d <= 1.5) tint(img, px, py, FOAM, n < 0.18 ? 0.55 : 0.9);
         else if (Math.abs(d - (2.2 + wave)) < 0.55) tint(img, px, py, FOAM, n < 0.3 ? 0.25 : 0.6);
         else if (d < 6) tint(img, px, py, RING, 0.42 * (1 - (d - 1.5) / 4.5) * (c === 2 ? 0.7 : 1));
@@ -298,27 +310,27 @@ function waterEdges(img, terr, map, frame) {
       const c = code(cx, cy);
       const x0 = cx * SIZE;
       const y0 = cy * SIZE;
-      if (WATER.has(c) && hash(cx, cy, 97) % 5 < 2) {
+      if (WATER.has(c) && hash(cx + OX, cy + OY, 97) % 5 < 2) {
         // brilho do sol na agua: por celula (sem grade), so sobre pixel de agua aberta
-        const sx = x0 + 2 + (hash(cx, cy, 98) % 10);
-        const sy = y0 + 2 + (hash(cx, cy, 99) % 12);
-        sparkle((x, y, h) => { if (x >= 0 && y >= 0 && x < W && y < H && wcls[y * W + x] && toLand[y * W + x] > 2.5) setHex(x, y, h); }, sx, sy, frame + (hash(cx, cy, 100) % 4));
+        const sx = x0 + 2 + (hash(cx + OX, cy + OY, 98) % 10);
+        const sy = y0 + 2 + (hash(cx + OX, cy + OY, 99) % 12);
+        sparkle((x, y, h) => { if (x >= 0 && y >= 0 && x < W && y < H && wcls[y * W + x] && toLand[y * W + x] > 2.5) setHex(x, y, h); }, sx, sy, frame + (hash(cx + OX, cy + OY, 100) % 4));
       }
       if (c === '0') {
         // pedras do rio: 0 a 2 por celula, posicao e tamanho pelo hash (nunca o mesmo desenho)
-        const n = hash(cx, cy, 90) % 5;
+        const n = hash(cx + OX, cy + OY, 90) % 5;
         const count = n < 1 ? 0 : n < 4 ? 1 : 2;
         for (let s = 0; s < count; s++) {
-          const sx = x0 + 4 + (hash(cx, cy, 91 + s) % 8);
-          const sy = y0 + 4 + ((hash(cx, cy, 93 + s) % 4) + s * 5);
-          riverStone(setHex, sx, sy, hash(cx, cy, 95 + s) % 2, frame + s);
+          const sx = x0 + 4 + (hash(cx + OX, cy + OY, 91 + s) % 8);
+          const sy = y0 + 4 + ((hash(cx + OX, cy + OY, 93 + s) % 4) + s * 5);
+          riverStone(setHex, sx, sy, hash(cx + OX, cy + OY, 95 + s) % 2, frame + s);
         }
       }
       if (c !== 'V') continue;
       // cachoeira: pedra dos lados onde nao continua, borda de cima clara, espuma no pe
       const side = (dx) => code(cx + dx, cy) !== 'V';
       for (let y = 0; y < SIZE; y++) {
-        const r = ROCK[1 + (hash(cx, cy * SIZE + y, 70) % 3)];
+        const r = ROCK[1 + (hash(cx + OX, (cy + OY) * SIZE + y, 70) % 3)];
         if (side(-1)) { blend(img, x0, y0 + y, ...ROCK[0], 1); blend(img, x0 + 1, y0 + y, ...r, 1); if ((y + frame * 4) % 7 === 0) blend(img, x0 + 2, y0 + y, ...FOAM, 0.8); }
         if (side(1)) { blend(img, x0 + 15, y0 + y, ...ROCK[0], 1); blend(img, x0 + 14, y0 + y, ...r, 1); if ((y + frame * 4 + 3) % 7 === 0) blend(img, x0 + 13, y0 + y, ...FOAM, 0.8); }
       }
@@ -332,7 +344,7 @@ function waterEdges(img, terr, map, frame) {
         for (let y = 10; y < SIZE + (intoWater ? 7 : 0); y++) {
           for (let x = 1; x < 15; x++) {
             const depth = y < SIZE ? (y - 10) / 6 : 1 - (y - SIZE) / 7;
-            const v = valueNoise(x0 + x, y0 + y - frame * 2, 3, 8) * 0.7 + rand(x0 + x, y0 + y + frame, 9) * 0.3;
+            const v = valueNoise(x0 + x + PX, y0 + y + PY - frame * 2, 3, 8) * 0.7 + rand(x0 + x + PX, y0 + y + PY + frame, 9) * 0.3;
             if (v < 0.75 - depth * 0.45) continue;
             tint(img, x0 + x, y0 + y, FOAM, v > 0.7 ? 0.95 : 0.6);
           }
@@ -346,6 +358,7 @@ function waterEdges(img, terr, map, frame) {
 // Devolve a imagem do chao inteiro (16 px por celula) para um quadro de animacao.
 export function renderTerrain(map, { frame = 0, beautify = true, decor = 'normal' } = {}) {
   const { cols, rows } = map;
+  const OX = map.origin?.x || 0; const OY = map.origin?.y || 0; const PX = OX * SIZE; const PY = OY * SIZE;
   const W = cols * SIZE;
   const H = rows * SIZE;
   const img = newImage(W, H);
@@ -376,6 +389,7 @@ export function renderTerrain(map, { frame = 0, beautify = true, decor = 'normal
 
   // passo 1: qual terreno cada pixel mostra
   const cand = [0, 0, 0, 0];
+  const quad = [0, 0, 0, 0];
   for (let py = 0; py < H; py++) {
     const cy = Math.floor(py / SIZE);
     const v = (py + 0.5) / SIZE - 0.5;
@@ -403,7 +417,9 @@ export function renderTerrain(map, { frame = 0, beautify = true, decor = 'normal
         const w11 = sx * sy;
         // candidatos em ordem de precedencia (maior primeiro); o ultimo preenche o resto
         let n = 0;
-        for (const q of [p00, p10, p01, p11]) {
+        quad[0] = p00; quad[1] = p10; quad[2] = p01; quad[3] = p11;
+        for (let qi = 0; qi < 4; qi++) {
+          const q = quad[qi];
           let dup = false;
           for (let k = 0; k < n; k++) if (cand[k] === q) dup = true;
           if (dup) continue;
@@ -411,7 +427,7 @@ export function renderTerrain(map, { frame = 0, beautify = true, decor = 'normal
           while (k > 0 && cand[k - 1] < q) { cand[k] = cand[k - 1]; k--; }
           cand[k] = q;
         }
-        const noise = (borderNoise(px, py) - 0.5) * 0.9;
+        const noise = (borderNoise(px + PX, py + PY) - 0.5) * 0.9;
         pick = cand[n - 1];
         for (let k = 0; k < n - 1; k++) {
           const t = cand[k];
@@ -429,19 +445,20 @@ export function renderTerrain(map, { frame = 0, beautify = true, decor = 'normal
       const own = getTile(code(cx, cy)) || getTile('.');
       const wall = beautify && own.wall ? wallVariant(map, cx, cy) : null;
       const ownRgba = wall
-        ? wallPixels(own, tileImages(own)[imageIndex(own, cx, cy, frame)], wall.kind, wall.mask)
-        : tileRgba(own, imageIndex(own, cx, cy, frame), beautify);
+        ? wallPixels(own, tileImages(own)[imageIndex(own, cx + OX, cy + OY, frame)], wall.kind, wall.mask)
+        : tileRgba(own, imageIndex(own, cx + OX, cy + OY, frame), beautify);
       const bySrc = [];
+      const ownId = PRECEDENCE[own.code] || 0;
       for (let y = 0; y < SIZE; y++) {
         for (let x = 0; x < SIZE; x++) {
           const px = cx * SIZE + x;
           const py = cy * SIZE + y;
           const id = terr[py * W + px];
           let src = ownRgba;
-          if (id && codeOf(id) !== own.code) {
+          if (id && id !== ownId) {
             if (!bySrc[id]) {
               const t = getTile(codeOf(id));
-              bySrc[id] = tileRgba(t, imageIndex(t, cx, cy, frame), beautify);
+              bySrc[id] = tileRgba(t, imageIndex(t, cx + OX, cy + OY, frame), beautify);
             }
             src = bySrc[id];
           }
@@ -516,10 +533,10 @@ export function renderTerrain(map, { frame = 0, beautify = true, decor = 'normal
         if (!list || (objects[cy]?.[cx] && objects[cy][cx] !== ' ')) continue;
         const ownId = PRECEDENCE[c] || 0;
         list.forEach(([name, chance], k) => {
-          if (rand(cx, cy, 20 + k) >= chance * density) return;
+          if (rand(cx + OX, cy + OY, 20 + k) >= chance * density) return;
           const d = DECAL_RGBA[name];
-          const ox = cx * SIZE + 1 + (hash(cx, cy, 40 + k) % (SIZE - d.w - 1));
-          const oy = cy * SIZE + 1 + (hash(cx, cy, 60 + k) % (SIZE - d.h - 1));
+          const ox = cx * SIZE + 1 + (hash(cx + OX, cy + OY, 40 + k) % (SIZE - d.w - 1));
+          const oy = cy * SIZE + 1 + (hash(cx + OX, cy + OY, 60 + k) % (SIZE - d.h - 1));
           for (let y = 0; y < d.h; y++) {
             for (let x = 0; x < d.w; x++) {
               const i = (y * d.w + x) * 4;
@@ -531,11 +548,11 @@ export function renderTerrain(map, { frame = 0, beautify = true, decor = 'normal
         // pedras soltas na grama que encosta no caminho
         if (GRASS.has(c)) {
           const nearPath = [[1, 0], [-1, 0], [0, 1], [0, -1]].find(([dx, dy]) => PATH.has(code(cx + dx, cy + dy)));
-          if (nearPath && rand(cx, cy, 80) < 0.55 * density) {
+          if (nearPath && rand(cx + OX, cy + OY, 80) < 0.55 * density) {
             const d = DECAL_RGBA.pebbleS;
             const [dx, dy] = nearPath;
-            const ox = cx * SIZE + (dx > 0 ? 12 : dx < 0 ? 2 : 3 + (hash(cx, cy, 81) % 10));
-            const oy = cy * SIZE + (dy > 0 ? 12 : dy < 0 ? 2 : 3 + (hash(cx, cy, 82) % 10));
+            const ox = cx * SIZE + (dx > 0 ? 12 : dx < 0 ? 2 : 3 + (hash(cx + OX, cy + OY, 81) % 10));
+            const oy = cy * SIZE + (dy > 0 ? 12 : dy < 0 ? 2 : 3 + (hash(cx + OX, cy + OY, 82) % 10));
             stamp(img, d.data, d.w, d.h, ox, oy);
           }
         }
@@ -685,6 +702,7 @@ export const isAnimatedObject = (t) => Boolean(t?.frames);
 // Objetos animados (fogo, tocha, portal) ficam so com a sombra; o quadro e desenhado por cima a cada passo.
 export function renderObjects(map, { beautify = true } = {}) {
   const { cols, rows } = map;
+  const OX = map.origin?.x || 0; const OY = map.origin?.y || 0;
   const img = newImage(cols * SIZE, rows * SIZE);
   const objects = map.layers.objects;
   for (let cy = 0; cy < rows; cy++) {
@@ -694,31 +712,39 @@ export function renderObjects(map, { beautify = true } = {}) {
       const x0 = cx * SIZE;
       const y0 = cy * SIZE;
       if (!beautify) {
-        if (!isAnimatedObject(t)) stamp(img, tileRgba(t, imageIndex(t, cx, cy, 0)), SIZE, SIZE, x0, y0);
+        if (!isAnimatedObject(t)) stamp(img, tileRgba(t, imageIndex(t, cx + OX, cy + OY, 0)), SIZE, SIZE, x0, y0);
         continue;
       }
       const big = TREES[t.code];
       if (big) {
-        const tree = big[hash(cx, cy, 5) % big.length];
-        const dx = (hash(cx, cy, 6) % 5) - 2;
+        const tree = big[hash(cx + OX, cy + OY, 5) % big.length];
+        const dx = (hash(cx + OX, cy + OY, 6) % 5) - 2;
         ellipse(img, x0 + 8 + dx, y0 + 14, tree.w * 0.32, 3.6, 0.42);
-        stamp(img, tree.data, tree.w, tree.h, x0 + 8 - tree.w / 2 + dx, y0 + SIZE - tree.h + 1, { flip: hash(cx, cy, 7) % 2 === 1 });
+        stamp(img, tree.data, tree.w, tree.h, x0 + 8 - tree.w / 2 + dx, y0 + SIZE - tree.h + 1, { flip: hash(cx + OX, cy + OY, 7) % 2 === 1 });
+        continue;
+      }
+      if (isFence(t.code)) {
+        // cerca/palicada: emenda com as vizinhas do mesmo codigo (fences.js)
+        const f = fenceSprite(t.code, fenceMask(objects, cx, cy, t.code), hash(cx + OX, cy + OY, 12) % 4);
+        for (const [sx, sy, rx, ry, a] of f.shadows) ellipse(img, x0 + sx, y0 + sy, rx, ry, a);
+        stamp(img, f.data, f.w, f.h, x0 + f.ox, y0 + f.oy);
         continue;
       }
       if (t.big) {
         // ancora = celula de baixo-esquerda da pegada; o sprite fica centrado na pegada
         const b = bigRgba(t);
         const fw = t.span[0] * SIZE;
-        ellipse(img, x0 + fw / 2, y0 + 13, fw * 0.48, 4, 0.4);
-        stamp(img, b.data, b.w, b.h, x0 + Math.round((fw - b.w) / 2), y0 + SIZE - b.h);
+        const drop = t.drop || 0; // fogueira grande: base desce um pouco (o fogo animado fica na ancora)
+        ellipse(img, x0 + fw / 2, y0 + 13 + drop, Math.max(fw, t.shadowW || 0) * 0.48, 4, 0.4);
+        stamp(img, b.data, b.w, b.h, x0 + Math.round((fw - b.w) / 2), y0 + SIZE - b.h + drop);
         continue;
       }
       ellipse(img, x0 + 8, y0 + 14, t.solid ? 7 : 5.5, t.solid ? 2.6 : 2, t.solid ? 0.4 : 0.3);
       if (isAnimatedObject(t)) continue;
       const natural = NATURAL.has(t.code);
-      const dx = natural ? (hash(cx, cy, 8) % 3) - 1 : 0;
-      const dy = natural ? -(hash(cx, cy, 9) % 2) : 0;
-      stamp(img, tileRgba(t, imageIndex(t, cx, cy, 0)), SIZE, SIZE, x0 + dx, y0 + dy, { flip: natural && hash(cx, cy, 10) % 2 === 1 });
+      const dx = natural ? (hash(cx + OX, cy + OY, 8) % 3) - 1 : 0;
+      const dy = natural ? -(hash(cx + OX, cy + OY, 9) % 2) : 0;
+      stamp(img, tileRgba(t, imageIndex(t, cx + OX, cy + OY, 0)), SIZE, SIZE, x0 + dx, y0 + dy, { flip: natural && hash(cx + OX, cy + OY, 10) % 2 === 1 });
     }
   }
   return img;
@@ -803,7 +829,7 @@ export function terrainFrames(map) {
 
 // ---------- ciclo de luz ----------
 // Multiplicacao pela cor do ceu + brilho somado das fontes de luz (tocha, fogo, janela, cristal).
-export const LIGHT_TINT = { dia: null, entardecer: '#f2b890', noite: '#3a4688' };
+export const LIGHT_TINT = { dia: null, entardecer: '#f2b890', noite: '#6874b4' };
 export const NIGHT_LIGHT = '#ffc46a';
 export function lightSources(map) {
   const out = [];
@@ -855,5 +881,57 @@ export function renderScene(map, { beautify = true, decor = map.decor || 'normal
       }
     }
   }
+  return img;
+}
+
+// ---------- pedacos (mapa grande, ate 1000x1000) ----------
+// O render.js desenha mapa grande em pedacos (64x64 celulas). Cada pedaco e renderizado num
+// recorte do mapa com folga em volta (os vizinhos de fora entram nas bordas misturadas, espuma,
+// sombra e copas) e depois cortado: o resultado e igual ao mesmo trecho do mapa inteiro
+// (compose.test.js confere pixel a pixel). O hash usa a posicao absoluta (map.origin).
+// Terreno: mistura olha 1 celula, sombra da grama 2 px, espuma/barranco ate 7 px, cachoeira 7 px.
+export const TERRAIN_PAD = { left: 2, right: 2, top: 2, bottom: 2 };
+// Objetos: copa/moinho sobem ate 4 celulas, largura ate 2 celulas para cada lado, sombra 1 abaixo.
+export const OBJECT_PAD = { left: 3, right: 3, top: 1, bottom: 5 };
+
+// Recorte do mapa (celulas x..x+w, y..y+h) com a origem absoluta; construcoes em coordenada local.
+export function subMap(map, x, y, w, h) {
+  if (x === 0 && y === 0 && w === map.cols && h === map.rows) return map;
+  const cut = (rows) => rows.slice(y, y + h).map((r) => r.slice(x, x + w));
+  const layers = { ...map.layers, ground: cut(map.layers.ground), objects: cut(map.layers.objects) };
+  const buildings = (map.buildings || []).map((b) => ({ ...b, x: b.x - x, y: b.y - y }));
+  return { ...map, cols: w, rows: h, layers, buildings, items: [], origin: { x: (map.origin?.x || 0) + x, y: (map.origin?.y || 0) + y } };
+}
+
+export function cropImage(img, x, y, w, h) {
+  if (x === 0 && y === 0 && w === img.w && h === img.h) return img;
+  const out = newImage(w, h);
+  for (let r = 0; r < h; r++) out.data.set(img.data.subarray(((y + r) * img.w + x) * 4, ((y + r) * img.w + x + w) * 4), r * w * 4);
+  return out;
+}
+
+function padded(map, x, y, w, h, pad) {
+  const x0 = Math.max(0, x - pad.left);
+  const y0 = Math.max(0, y - pad.top);
+  const x1 = Math.min(map.cols, x + w + pad.right);
+  const y1 = Math.min(map.rows, y + h + pad.bottom);
+  return { sub: subMap(map, x0, y0, x1 - x0, y1 - y0), ox: (x - x0) * SIZE, oy: (y - y0) * SIZE };
+}
+
+// Mesmo resultado de renderTerrain(map) cortado em (x, y, w, h) celulas, sem renderizar o resto.
+export function renderTerrainRegion(map, x, y, w, h, opts) {
+  const { sub, ox, oy } = padded(map, x, y, w, h, TERRAIN_PAD);
+  return cropImage(renderTerrain(sub, opts), ox, oy, w * SIZE, h * SIZE);
+}
+export function renderObjectsRegion(map, x, y, w, h, opts) {
+  const { sub, ox, oy } = padded(map, x, y, w, h, OBJECT_PAD);
+  return cropImage(renderObjects(sub, opts), ox, oy, w * SIZE, h * SIZE);
+}
+
+// Terreno + objetos estaticos de um pedaco num RGBA so (o que o render.js guarda por pedaco).
+export function renderRegion(map, x, y, w, h, { frame = 0, beautify = true, decor = 'normal' } = {}) {
+  const img = renderTerrainRegion(map, x, y, w, h, { frame, beautify, decor });
+  const obj = renderObjectsRegion(map, x, y, w, h, { beautify });
+  stamp(img, obj.data, obj.w, obj.h, 0, 0);
   return img;
 }

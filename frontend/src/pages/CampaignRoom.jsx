@@ -2,7 +2,8 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { fxFromRoll, fxFromHit } from '../lib/fx/sync';
 import { normalizeRules, playerRights } from '../lib/tableRules';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { Copy, Crown, Swords, X } from 'lucide-react';
+import { Copy, Crown, Map as MapIcon, Maximize2, Swords, X } from 'lucide-react';
+import WorldMapOverlay from '../components/vtt/WorldMapOverlay';
 import Alert from '../components/Alert';
 import Button from '../components/Button';
 import Board from '../components/vtt/Board';
@@ -13,6 +14,7 @@ import CampaignShopsTab from '../components/campaigns/CampaignShopsTab';
 import ActionBar from '../components/campaigns/room/ActionBar';
 import ChatPanel from '../components/campaigns/room/ChatPanel';
 import DiceOverlay from '../components/campaigns/room/DiceOverlay';
+import GameMode, { requestGameFullscreen } from '../components/game/GameMode';
 import GMPanel from '../components/campaigns/room/GMPanel';
 import NotesPanel from '../components/campaigns/room/NotesPanel';
 import SheetsPanel from '../components/campaigns/room/SheetsPanel';
@@ -50,6 +52,9 @@ export default function CampaignRoom() {
   const [notes, setNotes] = useState([]);
   const [myCharacters, setMyCharacters] = useState([]);
   const [sheet, setSheet] = useState(null);
+  // mapa-item aberto (mapa completo de uma cena) e os mapas que o jogador carrega
+  const [worldMap, setWorldMap] = useState(null);
+  const [mapsOpen, setMapsOpen] = useState(false);
   const [scenes, setScenes] = useState([]);
   const [viewSceneId, setViewSceneId] = useState(null);
   const [rules, setRules] = useState(() => normalizeRules({}));
@@ -74,6 +79,11 @@ export default function CampaignRoom() {
   const [sharing, setSharing] = useState(false);
   const [tileEditor, setTileEditor] = useState(null);
   const [sheetReload, setSheetReload] = useState(0);
+  // modo jogo do jogador (tela cheia); o chat vira gaveta. skipOwnFree: rolagens livres que o
+  // painel de dados ja anima sozinho nao repetem o d20 do centro da mesa.
+  const [gameMode, setGameMode] = useState(false);
+  const [gameChat, setGameChat] = useState(false);
+  const skipOwnFree = useRef(0);
   const fxCounter = useRef(0);
   const noticeTimer = useRef(null);
 
@@ -183,6 +193,10 @@ export default function CampaignRoom() {
           if (mySheet && p.characterId === mySheet.id) reload.sheet = true;
           setSheetReload((n) => n + 1);
           break;
+        case 'character:master-edit':
+          // aviso curto para o dono da ficha (o mestre ve o historico na aba Fichas)
+          if (!master && p.ownerId === stateRef.current.userId) notify(`O mestre ${p.summary} (${p.characterName}).`);
+          break;
         case 'notes:changed': reload.notes = true; break;
         case 'scene:activated': case 'scene:deleted': reload.scenes = true; break;
         case 'scene:updated':
@@ -227,7 +241,8 @@ export default function CampaignRoom() {
           }
           break;
         case 'roll':
-          setRollQueue((q) => [...q, p]);
+          if (p.kind === 'free' && p.userId === stateRef.current.userId && skipOwnFree.current > 0) skipOwnFree.current -= 1;
+          else setRollQueue((q) => [...q, p]);
           if (p.kind === 'attack' && p.targetTokenId) {
             const { tokens: toks, cell: c } = stateRef.current;
             const atk = fxFromRoll(p, { tokens: toks, cell: c, powers: [...(mySheet?.attacks || []), ...(mySheet?.spells || [])] });
@@ -265,7 +280,7 @@ export default function CampaignRoom() {
     if (reload.scenes) loadScenes(true).catch(() => null);
     if (reload.scene) loadScene(sid).catch(() => null);
     if (reload.sheet && !reload.room) loadSheet(me);
-  }, [loadRoom, loadNotes, loadScenes, loadScene, loadSheet, showHit]);
+  }, [loadRoom, loadNotes, loadScenes, loadScene, loadSheet, showHit, notify]);
 
   useCampaignFeed(id, applyEvents, { enabled: Boolean(room) });
 
@@ -435,7 +450,7 @@ export default function CampaignRoom() {
     const r = await roll({ kind: 'attack', formula, label: power.name, characterId: sheet.id, powerName: power.name, targetTokenId: target.id });
     if (!r) return;
     if (power.type === 'spells' && cost > 0) {
-      api.patch(`/campaigns/${id}/characters/${sheet.id}/vitals`, { mana_current: mana - cost }).then(({ data }) => setSheet((s) => ({ ...s, ...data, mana: data.mana_current }))).catch(() => null);
+      api.patch(`/campaigns/${id}/characters/${sheet.id}/vitals`, { mana_current: mana - cost, spell: power.name }).then(({ data }) => setSheet((s) => ({ ...s, ...data, mana: data.mana_current }))).catch(() => null);
     }
     const crit = r.dice?.[0]?.sides === 20 && r.dice[0].value >= Number(power.criticalValue || 20);
     setPendingDamage({ power, target, crit });
@@ -538,7 +553,7 @@ export default function CampaignRoom() {
   const currentRoll = rollQueue[0];
 
   return (
-    <main className="campaign-room flex flex-col lg:h-[calc(100svh-4.3rem)]">
+    <main className={`campaign-room flex flex-col lg:h-[calc(100svh-4.3rem)]${gameMode ? ' is-game' : ''}${gameMode && gameChat ? ' chat-open' : ''}`}>
       <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b-[4px] border-lead bg-abyss px-3 py-2">
         <h1 className="min-w-0 truncate font-display text-2xl leading-none text-bone sm:text-3xl">{room.campaign.name}</h1>
         {scene && (
@@ -548,6 +563,35 @@ export default function CampaignRoom() {
           </span>
         )}
         <span className="flex items-center gap-1 text-sm text-mist">{isMaster ? <><Crown size={14} className="text-ember" /> Você é o mestre</> : 'Você é jogador'}</span>
+        {!isMaster && (
+          <button type="button" className="btn btn-lit !min-h-8 px-3 text-sm" onClick={() => { requestGameFullscreen(); setGameMode(true); }} title="Jogar em tela cheia">
+            <Maximize2 size={15} /> Modo jogo
+          </button>
+        )}
+        {(() => {
+          const maps = isMaster ? scenes.filter((s) => s.map_kind === 'tiles' && !s.parent_scene_id).map((s) => ({ id: s.id, mapSceneId: s.id, name: `Mapa de ${s.name}` }))
+            : [...(sheet?.inventory || []), ...(sheet?.inventory || []).flatMap((it) => it.contents || [])].filter((it) => it?.mapSceneId);
+          if (!maps.length) return null;
+          const open = async (m) => {
+            setMapsOpen(false);
+            try {
+              const { data } = await api.get(`/campaigns/${id}/scenes/${m.mapSceneId}/worldmap`);
+              setWorldMap({ name: m.name, tiles: data.tiles });
+            } catch (err) { notify(err.response?.data?.message || 'Não deu para abrir o mapa.', 'error'); }
+          };
+          return (
+            <span className="relative">
+              <button type="button" className="btn btn-glass !min-h-8 px-2 text-sm" onClick={() => (maps.length === 1 ? open(maps[0]) : setMapsOpen((v) => !v))} aria-expanded={mapsOpen}>
+                <MapIcon size={15} /> {maps.length === 1 ? 'Abrir mapa' : 'Mapas'}
+              </button>
+              {mapsOpen && (
+                <span className="gothic-panel absolute left-0 top-full z-30 mt-1 flex w-60 flex-col rounded-md border-[3px] border-lead p-1">
+                  {maps.map((m) => <button key={m.id || m.mapSceneId} type="button" className="rounded px-2 py-1.5 text-left text-sm text-bone hover:bg-glass" onClick={() => open(m)}>{m.name}</button>)}
+                </span>
+              )}
+            </span>
+          );
+        })()}
         {isMaster && room.campaign.invite_code && (
           <button type="button" className="ml-auto flex items-center gap-1 text-sm text-mist hover:text-bone" onClick={() => navigator.clipboard?.writeText(room.campaign.invite_code).then(() => notify('Código de convite copiado.'))}>
             Convite <span className="font-bold tracking-wider text-ember">{room.campaign.invite_code}</span> <Copy size={13} />
@@ -555,12 +599,14 @@ export default function CampaignRoom() {
         )}
       </header>
 
+      {worldMap && <WorldMapOverlay name={worldMap.name} tiles={worldMap.tiles} onClose={() => setWorldMap(null)} />}
+
       {notice && (
         <div role="status" className={`fixed left-1/2 top-20 z-[60] -translate-x-1/2 border-[3px] border-lead px-4 py-2 shadow-2xl ${notice.type === 'error' ? 'bg-[#2a0b12] text-red-100' : 'lit'}`}>{notice.text}</div>
       )}
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <section className="relative flex min-h-[46svh] min-w-0 flex-1 flex-col lg:min-h-0" aria-label="Mesa virtual">
+        <section className="game-stage relative flex min-h-[46svh] min-w-0 flex-1 flex-col lg:min-h-0" aria-label="Mesa virtual">
           {scene?.mode === 'combat' && order.length > 0 && (
             <ol className="flex gap-1 overflow-x-auto border-b-[3px] border-lead bg-black/60 px-2 py-1.5" aria-label="Ordem de iniciativa">
               {order.map((e, i) => (
@@ -615,11 +661,48 @@ export default function CampaignRoom() {
               </div>
             )}
             {currentRoll && <DiceOverlay key={currentRoll.rollId} roll={currentRoll} onDone={() => setRollQueue((q) => q.slice(1))} />}
+            {gameMode && !isMaster && (
+              <GameMode
+                sheet={sheet}
+                rules={rules}
+                userId={user?.id}
+                campaignId={id}
+                scene={scene}
+                myToken={myToken}
+                isMyTurn={isMyTurn}
+                busy={busy}
+                isMaster={isMaster}
+                onRoll={roll}
+                onRollFree={async (body) => {
+                  skipOwnFree.current += 1;
+                  const r = await roll(body);
+                  if (!r) skipOwnFree.current = Math.max(0, skipOwnFree.current - 1);
+                  return r;
+                }}
+                onAttack={(power, formula) => setTargeting({ power, formula })}
+                pendingDamage={pendingDamage}
+                onDamage={rollDamage}
+                onEndTurn={() => api.post(`/campaigns/${id}/scenes/${scene.id}/combat/end-turn`).catch((err) => notify(err.response?.data?.message || 'Não deu.', 'error'))}
+                onPlaceToken={placeMyToken}
+                onOpenMap={async (m) => {
+                  try {
+                    const { data } = await api.get(`/campaigns/${id}/scenes/${m.mapSceneId}/worldmap`);
+                    setWorldMap({ name: m.name, tiles: data.tiles });
+                  } catch (err) { notify(err.response?.data?.message || 'Não deu para abrir o mapa.', 'error'); }
+                }}
+                onExit={() => { setGameMode(false); setGameChat(false); }}
+                chatOpen={gameChat}
+                onToggleChat={setGameChat}
+                notes={notes}
+                onNotesChanged={loadNotes}
+                targeting={Boolean(targeting)}
+              />
+            )}
             {targeting && (
               <button type="button" className="btn btn-glass absolute left-3 top-3 z-10 !min-h-10 text-sm" onClick={() => setTargeting(null)}><X size={15} /> Cancelar alvo</button>
             )}
           </div>
-          {!isMaster && (
+          {!isMaster && !gameMode && (
             <ActionBar
               sheet={sheet}
               myToken={myToken}
@@ -680,6 +763,7 @@ export default function CampaignRoom() {
                 notify={notify}
                 rules={rules}
                 onRulesChange={setRules}
+                reloadKey={sheetReload}
               />
             )}
             {tab === 'diary' && <div className="h-full overflow-y-auto p-3"><CampaignDiaryTab campaignId={id} isMaster={isMaster} currentUserId={user?.id} /></div>}

@@ -314,7 +314,7 @@ export function housePixels(b, tiles, { light = 'dia', style } = {}) {
 
   // ---------- RGBA + sombra no chao + luz da cena ----------
   const data = new Uint8ClampedArray(W * T * 4);
-  const tint = { entardecer: [242, 184, 144], noite: [58, 70, 136] }[light];
+  const tint = { entardecer: [242, 184, 144], noite: [104, 116, 180] }[light];
   for (let i = 0; i < W * T; i++) {
     const c = style && style !== 'padrao' && rgb[i] ? styleRgb(rgb[i][0], rgb[i][1], rgb[i][2], style) : rgb[i];
     if (!c) continue;

@@ -10,6 +10,7 @@ import { boolish, httpError, parseJson, requireDatabase } from '../utils/http.js
 import { buildingDoor, buildingLook, contentSchema, dracmasToCoins, MAX_CONTENTS, playerItem, playerTiles, validateTiles } from '../utils/tiles.js';
 import { assertRight, inventoryLimits, normalizeRules, tableRulesSchema } from '../utils/tableRules.js';
 import { inventoryLimitError, roundKg, unitWeight } from '../utils/itemWeight.js';
+import { STATS_LOCKED } from '../utils/sheetLocks.js';
 import { parseDiceFormula, rollDiceFormula, SKILL_DEFINITIONS } from '../utils/rules.js';
 import { enrich } from './character.routes.js';
 
@@ -39,8 +40,9 @@ const sceneFields = {
   grid_size: int(10, 400),
   grid_offset_x: int(-2000, 2000),
   grid_offset_y: int(-2000, 2000),
-  width: int(100, 20000),
-  height: int(100, 20000),
+  // mapa em tiles de ate 1000x1000 celulas com grid_size ate 400 px
+  width: int(100, 400000),
+  height: int(100, 400000),
   show_grid: boolish,
   fog_enabled: boolish,
   fog_reveals: z.array(rectSchema).max(1000),
@@ -70,8 +72,8 @@ const npcPatchSchema = z.object(npcFields).partial();
 const tokenFields = {
   name: z.string().trim().max(120),
   image_url: imageUrlSchema.nullable(),
-  x: z.coerce.number().min(-100000).max(100000),
-  y: z.coerce.number().min(-100000).max(100000),
+  x: z.coerce.number().min(-500000).max(500000),
+  y: z.coerce.number().min(-500000).max(500000),
   size: z.coerce.number().min(0.25).max(20),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
   hidden: boolish,
@@ -116,7 +118,8 @@ const hitSchema = z.object({
 const vitalsSchema = z.object({
   life_current: z.coerce.number().int().optional(),
   sanity_current: z.coerce.number().int().optional(),
-  mana_current: z.coerce.number().int().optional()
+  mana_current: z.coerce.number().int().optional(),
+  spell: z.string().max(120).optional() // nome da magia lancada (gasto de mana do proprio jogador)
 });
 const pickupSchema = z.object({
   itemId: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/),
@@ -170,7 +173,7 @@ async function visibleToPlayers(scene) {
   return scene.is_active || (await playerSceneIds(scene.campaign_id)).has(scene.id);
 }
 
-async function loadRules(campaignId) {
+export async function loadRules(campaignId) {
   const { rows } = await query('select table_rules from campaigns where id = $1', [campaignId]);
   return normalizeRules(parseJson(rows[0]?.table_rules, {}));
 }
@@ -300,7 +303,7 @@ async function emitTokenMoved(campaignId, token, userId) {
 }
 
 // ---------- fichas ----------
-async function sharedInCampaign(campaignId, characterId) {
+export async function sharedInCampaign(campaignId, characterId) {
   const { rowCount } = await query(
     'select 1 from campaign_members where campaign_id = $1 and coalesce(shared_character_id, character_id) = $2',
     [campaignId, characterId]
@@ -454,6 +457,12 @@ export function registerCampaignV2Routes(router) {
     const { master } = await requireCampaignMember(req.params.id, req.user);
     const character = await accessibleCharacter(req.params.id, req.params.characterId, req.user, master);
     const body = vitalsSchema.parse(req.body);
+    if (!master && (await loadRules(req.params.id)).sheet.stats === 'mestre') {
+      // regra 'mestre': o jogador so gasta a mana certa de uma magia que ele tem (lancar magia na mesa)
+      const spell = body.spell && parseJson(character.spells, []).find((entry) => entry.name === body.spell);
+      const onlyMana = body.life_current === undefined && body.sanity_current === undefined && body.mana_current !== undefined;
+      if (!spell || !onlyMana || Number(character.mana) - body.mana_current !== Number(spell.manaCost || 0)) throw httpError(STATS_LOCKED, 403);
+    }
     const life = clamp(body.life_current ?? character.life_current, 0, Number(character.life_max));
     const sanity = clamp(body.sanity_current ?? character.sanity_current, 0, Number(character.sanity_max));
     const mana = clamp(body.mana_current ?? character.mana, 0, Number(character.mana_max || character.mana));
@@ -1059,6 +1068,46 @@ export function registerCampaignV2Routes(router) {
     await emitSceneUpdated(req.params.id, interior, {}, req.user.id);
     await editTiles(req.params.id, parent.id, req.user.id, (t) => ({ ...t, buildings: t.buildings.map((b) => (b.id === building.id ? { ...b, interior: interior.id } : b)) }));
     res.status(201).json(sceneView(interior));
+  });
+
+  // ===== mapa-item: o mestre entrega o mapa da cena; quem tem o item abre o mapa completo =====
+  const worldTiles = (tiles) => {
+    const t = playerTiles(parseJson(tiles, null));
+    if (!t) return t;
+    // o mapa mostra o lugar, nao o saque: sem itens no chao
+    return { ...t, items: [] };
+  };
+  router.post('/:id/scenes/:sceneId/give-map', async (req, res) => {
+    await assertCampaignMaster(req.params.id, req.user);
+    const scene = await loadScene(req.params.id, req.params.sceneId, true);
+    if (scene.map_kind !== 'tiles') throw httpError('Só dá para entregar mapa de cena em pixel art.', 409);
+    const body = z.object({ characterIds: z.array(z.string().uuid()).max(50).optional(), name: z.string().trim().min(1).max(60).optional() }).parse(req.body || {});
+    const members = await query('select distinct coalesce(shared_character_id, character_id) as cid from campaign_members where campaign_id = $1 and coalesce(shared_character_id, character_id) is not null', [req.params.id]);
+    const ids = members.rows.map((r) => r.cid).filter((cid) => !body.characterIds || body.characterIds.includes(cid));
+    const given = [];
+    for (const cid of ids) {
+      const row = (await query('select id, inventory from characters where id = $1', [cid])).rows[0];
+      if (!row) continue;
+      await query('insert into campaign_map_grants (campaign_id, scene_id, character_id) values ($1, $2, $3) on conflict do nothing', [req.params.id, scene.id, cid]);
+      const inventory = parseJson(row.inventory, []);
+      if (inventory.some((it) => it?.mapSceneId === scene.id)) continue;
+      inventory.push({ id: crypto.randomUUID(), name: body.name || `Mapa de ${scene.name}`.slice(0, 60), quantity: 1, weight: 0.1, category: 'Achados', description: 'Abra para ver o mapa completo e os pontos principais.', defenseBonus: 0, icon: 'mapa', mapSceneId: scene.id });
+      await query('update characters set inventory = $1, updated_at = now() where id = $2', [JSON.stringify(inventory), cid]);
+      await emitEvent(req.params.id, 'character:updated', { characterId: cid }, 'all', req.user.id);
+      given.push(cid);
+    }
+    res.json({ given: given.length });
+  });
+  router.get('/:id/scenes/:sceneId/worldmap', async (req, res) => {
+    const { master, member } = await requireCampaignMember(req.params.id, req.user);
+    const scene = await loadScene(req.params.id, req.params.sceneId, true);
+    if (!master) {
+      const cid = member?.shared_character_id || member?.character_id;
+      // permissao gravada no servidor quando o mestre entregou o mapa (o item no inventario e so o atalho)
+      const grant = cid ? await query('select 1 from campaign_map_grants where scene_id = $1 and character_id = $2 and campaign_id = $3', [scene.id, cid, req.params.id]) : { rowCount: 0 };
+      if (!grant.rowCount) throw httpError('Você não tem o mapa deste lugar.', 403);
+    }
+    res.json({ id: scene.id, name: scene.name, tiles: master ? { ...parseJson(scene.tiles, null), items: [] } : worldTiles(scene.tiles) });
   });
 
   // ===== portas: entrar e sair das construcoes (interior e outra cena) =====

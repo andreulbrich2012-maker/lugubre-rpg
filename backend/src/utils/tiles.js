@@ -9,7 +9,10 @@ const PRINTABLE = /^[\x20-\x7E\u00A1-\u00FF]*$/;
 const MAX_LAYERS = 2;
 export const ITEM_CATEGORIES = ['Achados', 'Armas', 'Armaduras', 'Poções', 'Tesouro', 'Livros', 'Ingredientes', 'Outros'];
 const id = z.string().regex(/^[A-Za-z0-9_-]{1,40}$/, 'Id inválido.');
-const cell = z.number().int().min(0).max(79);
+export const MAX_TILES_SIZE = 1000;
+export const MAX_TILES_ITEMS = 2000;
+export const MAX_TILES_BUILDINGS = 3000;
+const cell = z.number().int().min(0).max(MAX_TILES_SIZE - 1);
 
 export const MAX_CONTENTS = 30;
 const baseItem = {
@@ -45,6 +48,7 @@ export const buildingLook = {
   design: z.string().regex(/^[a-z0-9-]{1,60}$/).optional(),
   material: z.enum(['tabuas', 'verticais', 'troncos', 'pedra', 'tijolo', 'reboco', 'vidro']).optional(),
   roofStyle: z.enum(['escama', 'ardosia', 'palha', 'vidro', 'tabuinhas']).optional(),
+  facing: z.enum(['sul', 'norte', 'leste', 'oeste']).optional(),
   colors: z.object({ roof: hex, wall: hex, trim: hex, wood: hex, stone: hex, window: hex, accent: hex }).partial().optional()
 };
 const buildingSchema = z.object({
@@ -52,8 +56,8 @@ const buildingSchema = z.object({
   id,
   x: cell,
   y: cell,
-  w: z.number().int().min(3).max(80),
-  h: z.number().int().min(3).max(80),
+  w: z.number().int().min(3).max(200),
+  h: z.number().int().min(3).max(200),
   name: z.string().trim().max(60).optional().default(''),
   roof: z.enum(['telha', 'telha-azul', 'palha', 'palha-escura', 'ardosia', 'ardosia-verde', 'madeira', 'madeira-escura']).optional().default('telha'),
   // fachada 3D (material da parede), porta trancada e o mapa do interior (outra cena)
@@ -64,12 +68,21 @@ const buildingSchema = z.object({
 });
 export const MAP_STYLES = ['padrao', 'obscuro', 'arco-iris', 'outono', 'inverno', 'primavera', 'verao-tropical', 'sepia', 'noturno-azul', 'pastel', 'neon', 'gotico', 'vitral', 'cinzas', 'sangue', 'gelo', 'floresta-encantada', 'deserto', 'pantano', 'aquarela'];
 const extrasSchema = z.object({
-  items: z.array(itemSchema).max(60, 'No máximo 60 itens no mapa.').optional().default([]),
-  buildings: z.array(buildingSchema).max(30, 'No máximo 30 construções no mapa.').optional().default([]),
+  items: z.array(itemSchema).max(MAX_TILES_ITEMS, `No máximo ${MAX_TILES_ITEMS} itens no mapa.`).optional().default([]),
+  buildings: z.array(buildingSchema).max(MAX_TILES_BUILDINGS, `No máximo ${MAX_TILES_BUILDINGS} construções no mapa.`).optional().default([]),
   light: z.enum(['dia', 'entardecer', 'noite']).optional(),
   decor: z.enum(['nenhuma', 'pouca', 'normal', 'muita']).optional(),
   // estilo global de cor do mapa (frontend/src/lib/tiles/styles.js: mesma lista de ids)
-  style: z.enum(MAP_STYLES).optional()
+  style: z.enum(MAP_STYLES).optional(),
+  // pontos principais (legenda numerada do mapa-item); hidden = so o mestre ve
+  pois: z.array(z.object({
+    id,
+    x: cell,
+    y: cell,
+    name: z.string().trim().min(1).max(60),
+    note: z.string().max(300).optional(),
+    hidden: z.boolean().optional()
+  })).max(99, 'No máximo 99 pontos principais no mapa.').optional()
 });
 
 // Valida o formato {cols, rows, layers:{nome:[linhas]}} com 1 caractere ASCII por celula,
@@ -83,7 +96,8 @@ export function playerItem({ note, ...item }) {
 export function playerTiles(tiles) {
   if (!tiles || typeof tiles !== 'object') return tiles;
   const items = Array.isArray(tiles.items) ? tiles.items.filter((item) => !item.hidden).map(playerItem) : tiles.items;
-  return { ...tiles, items };
+  const pois = Array.isArray(tiles.pois) ? tiles.pois.filter((p) => !p.hidden) : tiles.pois;
+  return { ...tiles, items, ...(pois ? { pois } : {}) };
 }
 
 // Porta de uma construcao: a declarada, senao a primeira porta (D, X, (, ?, ]) no contorno,
@@ -101,8 +115,8 @@ export function buildingDoor(tiles, b) {
 export function validateTiles(tiles) {
   if (!tiles || typeof tiles !== 'object') throw httpError('Mapa em tiles inválido.');
   const { cols, rows, layers } = tiles;
-  if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 4 || cols > 80 || rows < 4 || rows > 80) {
-    throw httpError('O mapa em tiles deve ter entre 4 e 80 colunas e linhas.');
+  if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 4 || cols > MAX_TILES_SIZE || rows < 4 || rows > MAX_TILES_SIZE) {
+    throw httpError(`O mapa em tiles deve ter entre 4 e ${MAX_TILES_SIZE} colunas e linhas.`);
   }
   if (!layers || typeof layers !== 'object' || Array.isArray(layers)) throw httpError('O mapa precisa de camadas (layers).');
   const names = Object.keys(layers);
@@ -122,7 +136,7 @@ export function validateTiles(tiles) {
     const issue = parsed.error.issues[0];
     throw httpError(`Mapa: ${issue.path.join('.')} — ${issue.message}`);
   }
-  const { items, buildings, light, decor, style } = parsed.data;
+  const { items, buildings, light, decor, style, pois } = parsed.data;
   for (const list of [items, buildings]) {
     if (new Set(list.map((entry) => entry.id)).size !== list.length) throw httpError('Mapa: ids repetidos em itens ou construções.');
   }
@@ -132,9 +146,10 @@ export function validateTiles(tiles) {
   }
   if (items.some((item) => item.x >= cols || item.y >= rows)) throw httpError('Mapa: item fora do mapa.');
   if (buildings.some((b) => b.x + b.w > cols || b.y + b.h > rows)) throw httpError('Mapa: construção fora do mapa.');
+  if ((pois || []).some((p) => p.x >= cols || p.y >= rows)) throw httpError('Mapa: ponto principal fora do mapa.');
   return {
     cols, rows, layers: Object.fromEntries(names.map((name) => [name, [...layers[name]]])),
-    items, buildings, ...(light ? { light } : {}), ...(decor ? { decor } : {}), ...(style && style !== 'padrao' ? { style } : {})
+    items, buildings, ...(light ? { light } : {}), ...(decor ? { decor } : {}), ...(style && style !== 'padrao' ? { style } : {}), ...(pois?.length ? { pois } : {})
   };
 }
 

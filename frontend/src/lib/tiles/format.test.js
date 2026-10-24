@@ -11,7 +11,7 @@ describe('formato do mapa', () => {
     expect(m.layers.ground[0]).toBe('..........');
     expect(m.layers.objects[0]).toBe('          ');
     expect(emptyMap(1, 999).cols).toBe(4);
-    expect(emptyMap(1, 999).rows).toBe(80);
+    expect(emptyMap(1, 99999).rows).toBe(1000);
   });
 
   it('validateMap acha erros', () => {

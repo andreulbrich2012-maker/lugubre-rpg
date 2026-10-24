@@ -5,6 +5,8 @@
 import { canvas, tone, hash, toImages, thumbnail } from './paint.js';
 import { WATER_TILES } from './water.js';
 import { STAMP3D } from './objects3d.js';
+import { palisadeIcon } from './fences.js';
+import { bonfireTile } from './bonfire.js';
 
 const N = 16;
 // Pinta 'n' imagens (variantes ou quadros) chamando fn(c, i) em cada canvas 16x16.
@@ -331,7 +333,14 @@ const TREES = Object.entries(TREE_KINDS).map(([code, k]) => {
   return { code, name: k.name, category: 'Natureza', layer: 'objects', solid: true, pixels: imgs[0], palette, tree: true };
 });
 
-export const MORE_TILES = [...TERRAINS, ...OBJECTS, ...STAMPS, ...TREES];
+// Palicada: toras pontudas altas que emendam com a vizinha (o desenho vem de fences.js; os
+// pixels aqui sao so o icone do editor e o modo sem embelezamento).
+const PALISADE = (() => {
+  const { images: imgs, palette } = palisadeIcon();
+  return { code: 'Æ', name: 'Paliçada', category: 'Paredes', layer: 'objects', solid: true, pixels: imgs[0], palette };
+})();
+
+export const MORE_TILES = [...TERRAINS, ...OBJECTS, ...STAMPS, bonfireTile(), PALISADE, ...TREES];
 
 // Repintura (auditoria 24/10): terrenos antigos que estavam chapados ganham textura rica e 3
 // variantes. So troca a imagem e a paleta; codigo, nome e regras continuam iguais.

@@ -30,6 +30,8 @@ export function createApp() {
     crossOriginResourcePolicy: false
   }));
   app.use(cors({ origin: corsOrigin }));
+  // cenas com mapa em tiles grande (ate 1000x1000 celulas, ~2-4 MB de JSON): limite maior so ali
+  app.use(/^\/api\/campaigns\/[^/]+\/scenes(\/|$)/, express.json({ limit: '16mb' }));
   app.use(express.json({ limit: '4mb' }));
 
   app.get('/health', (_, res) => res.json({ ok: true, name: 'Lúgubre RPG API' }));

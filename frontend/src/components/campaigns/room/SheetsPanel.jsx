@@ -6,6 +6,7 @@ import { api } from '../../../lib/api';
 import ItemIcon from '../../icons/ItemIcon';
 import { formatKg, inventoryLoad, itemLoad } from '../../../lib/itemWeight';
 import { inventoryLimits } from '../../../lib/tableRules';
+import MasterSheet, { MasterOverview } from './MasterSheet';
 
 // Fichas na campanha: o jogador escolhe qual ficha o mestre ve; o mestre abre a ficha inteira e mexe nos vitais.
 const VITALS = [
@@ -154,9 +155,34 @@ function FullSheet({ campaignId, characterId, isMaster, onBack, reloadKey, rules
 export default function SheetsPanel({ campaignId, members, myCharacters, myMember, isMaster, onShare, sharing, reloadKey, rules }) {
   const [open, setOpen] = useState(null);
   const [choice, setChoice] = useState(myMember?.shared_character_id || '');
+  // mestre: lista com vitais e carga de todos (recarrega a cada 'character:updated')
+  const [overview, setOverview] = useState(null);
+  const [overviewTick, setOverviewTick] = useState(0);
   useEffect(() => { setChoice(myMember?.shared_character_id || ''); }, [myMember?.shared_character_id]);
+  useEffect(() => {
+    if (!isMaster) return;
+    api.get(`/campaigns/${campaignId}/master/characters`).then(({ data }) => setOverview(data)).catch(() => setOverview((cur) => cur || []));
+  }, [isMaster, campaignId, reloadKey, overviewTick, members.length]);
 
+  if (open && isMaster) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <MasterSheet campaignId={campaignId} characterId={open} onBack={() => setOpen(null)} reloadKey={reloadKey} rules={rules} others={overview || []} />
+      </div>
+    );
+  }
   if (open) return <div className="h-full overflow-y-auto"><FullSheet campaignId={campaignId} characterId={open} isMaster={isMaster} onBack={() => setOpen(null)} reloadKey={reloadKey} rules={rules} /></div>;
+  if (isMaster) {
+    return (
+      <div className="h-full space-y-3 overflow-y-auto p-3">
+        <div>
+          <h3 className="font-display text-2xl text-bone">Fichas dos jogadores</h3>
+          <p className="text-sm text-mist">Visão geral da mesa. Abra uma ficha para mexer em tudo: vitais, atributos, inventário, poderes.</p>
+        </div>
+        <MasterOverview campaignId={campaignId} list={overview} onOpen={setOpen} onChanged={() => setOverviewTick((n) => n + 1)} />
+      </div>
+    );
+  }
 
   const shared = members.filter((m) => m.shared_character_id);
   return (

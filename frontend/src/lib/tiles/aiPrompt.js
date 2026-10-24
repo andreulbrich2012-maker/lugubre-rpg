@@ -1,6 +1,7 @@
 // Prompt para qualquer IA (servidor ou copiar/colar no ChatGPT/Claude/Gemini) gerar
 // um mapa no nosso formato, e o leitor tolerante da resposta.
 import { TILES, CATEGORIES, DEFAULT_GROUND } from './catalog.js';
+import { isPlan, planToMap } from './mapPlan.js';
 import { repairMap, isSolid, ITEM_CATEGORIES, MAX_ITEMS, MAX_BUILDINGS, MAX_CONTENTS } from './format.js';
 
 export function catalogText() {
@@ -187,6 +188,11 @@ export function parseMapResponse(text, cols, rows) {
   const fenced = [...src.matchAll(/```[a-zA-Z]*\s*\n?([\s\S]*?)```/g)].map((m) => m[1]);
   for (const chunk of [...fenced, src]) {
     const obj = findJsonObjects(chunk)[0];
+    // plano (areas, rios, estradas, construcoes em %): o sistema desenha
+    if (obj && isPlan(obj)) {
+      const r = planToMap(obj, { cols, rows });
+      return { ok: true, map: r.map, name: r.name, notes: r.notes, warnings: r.warnings, monsters: r.monsters, plan: true };
+    }
     const layers = obj && layersFrom(obj);
     if (layers) {
       const { map, warnings } = repairMap({ layers, items: extra(obj, 'items'), buildings: extra(obj, 'buildings') }, { cols, rows });

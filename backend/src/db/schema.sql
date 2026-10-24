@@ -109,6 +109,9 @@ alter table characters add column if not exists spells jsonb not null default '[
 alter table characters add column if not exists wallet jsonb not null default '{"bronze":0,"silver":0,"platinum":0,"gold":0}';
 alter table characters add column if not exists dice_settings jsonb not null default '{"quickRollModifier":0}';
 alter table characters add column if not exists appearance jsonb;
+-- condicoes (envenenado, caido...) e anotacoes da ficha; o mestre edita pela sala da campanha
+alter table characters add column if not exists conditions jsonb not null default '[]';
+alter table characters add column if not exists notes text not null default '';
 update characters set mana_max = mana where mana_max = 0 and mana > 0;
 
 create table if not exists character_saves (
@@ -734,3 +737,13 @@ create table if not exists rulebook_meta (
   value text not null default ''
 );
 insert into rulebook_meta ("key", value) values ('version', '0.5 Beta') on conflict ("key") do nothing;
+
+-- mapa-item: quem recebeu o mapa de qual cena (o inventario e editavel pelo jogador, entao a
+-- permissao de abrir o mapa fica aqui no servidor)
+create table if not exists campaign_map_grants (
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  scene_id uuid not null references campaign_scenes(id) on delete cascade,
+  character_id uuid not null references characters(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (scene_id, character_id)
+);

@@ -6,6 +6,7 @@
 // regras pequenas (tabuas, troncos, pedra, tijolo, reboco com enxaimel) com luz do alto-esquerda.
 // Puro (sem DOM): devolve RGBA; o Board e as previas em node usam o mesmo codigo.
 import { ramp, hexToRgb } from '../avatar/palette.js';
+import { applyStyle } from '../tiles/styles.js';
 
 const tone5 = (hex) => ramp(hex).map(hexToRgb);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -624,7 +625,7 @@ function drawTent(c, cx, groundY, w, h, colors) {
 // ---------- montagem ----------
 // spec: { w, h (celulas), volumes:[...], tower, vines, bushes, colors, seed }
 // Devolve { width, height, data, offsetY } no mesmo formato do house3d (16 px por celula).
-export function renderBuilding(spec, { light = 'dia', locked = false } = {}) {
+export function renderBuilding(spec, { light = 'dia', locked = false, style } = {}) {
   const S = 16;
   const W = spec.w * S + 8;
   const footH = spec.h * S;
@@ -663,12 +664,19 @@ export function renderBuilding(spec, { light = 'dia', locked = false } = {}) {
   }
   for (const [x, y] of add) c.set(x, y, OUT);
   // RGBA + sombra no chao + luz da cena
+  // estilo do mapa ANTES da luz, na mesma ordem do chao (render.js): senao o obscuro escurecia
+  // por cima da noite e a casa ficava bem mais funda que o resto do mapa
   const data = new Uint8ClampedArray(W * H * 4);
-  const tint = { entardecer: [242, 184, 144], noite: [58, 70, 136] }[light];
   for (let i = 0; i < W * H; i++) {
     const p = c.px[i]; if (!p) continue;
-    const m = tint && !c.glow[i] ? tint.map((v) => v / 255) : [1, 1, 1];
-    data[i * 4] = p[0] * m[0]; data[i * 4 + 1] = p[1] * m[1]; data[i * 4 + 2] = p[2] * m[2]; data[i * 4 + 3] = 255;
+    data[i * 4] = p[0]; data[i * 4 + 1] = p[1]; data[i * 4 + 2] = p[2]; data[i * 4 + 3] = 255;
+  }
+  applyStyle(data, style);
+  // noite de lua (azul claro, legivel) igual ao LIGHT_TINT do compose.js
+  const tint = { entardecer: [242, 184, 144], noite: [104, 116, 180] }[light];
+  if (tint) for (let i = 0; i < W * H; i++) {
+    if (!data[i * 4 + 3] || c.glow[i]) continue;
+    for (let k = 0; k < 3; k++) data[i * 4 + k] = (data[i * 4 + k] * tint[k]) / 255;
   }
   for (let y = groundY + 3; y < H; y++) for (let x = 6; x < W; x++) {
     const i = (y * W + x) * 4; if (data[i + 3]) continue;

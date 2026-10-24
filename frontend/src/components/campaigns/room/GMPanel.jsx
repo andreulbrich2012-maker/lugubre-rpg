@@ -3,6 +3,7 @@ import { Check, Eye, EyeOff, Heart, ImageUp, Map as MapIcon, Play, Plus, Skull, 
 import Button from '../../Button';
 import { api } from '../../../lib/api';
 import { normalizeRules } from '../../../lib/tableRules';
+import QuickPoints from './QuickPoints';
 
 // Painel do mestre: tudo que so ele controla. O mestre decide acerto e dano; os jogadores so veem o efeito.
 const CONDITIONS = ['caído', 'envenenado', 'atordoado', 'imobilizado', 'sangrando', 'amedrontado', 'invisível', 'inconsciente'];
@@ -90,8 +91,20 @@ function TableRules({ campaignId, rules, members, onRulesChange, notify }) {
           </label>
         ))}
       </div>
+      <p className="mt-4 font-bold text-bone">Quem mexe nas fichas</p>
+      <p className="text-xs text-mist">Vale para as fichas mostradas nesta campanha. Fora dela, o jogador continua livre.</p>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+        {[['stats', 'Vida, mana e sanidade'], ['powers', 'Ataques e magias']].map(([key, label]) => (
+          <label key={key} className="text-mist">{label}
+            <select className="field" disabled={saving} value={rules.sheet?.[key] || 'mestre'} onChange={(e) => save({ ...rules, sheet: { ...rules.sheet, [key]: e.target.value } }, e.target.value === 'mestre' ? `${label}: só o mestre muda.` : `${label}: o jogador também muda.`)}>
+              <option value="mestre">Só o mestre</option>
+              <option value="jogador">Mestre e jogador</option>
+            </select>
+          </label>
+        ))}
+      </div>
       <p className="mt-4 font-bold text-bone">Inventário dos jogadores</p>
-      <p className="text-xs text-mist">Vazio = sem limite. Mochilas guardam itens dentro: pesam, mas contam como 1 item.</p>
+      <p className="text-xs text-mist">Padrão: 30 kg e 9 itens. Vazio = sem limite. Mochilas guardam itens dentro: pesam, mas contam como 1 item.</p>
       <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
         <label className="text-mist">Peso máximo (kg)
           <input inputMode="decimal" className="field" placeholder="sem limite" value={draft.maxWeight} onChange={(e) => setDraft({ ...draft, maxWeight: e.target.value })} />
@@ -134,7 +147,7 @@ function Section({ title, children, open = true }) {
   );
 }
 
-export default function GMPanel({ campaignId, scenes, scene, viewSceneId, onViewScene, tokens, members, npcs, pending, onResolve, onDismiss, onChanged, onOpenTileEditor, notify, rules, onRulesChange }) {
+export default function GMPanel({ campaignId, scenes, scene, viewSceneId, onViewScene, tokens, members, npcs, pending, onResolve, onDismiss, onChanged, onOpenTileEditor, notify, rules, onRulesChange, reloadKey }) {
   const [monsters, setMonsters] = useState([]);
   const [newNpc, setNewNpc] = useState(null);
   const [amounts, setAmounts] = useState({});
@@ -180,6 +193,9 @@ export default function GMPanel({ campaignId, scenes, scene, viewSceneId, onView
 
   return (
     <div className="h-full overflow-y-auto">
+      <Section title="Pontos: vida, sanidade, mana">
+        <QuickPoints campaignId={campaignId} reloadKey={reloadKey} />
+      </Section>
       <Section title="Cena">
         <div className="flex gap-2">
           <select className="field !mt-0 flex-1" value={viewSceneId || ''} onChange={(e) => onViewScene(e.target.value)} aria-label="Cena em edição">
@@ -194,6 +210,9 @@ export default function GMPanel({ campaignId, scenes, scene, viewSceneId, onView
               {!scene.is_active && <Button className="!min-h-10 text-sm" disabled={busy} onClick={() => run(() => api.post(`/campaigns/${campaignId}/scenes/${scene.id}/activate`), 'Cena no ar para os jogadores.')}><Play size={15} /> Pôr no ar</Button>}
               <label className="btn btn-glass !min-h-10 cursor-pointer text-sm"><ImageUp size={15} /> Mapa do PC<input type="file" accept="image/*" className="sr-only" onChange={uploadMap} /></label>
               <button type="button" className="btn btn-glass !min-h-10 text-sm" onClick={() => onOpenTileEditor(scene)}><MapIcon size={15} /> Mapa em pixel art / IA</button>
+              {scene.map_kind === 'tiles' && !scene.parent_scene_id && (
+                <button type="button" className="btn btn-glass !min-h-10 text-sm" onClick={() => api.post(`/campaigns/${campaignId}/scenes/${scene.id}/give-map`).then(({ data }) => notify(data.given ? `Mapa entregue a ${data.given} personagem(ns).` : 'Todos já tinham este mapa.')).catch((err) => notify(err.response?.data?.message || 'Não deu para entregar o mapa.', 'error'))}><MapIcon size={15} /> Dar o mapa desta cena aos jogadores</button>
+              )}
               <button type="button" className="btn btn-glass !min-h-10 text-sm text-red-200" disabled={busy} onClick={() => window.confirm(`Apagar a cena “${scene.name}” e os tokens dela?`) && run(() => api.delete(`/campaigns/${campaignId}/scenes/${scene.id}`), 'Cena apagada.')}><Trash2 size={15} /></button>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm">

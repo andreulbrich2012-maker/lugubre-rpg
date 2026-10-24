@@ -15,14 +15,21 @@ import { createPlayer } from '../../lib/fx/player.js';
 //
 // onFrame({ shake: {x,y}, tokens: { [tokenId]: {x,y,flash} } }) a cada quadro com efeito
 // ativo (e uma vez zerado no fim), para o Board tremer o mapa e empurrar/piscar tokens.
-const FxLayer = forwardRef(function FxLayer({ width, height, cell = 64, pixel, reducedMotion, onImpact, onFrame, onDone, className = '', style }, ref) {
+// area ({x, y, w, h} em px do mapa, opcional): mapa grande (ate 1000x1000 celulas) nao cabe
+// num canvas so; o canvas cobre so essa janela (a vista) e o desenho e deslocado para ela.
+const FxLayer = forwardRef(function FxLayer({ width, height, cell = 64, pixel, reducedMotion, onImpact, onFrame, onDone, area, className = '', style }, ref) {
   const canvasRef = useRef(null);
   const rafRef = useRef(0);
   const cb = useRef({ onImpact, onFrame, onDone });
   cb.current = { onImpact, onFrame, onDone };
   const unit = pixel || Math.max(1, cell / 16);
-  const cw = Math.max(1, Math.ceil(width / unit));
-  const ch = Math.max(1, Math.ceil(height / unit));
+  // janela alinhada ao pixel de arte (unit) para o efeito nao tremer ao mover a vista
+  const ax = area ? Math.max(0, Math.floor(area.x / unit)) : 0;
+  const ay = area ? Math.max(0, Math.floor(area.y / unit)) : 0;
+  const cw = Math.max(1, area ? Math.min(Math.ceil(width / unit) - ax, Math.ceil(area.w / unit) + 1) : Math.ceil(width / unit));
+  const ch = Math.max(1, area ? Math.min(Math.ceil(height / unit) - ay, Math.ceil(area.h / unit) + 1) : Math.ceil(height / unit));
+  const offRef = useRef([0, 0]);
+  offRef.current = [ax, ay];
 
   const reduced = useMemo(() => {
     if (reducedMotion != null) return reducedMotion;
@@ -44,8 +51,11 @@ const FxLayer = forwardRef(function FxLayer({ width, height, cell = 64, pixel, r
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.setTransform(1, 0, 0, 1, -offRef.current[0], -offRef.current[1]);
     const frame = player.step(ctx, performance.now());
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     cb.current.onFrame?.(frame);
     if (frame.active) rafRef.current = requestAnimationFrame(loop);
     else {
@@ -72,7 +82,7 @@ const FxLayer = forwardRef(function FxLayer({ width, height, cell = 64, pixel, r
       height={ch}
       aria-hidden="true"
       className={`pointer-events-none absolute left-0 top-0 ${className}`}
-      style={{ width: cw * unit, height: ch * unit, imageRendering: 'pixelated', ...style }}
+      style={{ width: cw * unit, height: ch * unit, imageRendering: 'pixelated', ...(area ? { left: ax * unit, top: ay * unit } : {}), ...style }}
     />
   );
 });

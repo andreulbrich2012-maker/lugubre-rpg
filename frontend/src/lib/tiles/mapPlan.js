@@ -74,7 +74,7 @@ export const PLAN_BUILDINGS = {
   cripta: { pequena: ['cripta-7'], media: ['mausoleu-7'], grande: ['mausoleu-10'] },
   pescador: { pequena: ['pescador-5', 'palafita-4'], media: ['pescador-7', 'palafita-6'], grande: ['pescador-7'] },
   cabana_bruxa: { pequena: ['cabana-bruxa-5'], media: ['cabana-bruxa-6'], grande: ['cabana-bruxa-6'] },
-  tenda: { pequena: ['tenda-canadense-3', 'tenda-abrigo-3', 'tenda-redonda-4', 'barraca-acampamento-3'], media: ['tenda-canadense-4', 'tenda-redonda-5', 'tenda-abrigo-4', 'tenda-4-7'], grande: ['tenda-lider-7', 'tenda-lider-9', 'tenda-6-6'] },
+  tenda: { pequena: ['tenda-canadense-3', 'tenda-abrigo-3', 'tenda-redonda-4', 'barraca-acampamento-3'], media: ['tenda-canadense-4', 'tenda-redonda-5', 'tenda-abrigo-4', 'tenda-4-7'], grande: ['tenda-lider-7', 'tenda-lider-9'] },
   cogumelo: { pequena: ['cogumelo-4'], media: ['cogumelo-5'], grande: ['cogumelo-6'] }
 };
 
@@ -234,7 +234,8 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     if (!p.length) return [0, 0];
     return [Math.max(...p.map((q) => num(q[0]))) - Math.min(...p.map((q) => num(q[0]))), Math.max(...p.map((q) => num(q[1]))) - Math.min(...p.map((q) => num(q[1])))];
   };
-  const rank = (a) => (['pantano', 'neve', 'campo', 'areia'].includes(a.type) && bbox(a).every((v) => v >= SCALE * 0.8) ? -1 : ORDER[a.type]);
+  // terra quase do mapa todo (IA usa como "chao da cidade") tambem e fundo: o campo da vila fica por cima
+  const rank = (a) => ((['pantano', 'neve', 'campo', 'areia'].includes(a.type) && bbox(a).every((v) => v >= SCALE * 0.8)) || (a.type === 'terra' && bbox(a).every((v) => v >= SCALE * 0.6)) ? -1 : ORDER[a.type]);
   const areas = (Array.isArray(plan.areas) ? plan.areas : []).map((a) => ({ ...a, type: strip(a?.type ?? a?.tipo) })).filter((a) => ORDER[a.type] !== undefined).sort((a, b) => rank(a) - rank(b));
   const noHouse = new Uint8Array(C * R); // mercado, cemiterio, ritual: o bairro nao poe casa em cima
   const forest = new Uint8Array(C * R); // 1 bosque, 2 floresta, 3 montanha
@@ -243,6 +244,7 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
   const lake = new Uint8Array(C * R); // 1 = celula de lago
   for (const a of areas) {
     let cells = shapeCells(a);
+    if (a.type === 'terra' && cells.length >= C * R * 0.3) a.huge = true; // chao de terra do mapa quase todo: so manchas
     if (a.type === 'terra' && cells.length >= C * R * 0.06) { a.big = true; if (Array.isArray(a.rect)) a._cells = cells = shapeCells({ type: 'terra', points: [[a.rect[0], a.rect[1]], [num(a.rect[0]) + num(a.rect[2]), a.rect[1]], [num(a.rect[0]) + num(a.rect[2]), num(a.rect[1]) + num(a.rect[3])], [a.rect[0], num(a.rect[1]) + num(a.rect[3])]] }); }
     const cemetery = [];
     for (const [x, y, d] of cells) {
@@ -266,7 +268,7 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
         case 'areia': G[y][x] = ':'; forest[y * C + x] = 0; break;
         case 'terra':
           // terra grande (chao da vila, cais, patio) vira chao batido em manchas; a pequena (feira) e cheia
-          G[y][x] = !a.big || wob(x, y, 8) * 0.8 + rnd() * 0.2 - d * 0.25 > 0.3 ? ',' : 'g';
+          G[y][x] = a.huge ? (wob(x, y, 8) * 0.8 + rnd() * 0.2 > 0.66 ? ',' : rnd() < 0.5 ? 'g' : '.') : !a.big || wob(x, y, 8) * 0.8 + rnd() * 0.2 - d * 0.25 > 0.3 ? ',' : 'g';
           forest[y * C + x] = 0; break;
         case 'pantano': {
           // manchas de agua parada e lama no meio do capim (ruido), mais ralas na borda da area
@@ -507,7 +509,8 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
   for (const f of Array.isArray(plan.fences) ? plan.fences : []) {
     const [layer, ch] = FENCE[strip(f?.type ?? f?.tipo)] || FENCE.cerca;
     line(f?.points, (x, y) => {
-      if (!inside(x, y) || WATER.has(G[y][x]) || ';cû-,'.includes(G[y][x])) return; // deixa passagem nas estradas
+      // deixa passagem so nas estradas/ruas de verdade (chao de terra nao abre o muro)
+      if (!inside(x, y) || WATER.has(G[y][x]) || roadCell[y * C + x] || ';cû-'.includes(G[y][x])) return;
       if (layer === 'o') setO(x, y, ch); else G[y][x] = ch;
       lock[y * C + x] = 1; forest[y * C + x] = 0;
     });

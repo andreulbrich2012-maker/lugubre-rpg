@@ -97,14 +97,14 @@ ${items ? `- "items": coisas para os jogadores pegarem (até 20): {"x","y","name
 ${monsters ? '- "monsters": [{"name","x","y","hp"}] (até 12), em lugares onde dá para andar, longe da entrada.' : ''}
 
 ${fromImage ? `PASSO A PASSO (faça nesta ordem)
-0. TAMANHO: "cols" = 6 × (largura da imagem ÷ largura de uma casa comum); "rows" = cols × altura ÷ largura da imagem.
+0. TAMANHO (obrigatório): ponha "cols" e "rows" no JSON (números, no topo, junto de "name"). cols = 6 × (largura da imagem ÷ largura de uma casa comum); rows = cols × altura ÷ largura da imagem.
 1. NOMES: leia a legenda (1, 2, 3...) e todo nome escrito no mapa → "pois".
 2. VILA: siga com o dedo a borda da vila e faça a cerca com esses pontos (repita o 1º no fim): muralha de pedra cinza = "muro"; troncos = "palicada"; sem cerca na imagem = nenhuma.
 3. CHÃO: olhe entre a vila e a borda da imagem. Árvores grudadas cobrindo tudo → uma "floresta" do mapa inteiro [[0,0],[1000,0],[1000,1000],[0,1000]]. Grama verde aberta → NADA de floresta do mapa inteiro: uma "floresta" (points) para CADA mancha de mata, "bosque" para árvores soltas. "campo"/"clareira" para descampados; "rocha"/"montanha" onde houver; costa = "mar" até a borda + "areia" na praia.
 4. ÁGUA: o rio principal é o mais largo e passa perto da vila. Siga-o com o dedo na direção em que corre, fazendo cada curva, até ele tocar a moldura; essa borda é o "exit" (direita = "leste"). Onde um riacho desce para ele, NÃO troque de rio: continue no largo. Riacho/afluente = outro item que começa na borda ou na nascente e TERMINA num ponto do rio principal. Píer = "cais" da praia para dentro do mar.
 5. CAMINHOS: cada estrada até a borda (0 ou 1000); a estrada que contorna a vila também; ruas de "terra" da praça até cada grupo de casas.
 6. CASAS: um "bairro" para CADA amontoado de telhados, até os de 3–4 casas, do tamanho do amontoado (não junte dois). Vila pintada e apertada: "size":"pequena", "density":1.5.
-7. ESPECIAIS: em "buildings" cada prédio com nome e cada telhado diferente (castelo = pedra cinza com torre, templo, taverna junto à praça, capela, celeiro, estábulo, serraria...). Quadrado cercado com lápides = "cemiterio" (plantação tem fileiras de terra).
+7. ESPECIAIS: em "buildings" cada prédio com nome e cada telhado diferente (castelo = pedra cinza com torre, templo, taverna junto à praça, capela, celeiro, estábulo, serraria...). Casa de pedra cinza com sininho = "capela"; prédio com colunas na porta = "prefeitura"; "igreja_gotica" só se for escura, alta e pontuda. Quadrado cercado com lápides = "cemiterio" (plantação tem fileiras de terra).
 8. DETALHES: praça com fogueira grande, bancos e tochas em volta; mercado: área "terra" com barracas, tendas e carroça; placas nas saídas; troncos na serraria.
 9. CLIMA: igual ao da imagem (noite escura → "light": "noite"; tons sombrios → "style": "obscuro").
 
@@ -128,5 +128,5 @@ Ponha "mode":"texto" no JSON. O pedido costuma ser curto e informal: complete co
 9. Região grande (várias vilas): cada vila com praça, 5–8 bairros, prédios e cerca, ligadas por estradas curvas; vilas de tamanhos e formas diferentes (nada simétrico); o resto é floresta, campo, rio, lago ou montanha.
 
 `}EXEMPLO (só o formato; faça o seu):
-${JSON.stringify(fromImage ? PLAN_EXAMPLE : TEXT_EXAMPLE)}`;
+${JSON.stringify(fromImage ? { name: PLAN_EXAMPLE.name, cols: 84, rows: 62, ...PLAN_EXAMPLE } : TEXT_EXAMPLE)}`;
 }

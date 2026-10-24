@@ -196,4 +196,11 @@ describe('plano de mapa', () => {
     expect(r.map.buildings.length).toBeGreaterThan(100);
     expect(performance.now() - t).toBeLessThan(15000);
   });
+  it('terra do mapa quase todo e fundo: campo da cidade fica verde e o muro nao abre no chao de terra', () => {
+    const r = planToMap({ areas: [{ type: 'terra', rect: [0, 0, 800, 1000] }, { type: 'campo', rect: [200, 200, 400, 600] }], fences: [{ type: 'muro', points: [[150, 150], [650, 150], [650, 850], [150, 850], [150, 150]] }] }, { cols: 80, rows: 60 });
+    const g = r.map.layers.ground;
+    expect(g[30].slice(30, 40)).not.toMatch(/,/);
+    const top = g[Math.round(0.15 * 59)].slice(Math.round(0.2 * 79), Math.round(0.6 * 79));
+    expect(top).toMatch(/^ç+$/);
+  });
 });

@@ -138,4 +138,56 @@ describe('plano de mapa', () => {
     expect([r.map.cols, r.map.rows]).toEqual([66, 46]);
     expect(planToMap({ cols: 5000, rows: 900 }, { cols: 60, rows: 40 }).map.cols).toBe(300);
   });
+
+  it('composicao organica: mesmo plano e semente dao o mesmo mapa (deterministico)', () => {
+    const plan = { mode: 'texto', areas: [{ type: 'floresta', rect: [0, 0, 1000, 1000] }, { type: 'campo', rect: [100, 100, 800, 800] }, { type: 'bairro', density: 1.5, size: 'pequena', rect: [150, 150, 700, 700] }, { type: 'praca', circle: [500, 500, 60] }, { type: 'lago', circle: [850, 850, 80] }],
+      roads: [{ type: 'terra', points: [[150, 350], [850, 350]] }, { type: 'terra', points: [[150, 650], [850, 650]] }, { type: 'estrada', points: [[0, 500], [1000, 500]] }] };
+    const a = planToMap(plan, { cols: 90, rows: 80, seed: 7 }).map;
+    const b = planToMap(plan, { cols: 90, rows: 80, seed: 7 }).map;
+    expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+    expect(JSON.stringify(planToMap(plan, { cols: 90, rows: 80, seed: 8 }).map)).not.toBe(JSON.stringify(a));
+  });
+
+  it('bairro com ruas: casas nao se sobrepoem, nao pisam na rua e a maioria fica de frente para ela', () => {
+    const plan = { mode: 'texto', areas: [{ type: 'bairro', density: 1.5, size: 'pequena', rect: [50, 50, 900, 900] }],
+      roads: [{ type: 'terra', points: [[0, 330], [1000, 330]] }, { type: 'terra', points: [[0, 660], [1000, 660]] }, { type: 'terra', points: [[500, 0], [500, 1000]] }] };
+    const { map } = planToMap(plan, { cols: 100, rows: 90, seed: 3 });
+    const bs = map.buildings;
+    expect(bs.length).toBeGreaterThan(25);
+    for (const a of bs) for (const b of bs) if (a !== b) expect(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y).toBe(true);
+    // ninguem em cima de rua: o chao embaixo das casas nunca e a terra da rua sem ser a casa
+    const facingStreet = bs.filter((b) => {
+      const f = b.facing || 'sul';
+      const probe = f === 'sul' ? [[b.x + (b.w >> 1), b.y + b.h], [b.x + (b.w >> 1), b.y + b.h + 1], [b.x + (b.w >> 1), b.y + b.h + 2]] : f === 'norte' ? [[b.x + (b.w >> 1), b.y - 1], [b.x + (b.w >> 1), b.y - 3], [b.x + (b.w >> 1), b.y - 4]] : f === 'leste' ? [[b.x + b.w, b.y + (b.h >> 1)], [b.x + b.w + 1, b.y + (b.h >> 1)], [b.x + b.w + 2, b.y + (b.h >> 1)]] : [[b.x - 1, b.y + (b.h >> 1)], [b.x - 2, b.y + (b.h >> 1)], [b.x - 3, b.y + (b.h >> 1)]];
+      return probe.some(([x, y]) => map.layers.ground[y]?.[x] === ',');
+    });
+    expect(facingStreet.length / bs.length).toBeGreaterThan(0.5);
+    // vizinhas nao repetem o mesmo projeto lado a lado
+    let same = 0;
+    for (const a of bs) for (const b of bs) if (a !== b && a.design === b.design && Math.abs(a.y - b.y) <= 1 && Math.abs(a.x + a.w - b.x) <= 2) same++;
+    expect(same / bs.length).toBeLessThan(0.15);
+  });
+
+  it('rua reta comprida do modo texto ganha curva mas as pontas ficam no lugar', () => {
+    const { map } = planToMap({ mode: 'texto', roads: [{ type: 'terra', width: 1, points: [[0, 500], [1000, 500]] }] }, { cols: 100, rows: 60, seed: 5 });
+    const rows = [];
+    for (let x = 0; x < 100; x++) { const y = map.layers.ground.findIndex((r) => r[x] === ','); rows.push(y); }
+    expect(rows[0]).toBeGreaterThanOrEqual(29); expect(rows[0]).toBeLessThanOrEqual(30);
+    expect(rows[99]).toBeGreaterThanOrEqual(29); expect(rows[99]).toBeLessThanOrEqual(30);
+    expect(Math.max(...rows.map((y) => Math.abs(y - 29.5)))).toBeGreaterThanOrEqual(2);
+  });
+
+  it('bairro grande sem rua ganha viela por dentro', () => {
+    const { map } = planToMap({ areas: [{ type: 'bairro', rect: [200, 200, 600, 600] }] }, { cols: 80, rows: 80, seed: 2 });
+    expect(map.layers.ground.slice(18, 62).join('')).toContain(',');
+  });
+
+  it('mapa grande (1000x1000) continua rapido', () => {
+    const plan = { mode: 'texto', areas: [{ type: 'floresta', rect: [0, 0, 1000, 1000] }, { type: 'campo', rect: [100, 100, 800, 800] }, { type: 'bairro', density: 1.2, rect: [200, 200, 600, 600] }, { type: 'mar', rect: [900, 0, 100, 1000] }],
+      roads: [{ type: 'terra', points: [[200, 500], [800, 500]] }, { type: 'estrada', points: [[0, 400], [900, 400]] }] };
+    const t = performance.now();
+    const r = planToMap(plan, { cols: 1000, rows: 1000 });
+    expect(r.map.buildings.length).toBeGreaterThan(100);
+    expect(performance.now() - t).toBeLessThan(15000);
+  });
 });

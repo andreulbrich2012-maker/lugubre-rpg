@@ -663,6 +663,11 @@ alter table campaign_scenes drop constraint if exists campaign_scenes_move_mode_
 alter table campaign_scenes add constraint campaign_scenes_move_mode_check check (move_mode in ('free', 'grid'));
 alter table campaign_scenes add column if not exists mode text not null default 'prep';
 alter table campaign_scenes add column if not exists movement_per_turn int not null default 6;
+-- interior de construcao (pixel art): cena filha ligada a uma construcao da cena-mae (24/10)
+alter table campaign_scenes add column if not exists parent_scene_id uuid references campaign_scenes(id) on delete set null;
+alter table campaign_scenes add column if not exists parent_building_id text;
+-- regras da mesa que o mestre controla: mover, poderes, pegar itens, vez de alguem e excecoes por jogador
+alter table campaigns add column if not exists table_rules jsonb not null default '{}';
 alter table campaign_scenes add column if not exists turn_state jsonb not null default '{}';
 alter table campaign_scenes drop constraint if exists campaign_scenes_mode_check;
 alter table campaign_scenes add constraint campaign_scenes_mode_check check (mode in ('prep', 'exploration', 'combat'));

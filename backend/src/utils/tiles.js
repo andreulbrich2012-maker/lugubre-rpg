@@ -19,7 +19,12 @@ const itemSchema = z.object({
   quantity: z.number().int().min(1).max(999).optional().default(1),
   weight: z.number().min(0).max(1000).optional().default(0),
   category: z.enum(ITEM_CATEGORIES).optional().default('Achados'),
-  dracmas: z.number().int().min(0).max(100000).optional()
+  dracmas: z.number().int().min(0).max(100000).optional(),
+  // configuracao do mestre: pegavel, escondido dos jogadores, nota secreta e icone pixel art
+  pickable: z.boolean().optional(),
+  hidden: z.boolean().optional(),
+  note: z.string().max(300).optional(),
+  icon: z.string().regex(/^[a-z0-9_-]{1,60}$/).optional()
 });
 const buildingSchema = z.object({
   id,
@@ -28,7 +33,12 @@ const buildingSchema = z.object({
   w: z.number().int().min(3).max(80),
   h: z.number().int().min(3).max(80),
   name: z.string().trim().max(60).optional().default(''),
-  roof: z.enum(['telha', 'telha-azul', 'palha', 'palha-escura', 'ardosia', 'ardosia-verde', 'madeira', 'madeira-escura']).optional().default('telha')
+  roof: z.enum(['telha', 'telha-azul', 'palha', 'palha-escura', 'ardosia', 'ardosia-verde', 'madeira', 'madeira-escura']).optional().default('telha'),
+  // fachada 3D (material da parede), porta trancada e o mapa do interior (outra cena)
+  wall: z.enum(['madeira', 'pedra', 'tijolo', 'enxaimel']).optional(),
+  locked: z.boolean().optional(),
+  interior: z.string().uuid().optional().nullable(),
+  door: z.object({ x: cell, y: cell }).optional()
 });
 const extrasSchema = z.object({
   items: z.array(itemSchema).max(60, 'No máximo 60 itens no mapa.').optional().default([]),
@@ -39,6 +49,25 @@ const extrasSchema = z.object({
 
 // Valida o formato {cols, rows, layers:{nome:[linhas]}} com 1 caractere ASCII por celula,
 // mais os itens pegaveis e as construcoes (dentro do mapa, ids unicos).
+// O que o jogador recebe do mapa: sem itens escondidos e sem a nota secreta do mestre.
+export function playerTiles(tiles) {
+  if (!tiles || typeof tiles !== 'object') return tiles;
+  const items = Array.isArray(tiles.items) ? tiles.items.filter((item) => !item.hidden).map(({ note, ...item }) => item) : tiles.items;
+  return { ...tiles, items };
+}
+
+// Porta de uma construcao: a declarada, senao a primeira porta (D, X, (, ?, ]) no contorno,
+// senao o meio da parede de baixo (fachada 3D sempre tem porta embaixo).
+const DOOR_CODES = new Set(['D', 'X', '(', '?', ']']);
+export function buildingDoor(tiles, b) {
+  if (b.door) return b.door;
+  const g = tiles?.layers?.ground || [];
+  for (let x = b.x; x < b.x + b.w; x++) if (DOOR_CODES.has(g[b.y + b.h - 1]?.[x])) return { x, y: b.y + b.h - 1 };
+  for (let y = b.y; y < b.y + b.h; y++) for (const x of [b.x, b.x + b.w - 1]) if (DOOR_CODES.has(g[y]?.[x])) return { x, y };
+  for (let x = b.x; x < b.x + b.w; x++) if (DOOR_CODES.has(g[b.y]?.[x])) return { x, y: b.y };
+  return { x: b.x + Math.floor(b.w / 2), y: b.y + b.h - 1 };
+}
+
 export function validateTiles(tiles) {
   if (!tiles || typeof tiles !== 'object') throw httpError('Mapa em tiles inválido.');
   const { cols, rows, layers } = tiles;

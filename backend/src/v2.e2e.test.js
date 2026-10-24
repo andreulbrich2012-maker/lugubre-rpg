@@ -300,6 +300,84 @@ describe.skipIf(!hasDb)('API v2 com Postgres', () => {
     await master.api.post(`${base()}/scenes/${scene.id}/combat/end`).expect(200);
   });
 
+  it('casas com interior, portas trancadas, regras do mestre e itens configuraveis', async () => {
+    const { body: vila } = await master.api.post(`${base()}/scenes`, { name: 'Vila', grid_size: 70 }).expect(201);
+    await master.api.post(`${base()}/scenes/${vila.id}/activate`).expect(200);
+    const ground = ['........', '........', '........', '........', '........', '........', '........', '........'];
+    const tiles = {
+      cols: 8, rows: 8, layers: { ground },
+      buildings: [{ id: 'casa', x: 2, y: 1, w: 4, h: 3, name: 'Casa', roof: 'telha', wall: 'madeira', locked: true }],
+      items: [
+        { id: 'secreto', x: 1, y: 6, name: 'Anel escondido', hidden: true, note: 'só o mestre sabe' },
+        { id: 'pesado', x: 1, y: 6, name: 'Bigorna', pickable: false },
+        { id: 'pao', x: 1, y: 6, name: 'Pão', note: 'nota secreta' }
+      ]
+    };
+    await master.api.patch(`${base()}/scenes/${vila.id}`, { map_kind: 'tiles', tiles, mode: 'exploration' }).expect(200);
+    // jogador nao recebe item escondido nem nota do mestre
+    const seen = (await player.api.get(`${base()}/scenes/${vila.id}`).expect(200)).body.tiles.items;
+    expect(seen.map((it) => it.id)).toEqual(['pesado', 'pao']);
+    expect(seen.some((it) => 'note' in it)).toBe(false);
+    expect((await master.api.get(`${base()}/scenes/${vila.id}`).expect(200)).body.tiles.items).toHaveLength(3);
+
+    // token do jogador na frente da porta (porta = meio da parede de baixo: x 4, y 3)
+    const { body: tok } = await player.api.post(`${base()}/scenes/${vila.id}/tokens`, { kind: 'character', x: 4 * 70, y: 4 * 70 }).expect(201);
+    const enter = () => player.api.post(`${base()}/scenes/${vila.id}/buildings/casa/enter`, {});
+    expect((await enter().expect(409)).body.message).toBe('A porta está trancada.');
+    await master.api.patch(`${base()}/scenes/${vila.id}/buildings/casa`, { locked: false }).expect(200);
+    expect((await enter().expect(409)).body.message).toBe('Esta construção ainda não tem interior.');
+    const { body: interior } = await master.api.post(`${base()}/scenes/${vila.id}/buildings/casa/interior`).expect(201);
+    expect(interior.parent_scene_id).toBe(vila.id);
+    expect(interior.tiles.layers.ground.at(-1)).toContain('D');
+
+    // regras: movimento travado so para este jogador
+    await master.api.put(`${base()}/rules`, { players: { [player.user.id]: { move: false } } }).expect(200);
+    expect((await enter().expect(403)).body.message).toBe('O mestre travou o movimento agora.');
+    await player.api.patch(`${base()}/tokens/${tok.id}`, { x: 4 * 70 + 5 }).expect(403);
+    await master.api.put(`${base()}/rules`, {}).expect(200);
+
+    const cursor = (await player.api.get(`${base()}/events`).expect(200)).body.cursor;
+    const { body: inside } = await enter().expect(200);
+    expect(inside.sceneId).toBe(interior.id);
+    const moved = await eventsAfter(player.api, cursor);
+    expect(moved.some((event) => event.type === 'token:scene' && event.payload.to === interior.id)).toBe(true);
+    // o jogador ve e anda no interior (nao e a cena no ar)
+    await player.api.get(`${base()}/scenes/${interior.id}`).expect(200);
+    const scenesForPlayer = (await player.api.get(`${base()}/scenes`).expect(200)).body.map((x) => x.id);
+    expect(scenesForPlayer).toEqual(expect.arrayContaining([vila.id, interior.id]));
+    await player.api.patch(`${base()}/tokens/${tok.id}`, { x: inside.token.x + 10 }).expect(200);
+    // longe da porta de dentro nao sai; perto sai e volta para a frente da casa
+    await player.api.patch(`${base()}/tokens/${tok.id}`, { x: 70, y: 70 }).expect(200);
+    expect((await player.api.post(`${base()}/scenes/${interior.id}/exit`, {}).expect(409)).body.message).toBe('Chegue mais perto da porta.');
+    const doorX = Math.floor(interior.tiles.cols / 2);
+    await player.api.patch(`${base()}/tokens/${tok.id}`, { x: doorX * 70, y: (interior.tiles.rows - 2) * 70 }).expect(200);
+    const { body: out } = await player.api.post(`${base()}/scenes/${interior.id}/exit`, {}).expect(200);
+    expect(out.sceneId).toBe(vila.id);
+    expect(out.token.y).toBe(4 * 70);
+
+    // pegar: escondido e nao pegavel recusados; regra de pegar travada para todos
+    const pick = (itemId) => player.api.post(`${base()}/scenes/${vila.id}/pickup`, { itemId });
+    await player.api.patch(`${base()}/tokens/${tok.id}`, { x: 1 * 70, y: 6 * 70 }).expect(200);
+    expect((await pick('secreto').expect(409)).body.message).toBe('Já pegaram esse item.');
+    expect((await pick('pesado').expect(409)).body.message).toBe('Este item não pode ser pego.');
+    await master.api.put(`${base()}/rules`, { pickup: false }).expect(200);
+    expect((await pick('pao').expect(403)).body.message).toBe('O mestre não liberou pegar itens agora.');
+    await master.api.put(`${base()}/rules`, {}).expect(200);
+    await master.api.patch(`${base()}/scenes/${vila.id}/items/secreto`, { hidden: false }).expect(200);
+    await pick('secreto').expect(201);
+
+    // vez de alguem fora do combate e poderes travados
+    const { body: npc } = await master.api.post(`${base()}/scenes/${vila.id}/tokens`, { kind: 'npc', name: 'Guarda', x: 0, y: 0 }).expect(201);
+    await master.api.put(`${base()}/rules`, { turn: npc.id }).expect(200);
+    expect((await player.api.patch(`${base()}/tokens/${tok.id}`, { x: 70 }).expect(409)).body.message).toBe('Agora é a vez de outro personagem.');
+    await master.api.put(`${base()}/rules`, { turn: tok.id, powers: false }).expect(200);
+    await player.api.patch(`${base()}/tokens/${tok.id}`, { x: 70 }).expect(200);
+    expect((await player.api.post(`${base()}/rolls`, { formula: '1d20', kind: 'attack', characterId: playerCharacter.id }).expect(403)).body.message).toBe('O mestre travou poderes e ataques agora.');
+    await player.api.post(`${base()}/rolls`, { formula: '1d20', kind: 'free' }).expect(201);
+    expect((await player.api.get(`${base()}/rules`).expect(200)).body.powers).toBe(false);
+    await master.api.put(`${base()}/rules`, {}).expect(200);
+  });
+
   it('correcoes: compra sem personagem, booleanos, diario e erros sem vazar SQL', async () => {
     const { body: shop } = await master.api.post(`${base()}/shops`, { name: 'Oculta', category: 'Taverna', visibleToPlayers: 'false' }).expect(201);
     expect(shop.visible_to_players).toBe(false);

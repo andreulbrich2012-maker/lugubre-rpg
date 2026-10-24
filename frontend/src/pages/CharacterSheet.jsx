@@ -555,7 +555,7 @@ function PlayEditor({ draft, setDraft, skillsCatalog, onRoll, roll }) {
       <div className="grid gap-2 md:grid-cols-2">
         {rows.map((skill) => (
           <div key={skill.key} className="grid grid-cols-[minmax(0,1fr)_72px_44px] items-center gap-2 border-b-[3px] border-lead pb-2 text-sm">
-            <span className="truncate text-bone">{skill.name}</span>
+            <span className="break-words leading-tight text-bone">{skill.name}</span>
             <input type="number" min="0" max="15" step="5" className="pane px-2 py-1 text-center" value={skill.value} onChange={(event) => updateSkill(skill.key, event.target.value)} />
             <button type="button" className="grid h-11 w-11 place-items-center border-[3px] border-lead text-ember" onClick={() => onRoll(skill, skill.value)}><Dice5 size={16} /></button>
           </div>
@@ -837,7 +837,7 @@ function PowerCard({ item, field, editing, index, onRoll, onEdit, onDelete, onUp
               <div className="min-w-0 flex-1">
                 <h4 className="break-words font-display text-2xl leading-tight text-bone">{item.name}</h4>
               </div>
-              <div className="shrink-0 field !mt-0 min-h-11 text-right">
+              <div className="shrink-0 border-[3px] border-lead bg-black/45 px-3 py-1.5 text-right">
                 <p className="text-xs font-bold text-mist">Dano</p>
                 <p className="break-all font-semibold text-ember">{item.damage || '-'}</p>
               </div>
@@ -1077,7 +1077,7 @@ function SkillTable({ sheet, skills, skillBonuses, skillsCatalog, onTrainingChan
           <article key={skill.key} className="pane p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="truncate font-semibold text-bone">{skill.name}</h3>
+                <h3 className="break-words font-semibold text-bone">{skill.name}</h3>
                 <p className="text-xs text-ember">Dado ({sheet.attributes?.[skill.attribute] ?? 2})</p>
               </div>
               <button type="button" className="grid h-11 w-11 shrink-0 place-items-center border-[3px] border-lead text-ember" onClick={() => onRoll(skill, skills?.[skill.key] ?? 0, skillBonuses?.[skill.key] ?? 0)}><Dice5 size={17} /></button>
@@ -1100,14 +1100,14 @@ function SkillTable({ sheet, skills, skillBonuses, skillsCatalog, onTrainingChan
         ))}
       </div>
       <div className="mt-4 hidden overflow-x-auto pb-2 sm:block">
-        <div className="min-w-[560px]">
-          <div className="grid grid-cols-[minmax(120px,1fr)_52px_116px_64px_44px] gap-x-2 text-xs text-mist sm:grid-cols-[1fr_64px_132px_72px_44px] sm:gap-x-3">
+        <div className="min-w-[32rem]">
+          <div className="grid grid-cols-[minmax(9rem,1fr)_52px_124px_64px_44px] gap-x-3 text-xs text-mist">
             <span>Perícia</span><span>Dado</span><span>Treino</span><span>Outros</span><span>Rolar</span>
           </div>
-          <div className="mt-2 grid gap-x-5 2xl:grid-cols-2">
+          <div className="mt-2 grid gap-x-6" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(32rem, 1fr))' }}>
             {skillsCatalog.map((skill) => (
-              <div key={skill.key} className="grid grid-cols-[minmax(120px,1fr)_52px_116px_64px_44px] items-center gap-x-2 border-b-[3px] border-lead py-2 text-sm sm:grid-cols-[1fr_64px_132px_72px_44px] sm:gap-x-3">
-                <span className="truncate text-bone">{skill.name}</span>
+              <div key={skill.key} className="grid grid-cols-[minmax(9rem,1fr)_52px_124px_64px_44px] items-center gap-x-3 border-b-[3px] border-lead py-2 text-sm">
+                <span className="break-words leading-tight text-bone">{skill.name}</span>
                 <span className="text-ember">({sheet.attributes?.[skill.attribute] ?? 2})</span>
                 <div className="grid grid-cols-[44px_1fr_44px] items-center pane">
                   <button type="button" className="h-11 text-mist hover:text-bone" onClick={() => onTrainingChange(skill.key, Number(skills?.[skill.key] || 0) - 5)}>-</button>

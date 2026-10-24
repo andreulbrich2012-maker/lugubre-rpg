@@ -96,42 +96,16 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 // Fora do mapa: nevoa leve que engrossa longe da borda (a continuacao em si e o padMap).
 function EdgeMist({ cell, width, height }) {
   const pad = PAD * cell;
-  const fade = 'rgba(10,12,14,.5)';
+  const fade = 'rgba(10,12,14,.18)'; // so uma bruma leve: nada de breu em volta
   const side = (style) => <div className="pointer-events-none absolute" style={style} aria-hidden="true" />;
   return (
     <>
-      {side({ left: -pad, top: -pad, width: width + pad * 2, height: pad, background: `linear-gradient(to top, transparent 40%, ${fade})` })}
-      {side({ left: -pad, top: height, width: width + pad * 2, height: pad, background: `linear-gradient(to bottom, transparent 40%, ${fade})` })}
-      {side({ left: -pad, top: 0, width: pad, height, background: `linear-gradient(to left, transparent 40%, ${fade})` })}
-      {side({ left: width, top: 0, width: pad, height, background: `linear-gradient(to right, transparent 40%, ${fade})` })}
+      {side({ left: -pad, top: -pad, width: width + pad * 2, height: pad, background: `linear-gradient(to top, transparent 70%, ${fade})` })}
+      {side({ left: -pad, top: height, width: width + pad * 2, height: pad, background: `linear-gradient(to bottom, transparent 70%, ${fade})` })}
+      {side({ left: -pad, top: 0, width: pad, height, background: `linear-gradient(to left, transparent 70%, ${fade})` })}
+      {side({ left: width, top: 0, width: pad, height, background: `linear-gradient(to right, transparent 70%, ${fade})` })}
     </>
   );
-}
-
-// Visao do jogador: escurece tudo fora de um circulo em volta do proprio personagem. Posicao
-// lida a cada quadro (o token anda sem re-render); raio em celulas do mapa.
-function VisionMask({ tokenRef, view, cell, radius }) {
-  const el = useRef(null);
-  const viewRef = useRef(view);
-  viewRef.current = view;
-  const posRef = useRef(tokenRef);
-  posRef.current = tokenRef;
-  useEffect(() => {
-    let raf = 0;
-    const tick = () => {
-      raf = requestAnimationFrame(tick);
-      const t = posRef.current();
-      const v = viewRef.current;
-      if (!el.current || !t) return;
-      const half = ((t.size || 1) * cell) / 2;
-      const x = v.x + (t.x + half) * v.z; const y = v.y + (t.y + half) * v.z;
-      const r = radius * cell * v.z;
-      el.current.style.background = `radial-gradient(circle at ${x}px ${y}px, transparent ${r * 0.72}px, rgba(4,3,8,.82) ${r}px, rgba(4,3,8,.97) ${r * 1.25}px)`;
-    };
-    tick();
-    return () => cancelAnimationFrame(raf);
-  }, [cell, radius]);
-  return <div ref={el} className="pointer-events-none absolute inset-0 z-[5]" aria-hidden="true" />;
 }
 
 export default function Board({
@@ -201,6 +175,22 @@ export default function Board({
   const [view, setView] = useState({ x: 0, y: 0, z: 1 });
   // tamanho da area da mesa (para saber o que aparece: mapa grande desenha so a vista)
   const [vsize, setVsize] = useState({ w: 1200, h: 800 });
+  // moldura 16:9 do jogador (o maior retangulo 16:9 que cabe na area da mesa)
+  const frameRef = useRef(null);
+  const [frameBox, setFrameBox] = useState(null);
+  useEffect(() => {
+    const el = frameRef.current;
+    if (!el) return undefined;
+    const read = () => setFrameBox((cur) => (cur && cur.w === el.clientWidth && cur.h === el.clientHeight ? cur : { w: el.clientWidth, h: el.clientHeight }));
+    read();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const frame16 = !isMaster && frameBox && frameBox.w > 0 && frameBox.h > 0
+    ? (frameBox.w / frameBox.h > 16 / 9 ? { w: Math.round(frameBox.h * 16 / 9), h: frameBox.h } : { w: frameBox.w, h: Math.round(frameBox.w * 9 / 16) })
+    : null;
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return undefined;
@@ -212,7 +202,16 @@ export default function Board({
     return () => ro.disconnect();
   }, []);
   // zoom minimo: mapa enorme (1000x1000) precisa caber inteiro na tela
-  const minZoom = Math.min(0.15, Math.min(vsize.w / width, vsize.h / height) * 0.9);
+  const baseMinZoom = Math.min(0.15, Math.min(vsize.w / width, vsize.h / height) * 0.9);
+  // jogador: nunca ve o fundo preto (no maximo o mapa + a margem de continuacao) e a "visao" do
+  // mestre so limita o quanto ele afasta o zoom (ve no maximo ~2r+1 celulas de largura)
+  const playerMinZoom = !isMaster && isTiles && vsize.w > 0 ? Math.max(
+    Math.max(vsize.w / (width + 2 * PAD * cell), vsize.h / (height + 2 * PAD * cell)),
+    visionCells ? Math.max(vsize.w, vsize.h) / ((2 * visionCells + 1) * cell) : 0
+  ) : 0;
+  const minZoom = Math.min(4, Math.max(baseMinZoom, playerMinZoom));
+  const minZoomRef = useRef(minZoom);
+  minZoomRef.current = minZoom;
   const [local, setLocal] = useState({});
   const localRef = useRef(local);
   localRef.current = local;
@@ -401,9 +400,32 @@ export default function Board({
     const fitZ = Math.min(el.clientWidth / width, el.clientHeight / height);
     // mapa de ate 200 celulas abre como antes (zoom minimo 0.2); maior que isso cabe inteiro
     const huge = width / cell > 200 || height / cell > 200;
-    const z = clamp(fitZ, huge ? Math.min(0.2, fitZ) : 0.2, 2);
+    const z = Math.max(clamp(fitZ, huge ? Math.min(0.2, fitZ) : 0.2, 2), minZoomRef.current);
     setView({ z, x: (el.clientWidth - width * z) / 2, y: (el.clientHeight - height * z) / 2 });
   }, [width, height, cell]);
+  // jogador nao arrasta a vista para alem do mapa + margem (o fundo preto nunca aparece)
+  useEffect(() => {
+    if (isMaster || !isTiles || !vsize.w) return;
+    const pad = PAD * cell;
+    setView((v) => {
+      const fitAxis = (pos, span, vis) => {
+        const total = (span + 2 * pad) * v.z;
+        if (total <= vis) return (vis - span * v.z) / 2; // cabe inteiro: centraliza
+        return clamp(pos, vis - (span + pad) * v.z, pad * v.z);
+      };
+      const x = fitAxis(v.x, width, vsize.w); const y = fitAxis(v.y, height, vsize.h);
+      return Math.abs(x - v.x) < 0.5 && Math.abs(y - v.y) < 0.5 ? v : { ...v, x, y };
+    });
+  }, [view, isMaster, isTiles, vsize, cell, width, height]);
+  // limite novo (mestre mudou a visao ou a janela mudou): o zoom atual se ajusta
+  useEffect(() => {
+    setView((v) => {
+      if (v.z >= minZoom) return v;
+      const el = viewportRef.current;
+      const mx = (el?.clientWidth || 0) / 2; const my = (el?.clientHeight || 0) / 2;
+      return { z: minZoom, x: mx - ((mx - v.x) / v.z) * minZoom, y: my - ((my - v.y) / v.z) * minZoom };
+    });
+  }, [minZoom]);
   useEffect(() => { fit(); }, [scene?.id, fit]);
 
   // Camera do modo jogo: cada pixel da arte vira 4 px de tela (inteiro = nitido) e o
@@ -660,7 +682,9 @@ export default function Board({
   const sortedTokens = useMemo(() => [...tokens].sort((a, b) => (a.kind === 'marker' ? 0 : 1) - (b.kind === 'marker' ? 0 : 1)), [tokens]);
 
   return (
-    <div className="relative h-full min-h-[300px] w-full overflow-hidden bg-[#050407]">
+    <div ref={frameRef} className="relative flex h-full min-h-[300px] w-full items-center justify-center overflow-hidden bg-[#050407]">
+    {/* jogador: a tela do jogo e sempre 16:9 (como qualquer jogo); o mestre usa a area toda */}
+    <div className="relative overflow-hidden" style={frame16 ? { width: frame16.w, height: frame16.h } : { width: '100%', height: '100%' }}>
       <div
         ref={viewportRef}
         className={`absolute inset-0 touch-none ${targeting || onCellPick ? 'cursor-crosshair' : 'cursor-grab active:cursor-grabbing'}`}
@@ -797,7 +821,6 @@ export default function Board({
         </div>
       </div>
 
-      {visionCells && !isMaster && isTiles && myToken && <VisionMask tokenRef={() => ({ ...myToken, ...(localRef.current[myToken.id] || {}) })} view={view} cell={cell} radius={visionCells} />}
 
       {clock?.on && isTiles && !scene.parent_scene_id && (
         <div className="pointer-events-auto absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-1 border-[3px] border-lead bg-abyss/90 px-2 py-1 text-sm text-bone shadow-lg" aria-label={`Hora: ${clockLabel(clock.minutes)}`}>
@@ -955,6 +978,7 @@ export default function Board({
           <p className="flex items-center gap-2 border-[3px] border-lead bg-abyss/95 px-4 py-2 font-bold text-ember"><Crosshair size={18} /> Escolha o alvo no mapa (Esc cancela)</p>
         </div>
       )}
+    </div>
     </div>
   );
 }

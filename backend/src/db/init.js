@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
+import { splitStatements } from './schemaRunner.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const backendRoot = path.resolve(__dirname, '../..');
@@ -21,57 +22,6 @@ for (const envPath of [
 
 const schemaPath = path.join(__dirname, 'schema.sql');
 const sql = (await fs.readFile(schemaPath, 'utf8')).replace(/^\uFEFF/, '');
-
-function splitStatements(source) {
-  const statements = [];
-  let statement = '';
-  let quote = null;
-
-  for (let index = 0; index < source.length; index += 1) {
-    const char = source[index];
-    const next = source[index + 1];
-    statement += char;
-
-    if (quote === 'single' && char === "'" && next === "'") {
-      statement += next;
-      index += 1;
-      continue;
-    }
-
-    if (!quote && char === '-' && next === '-') {
-      while (index + 1 < source.length && source[index + 1] !== '\n') {
-        index += 1;
-        statement += source[index];
-      }
-      continue;
-    }
-
-    if (!quote && char === '/' && next === '*') {
-      while (index + 1 < source.length && !(source[index] === '*' && source[index + 1] === '/')) {
-        index += 1;
-        statement += source[index];
-      }
-      if (index + 1 < source.length) {
-        index += 1;
-        statement += source[index];
-      }
-      continue;
-    }
-
-    if (char === "'" && quote !== 'double') quote = quote === 'single' ? null : 'single';
-    if (char === '"' && quote !== 'single') quote = quote === 'double' ? null : 'double';
-
-    if (!quote && char === ';') {
-      const clean = statement.trim();
-      if (clean) statements.push(clean);
-      statement = '';
-    }
-  }
-
-  const clean = statement.trim();
-  if (clean) statements.push(clean);
-  return statements;
-}
 
 if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL nao encontrado. Rode `vercel env pull .env.production.local --environment=production` ou defina a variavel antes de inicializar o banco.');

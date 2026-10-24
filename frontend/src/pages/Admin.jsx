@@ -6,6 +6,7 @@ import AdminPowerLibraryPage from '../components/admin/AdminPowerLibraryPage';
 import AdminDeveloperDiaryPage from '../components/admin/AdminDeveloperDiaryPage';
 import AdminFeedbackPage from '../components/feedback/AdminFeedbackPage';
 import AdminMonstersPage from '../components/monsters/AdminMonstersPage';
+import AdminSystemPage from '../components/admin/AdminSystemPage';
 import { api } from '../lib/api';
 
 const attributes = ['forca', 'agilidade', 'intelecto', 'vigor', 'presenca'];
@@ -17,7 +18,7 @@ export default function Admin() {
   const [origin, setOrigin] = useState(blankOrigin());
   const [skill, setSkill] = useState({ name: '', key: '', attribute: 'presenca' });
   const [editor, setEditor] = useState(null);
-  const [adminSection, setAdminSection] = useState('catalogs');
+  const [adminSection, setAdminSection] = useState(() => new URLSearchParams(window.location.search).get('sec') || 'catalogs');
   const [message, setMessage] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -145,6 +146,7 @@ export default function Admin() {
           <button type="button" className={`min-h-11 px-3 py-2 text-sm ${adminSection === 'powers' ? 'lit text-bone' : 'text-mist hover:text-bone'}`} onClick={() => setAdminSection('powers')}>Biblioteca</button>
           <button type="button" className={`min-h-11 px-3 py-2 text-sm ${adminSection === 'developer' ? 'lit text-bone' : 'text-mist hover:text-bone'}`} onClick={() => setAdminSection('developer')}>Diário</button>
           <button type="button" className={`min-h-11 px-3 py-2 text-sm ${adminSection === 'feedbacks' ? 'lit text-bone' : 'text-mist hover:text-bone'}`} onClick={() => setAdminSection('feedbacks')}>Feedback</button>
+          <button type="button" className={`min-h-11 px-3 py-2 text-sm ${adminSection === 'system' ? 'lit text-bone' : 'text-mist hover:text-bone'}`} onClick={() => setAdminSection('system')}>Sistema</button>
         </div>
       </div>
 
@@ -156,6 +158,8 @@ export default function Admin() {
         <div className="mt-8"><AdminDeveloperDiaryPage /></div>
       ) : adminSection === 'feedbacks' ? (
         <div className="mt-8"><AdminFeedbackPage /></div>
+      ) : adminSection === 'system' ? (
+        <div className="mt-8"><AdminSystemPage /></div>
       ) : (
         <>
       {message && <div className="mt-6"><Alert type={message.type}>{message.text}</Alert></div>}

@@ -1,6 +1,9 @@
+import fs from 'fs/promises';
 import { Router } from 'express';
 import { z } from 'zod';
-import { tryQuery } from '../db/pool.js';
+import { pool, tryQuery } from '../db/pool.js';
+import { applySchema } from '../db/schemaRunner.js';
+import { DEFAULT_FILE as RULEBOOK_FILE, seedRules } from '../db/seedRules.js';
 import {
   createLocalCatalogItem,
   createLocalDeveloperPost,
@@ -630,6 +633,45 @@ router.delete('/powers/:id', async (req, res) => {
     localDelete: () => deleteLocalPower(req.params.id)
   });
   res.status(deleted.status).json(deleted.body);
+});
+
+// ---- Sistema: copia de seguranca e atualizacao do banco pela propria Vercel (23/10) ----
+// A senha do banco e "sensivel" na Vercel e nao sai de la; por isso a copia e a migracao rodam aqui,
+// so para admin. A copia vem em paginas pequenas (limite de 4,5 MB por resposta da Vercel).
+async function publicTables() {
+  const { rows } = await pool.query(
+    `select table_name from information_schema.tables where table_schema = 'public' and table_type = 'BASE TABLE' order by table_name`
+  );
+  return rows.map((r) => r.table_name);
+}
+
+router.get('/system/status', async (_req, res) => {
+  if (!process.env.DATABASE_URL) return res.status(503).json({ message: 'Banco de dados não configurado.' });
+  const tables = await publicTables();
+  const counts = [];
+  for (const name of tables) {
+    const { rows } = await pool.query(`select count(*)::int as n from "${name}"`);
+    counts.push({ name, rows: rows[0].n });
+  }
+  res.json({ tables: counts, v2: tables.includes('rule_sections') && tables.includes('campaign_events') });
+});
+
+router.get('/system/backup/:table', async (req, res) => {
+  const tables = await publicTables();
+  const name = req.params.table;
+  if (!tables.includes(name)) return res.status(404).json({ message: 'Tabela não encontrada.' });
+  const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0);
+  const limit = Math.min(200, Math.max(1, Number.parseInt(req.query.limit, 10) || 25));
+  const { rows } = await pool.query(`select * from "${name}" order by 1 offset $1 limit $2`, [offset, limit]);
+  res.json({ table: name, offset, rows });
+});
+
+router.post('/system/migrate', async (req, res) => {
+  if (!process.env.DATABASE_URL) return res.status(503).json({ message: 'Banco de dados não configurado.' });
+  if (req.body?.confirm !== 'ATUALIZAR') return res.status(400).json({ message: 'Confirmação ausente.' });
+  const statements = await applySchema(pool);
+  const rules = await seedRules(pool, await fs.readFile(RULEBOOK_FILE, 'utf8'));
+  res.json({ statements, rules });
 });
 
 export default router;

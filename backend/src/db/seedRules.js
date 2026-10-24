@@ -8,7 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_FILE = path.resolve(__dirname, '../../../docs/livro/livro-0.5-beta-v2.md');
+export const DEFAULT_FILE = path.resolve(__dirname, '../../../docs/livro/livro-0.5-beta-v2.md');
 const ROOT_TITLE = 'Sobre esta edição';
 export const RULEBOOK_VERSION = '0.5 Beta';
 

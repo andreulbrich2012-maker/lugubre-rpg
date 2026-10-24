@@ -4,6 +4,7 @@ import TileMapCanvas from './TileMapCanvas';
 import Crack from '../glass/Crack';
 import { buildingAt, isSolid, PICKUP_RANGE, tokenBuilding, tokenItemDistance } from '../../lib/tiles/format';
 import { roofCanvas } from '../../lib/tiles/render';
+import { detectBuildings } from '../../lib/tiles/compose';
 import { EAVE_SHADOW, roofRows } from '../../lib/tiles/roofs';
 import { getTile } from '../../lib/tiles/catalog';
 import AvatarSprite from '../avatar/AvatarSprite';
@@ -104,7 +105,14 @@ export default function Board({
 
   // ---- itens pegaveis e telhados ----
   const items = useMemo(() => (isTiles ? scene.tiles.items || [] : []), [isTiles, scene?.tiles]);
-  const buildings = useMemo(() => (isTiles ? scene.tiles.buildings || [] : []), [isTiles, scene?.tiles]);
+  // Telhado automatico (plano de arte): sala fechada com porta ganha telhado mesmo quando o
+  // mapa (IA ou a mao) nao declarou "buildings". Deterministico: igual para todos.
+  const buildings = useMemo(() => {
+    if (!isTiles) return [];
+    if (scene.tiles.buildings?.length) return scene.tiles.buildings;
+    return detectBuildings(scene.tiles);
+  }, [isTiles, scene?.tiles]);
+  const tilesWithRoofs = useMemo(() => (isTiles ? { ...scene.tiles, buildings } : null), [isTiles, scene?.tiles, buildings]);
   const [roofToggle, setRoofToggle] = useState({}); // escolha local de cada pessoa (id -> aberto?)
   const [interiors, setInteriors] = useState(false); // mestre: "ver interiores"
   const [popover, setPopover] = useState(null); // celula {x, y} com itens
@@ -114,11 +122,11 @@ export default function Board({
   // Interior abre sozinho quando o token da pessoa esta dentro (posicao local, ja enquanto anda).
   const myToken = tokens.find((t) => t.id === myTokenId);
   const myPos = myToken && (local[myToken.id] || { x: myToken.x, y: myToken.y });
-  const myBuildingId = isTiles && myPos ? tokenBuilding(scene.tiles, { ...myToken, ...myPos }, cell)?.id : null;
+  const myBuildingId = isTiles && myPos ? tokenBuilding(tilesWithRoofs, { ...myToken, ...myPos }, cell)?.id : null;
   const roofOpen = useCallback((b) => roofToggle[b.id] ?? (b.id === myBuildingId || (isMaster && interiors)), [roofToggle, myBuildingId, isMaster, interiors]);
   const toggleRoof = useCallback((b) => setRoofToggle((cur) => ({ ...cur, [b.id]: !roofOpen(b) })), [roofOpen]);
   const underRoof = useCallback((x, y) => {
-    const b = isTiles ? buildingAt(scene.tiles, x, y) : null;
+    const b = isTiles ? buildingAt(tilesWithRoofs, x, y) : null;
     return Boolean(b && !roofOpen(b));
   }, [isTiles, scene?.tiles, roofOpen]);
   const visibleItems = useMemo(() => items.filter((it) => !underRoof(it.x, it.y)), [items, underRoof]);
@@ -152,12 +160,12 @@ export default function Board({
       if (door) {
         e.preventDefault();
         if (getTile(door.code)?.solid) { setNotice(`${getTile(door.code).name}: está fechada. Peça ao mestre para abrir.`); return; }
-        const b = buildingAt(scene.tiles, door.x, door.y);
+        const b = buildingAt(tilesWithRoofs, door.x, door.y);
         if (b) { toggleRoof(b); setNotice(`${b.name || 'Construção'}: ${roofOpen(b) ? 'telhado de volta' : 'você olha para dentro'}.`); }
         else setNotice('A porta está aberta.');
         return;
       }
-      const b = tokenBuilding(scene.tiles, pos, cell) || buildingAt(scene.tiles, Math.floor(cx), Math.floor(cy + 1));
+      const b = tokenBuilding(tilesWithRoofs, pos, cell) || buildingAt(tilesWithRoofs, Math.floor(cx), Math.floor(cy + 1));
       if (b) { e.preventDefault(); toggleRoof(b); }
     };
     window.addEventListener('keydown', onKey);
@@ -170,7 +178,7 @@ export default function Board({
     const y = Math.floor(p.y / cell);
     if (itemsAt(x, y).length) { setPopover({ x, y }); return; }
     setPopover(null);
-    const b = isTiles ? buildingAt(scene.tiles, x, y) : null;
+    const b = isTiles ? buildingAt(tilesWithRoofs, x, y) : null;
     if (b) toggleRoof(b);
   }
 
@@ -180,7 +188,7 @@ export default function Board({
     const x = Math.floor(p.x / cell);
     const y = Math.floor(p.y / cell);
     const here = itemsAt(x, y);
-    const b = buildingAt(scene.tiles, x, y);
+    const b = buildingAt(tilesWithRoofs, x, y);
     const text = isMaster && here.length ? here.map((it) => it.name).join(', ') : b && !roofOpen(b) ? b.name : '';
     setHover((cur) => (text ? (cur?.text === text && cur.x === x && cur.y === y ? cur : { text, x, y }) : null));
   }
@@ -464,7 +472,7 @@ export default function Board({
           {sortedTokens.map((t) => {
             const pos = local[t.id] || { x: t.x, y: t.y };
             const hiddenInside = !isMaster && t.id !== myTokenId && isTiles && (() => {
-              const b = tokenBuilding(scene.tiles, { ...t, ...pos }, cell);
+              const b = tokenBuilding(tilesWithRoofs, { ...t, ...pos }, cell);
               return b && !roofOpen(b);
             })();
             if (hiddenInside) return null;

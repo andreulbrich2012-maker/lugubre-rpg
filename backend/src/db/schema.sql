@@ -363,7 +363,7 @@ create table if not exists monsters (
   image_url text,
   token_url text,
   category text not null default 'Caos',
-  difficulty text not null default 'Media',
+  difficulty text not null default 'Média',
   base_health int not null default 8 check (base_health >= 0),
   min_health int not null default 4 check (min_health >= 0),
   max_health int not null default 12 check (max_health >= 0),
@@ -378,7 +378,7 @@ create table if not exists monsters (
 alter table monsters add column if not exists image_url text;
 alter table monsters add column if not exists token_url text;
 alter table monsters add column if not exists category text not null default 'Caos';
-alter table monsters add column if not exists difficulty text not null default 'Media';
+alter table monsters add column if not exists difficulty text not null default 'Média';
 alter table monsters add column if not exists base_health int not null default 8;
 alter table monsters add column if not exists min_health int not null default 4;
 alter table monsters add column if not exists max_health int not null default 12;
@@ -591,3 +591,140 @@ insert into users (name, email, password_hash, role)
 values
   ('Joao Admin', 'joaogames9909@gmail.com', '$2a$10$Cyj/jAp.xt9hJiv9mO1cUOw.xB6x2AeKIm9c5ZDiZ/5517JtvfvBC', 'admin')
 on conflict (email) do update set role = 'admin', updated_at = now();
+
+-- ===== v2: Média com acento nos monstros =====
+alter table monsters alter column difficulty set default 'Média';
+update monsters set difficulty = 'Média' where difficulty = 'Media';
+
+-- ===== v2: mensagens com tipo (texto/rolagem) =====
+alter table messages add column if not exists message_type text not null default 'text';
+alter table messages add column if not exists meta jsonb;
+
+-- ===== v2: feed de eventos (substitui sockets em producao) =====
+create table if not exists campaign_events (
+  id bigserial primary key,
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  type text not null,
+  payload jsonb not null default '{}',
+  audience text not null default 'all',
+  created_by uuid references users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index if not exists campaign_events_campaign_id_idx on campaign_events (campaign_id, id);
+create index if not exists campaign_events_created_idx on campaign_events (created_at);
+
+-- ===== v2: notas =====
+create table if not exists campaign_notes (
+  id uuid primary key default uuid_generate_v4(),
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  author_id uuid not null references users(id) on delete cascade,
+  character_id uuid references characters(id) on delete set null,
+  scope text not null default 'private' check (scope in ('private', 'master', 'party')),
+  title text not null,
+  body text not null default '',
+  pinned boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists campaign_notes_campaign_idx on campaign_notes (campaign_id, pinned desc, updated_at desc);
+
+-- ===== v2: mesa virtual =====
+create table if not exists campaign_scenes (
+  id uuid primary key default uuid_generate_v4(),
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  name text not null,
+  map_url text,
+  grid_size int not null default 70,
+  grid_offset_x int not null default 0,
+  grid_offset_y int not null default 0,
+  width int not null default 1400,
+  height int not null default 1000,
+  show_grid boolean not null default false,
+  fog_enabled boolean not null default false,
+  fog_reveals jsonb not null default '[]',
+  initiative jsonb not null default '[]',
+  turn_index int not null default 0,
+  round int not null default 1,
+  is_active boolean not null default false,
+  position int not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table campaign_scenes add column if not exists map_kind text not null default 'image';
+alter table campaign_scenes add column if not exists tiles jsonb;
+alter table campaign_scenes add column if not exists move_speed double precision not null default 6;
+alter table campaign_scenes add column if not exists move_mode text not null default 'free';
+alter table campaign_scenes alter column move_mode set default 'free';
+alter table campaign_scenes alter column show_grid set default false;
+alter table campaign_scenes drop constraint if exists campaign_scenes_map_kind_check;
+alter table campaign_scenes add constraint campaign_scenes_map_kind_check check (map_kind in ('image', 'tiles'));
+alter table campaign_scenes drop constraint if exists campaign_scenes_move_mode_check;
+alter table campaign_scenes add constraint campaign_scenes_move_mode_check check (move_mode in ('free', 'grid'));
+alter table campaign_scenes add column if not exists mode text not null default 'prep';
+alter table campaign_scenes add column if not exists movement_per_turn int not null default 6;
+alter table campaign_scenes add column if not exists turn_state jsonb not null default '{}';
+alter table campaign_scenes drop constraint if exists campaign_scenes_mode_check;
+alter table campaign_scenes add constraint campaign_scenes_mode_check check (mode in ('prep', 'exploration', 'combat'));
+create index if not exists campaign_scenes_campaign_idx on campaign_scenes (campaign_id, position);
+
+create table if not exists campaign_npcs (
+  id uuid primary key default uuid_generate_v4(),
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  name text not null,
+  image_url text,
+  kind text not null default 'npc' check (kind in ('npc', 'monster')),
+  monster_id uuid references monsters(id) on delete set null,
+  hp_max int not null default 10 check (hp_max >= 0),
+  defense int not null default 10,
+  dodge int not null default 13,
+  attacks jsonb not null default '[]',
+  notes text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists campaign_npcs_campaign_idx on campaign_npcs (campaign_id, name);
+
+create table if not exists campaign_tokens (
+  id uuid primary key default uuid_generate_v4(),
+  scene_id uuid not null references campaign_scenes(id) on delete cascade,
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  kind text not null check (kind in ('character', 'npc', 'monster', 'marker')),
+  character_id uuid references characters(id) on delete cascade,
+  npc_id uuid references campaign_npcs(id) on delete set null,
+  name text not null default '',
+  image_url text,
+  x double precision not null default 0,
+  y double precision not null default 0,
+  size double precision not null default 1,
+  color text,
+  hidden boolean not null default false,
+  hp_current int,
+  hp_max int,
+  conditions jsonb not null default '[]',
+  controlled_by uuid references users(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists campaign_tokens_scene_idx on campaign_tokens (scene_id);
+create unique index if not exists campaign_tokens_character_scene_unique on campaign_tokens (scene_id, character_id) where character_id is not null;
+
+-- ===== v2: livro de regras =====
+create table if not exists rule_sections (
+  id uuid primary key default uuid_generate_v4(),
+  slug text not null unique,
+  parent_id uuid references rule_sections(id) on delete restrict,
+  position int not null default 0,
+  level int not null default 1,
+  title text not null,
+  body_md text not null default '',
+  seed_hash text,
+  updated_at timestamptz not null default now(),
+  updated_by uuid references users(id) on delete set null
+);
+create index if not exists rule_sections_parent_idx on rule_sections (parent_id, position);
+
+create table if not exists rulebook_meta (
+  "key" text primary key,
+  value text not null default ''
+);
+insert into rulebook_meta ("key", value) values ('version', '0.5 Beta') on conflict ("key") do nothing;

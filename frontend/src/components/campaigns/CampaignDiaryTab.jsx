@@ -58,7 +58,7 @@ export default function CampaignDiaryTab({ campaignId, isMaster, currentUserId }
     <section className="gothic-panel rounded-md p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[.24em] text-ember/70">Campanha</p>
+          <p className="text-xs text-ember/70">Campanha</p>
           <h2 className="font-display text-3xl text-ember">Diário da Campanha</h2>
           <p className="mt-1 text-sm text-mist">{isMaster ? 'Você pode ler os diários dos jogadores. Seu diário privado fica só com você.' : 'Suas anotações ficam separadas por campanha.'}</p>
         </div>
@@ -68,13 +68,13 @@ export default function CampaignDiaryTab({ campaignId, isMaster, currentUserId }
       <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_180px_220px_auto]">
         <label className="relative block">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-mist" />
-          <input className="w-full rounded-md border border-ember/20 bg-black/30 py-3 pl-9 pr-3" placeholder="Buscar no diário" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} />
+          <input className="w-full rounded-md border-[3px] border-lead bg-black/30 py-3 pl-9 pr-3" placeholder="Buscar no diário" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} />
         </label>
-        <select className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={filters.marker} onChange={(event) => setFilters({ ...filters, marker: event.target.value })}>
+        <select className="rounded-md border-[3px] border-lead bg-black/30 px-3 py-3" value={filters.marker} onChange={(event) => setFilters({ ...filters, marker: event.target.value })}>
           {markers.map((marker) => <option key={marker || 'todos'} value={marker}>{marker || 'Todos marcadores'}</option>)}
         </select>
         {isMaster && (
-          <select className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={filters.userId} onChange={(event) => setFilters({ ...filters, userId: event.target.value })}>
+          <select className="rounded-md border-[3px] border-lead bg-black/30 px-3 py-3" value={filters.userId} onChange={(event) => setFilters({ ...filters, userId: event.target.value })}>
             <option value="">Todos visíveis</option>
             <option value={currentUserId}>Meu diário privado</option>
             {visibleMembers.filter((member) => member.user_id !== currentUserId).map((member) => <option key={member.user_id} value={member.user_id}>{member.display_name || member.name}</option>)}
@@ -87,11 +87,11 @@ export default function CampaignDiaryTab({ campaignId, isMaster, currentUserId }
 
       <div className="mt-5 grid gap-3 lg:grid-cols-2">
         {entries.map((entry) => (
-          <article key={entry.id} className="rounded-md border border-ember/15 bg-black/25 p-4">
+          <article key={entry.id} className="rounded-md border-[3px] border-lead bg-black/25 p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <button type="button" className="min-w-0 text-left" onClick={() => setReader(entry)}>
-                <p className="text-xs uppercase tracking-[.18em] text-ember">{entry.marker || 'anotação'} {entry.is_gm_private ? 'privada' : ''}</p>
-                <h3 className="break-words font-display text-2xl text-white">{entry.title}</h3>
+                <p className="text-xs text-ember">{entry.marker || 'anotação'} {entry.is_gm_private ? 'privada' : ''}</p>
+                <h3 className="break-words font-display text-2xl text-bone">{entry.title}</h3>
                 <p className="mt-1 line-clamp-3 text-sm text-mist">{entry.content}</p>
                 <p className="mt-3 text-xs text-mist">{entry.author_name} · {new Date(entry.created_at).toLocaleString('pt-BR')}</p>
               </button>
@@ -104,7 +104,7 @@ export default function CampaignDiaryTab({ campaignId, isMaster, currentUserId }
             </div>
           </article>
         ))}
-        {!entries.length && <p className="rounded-md border border-dashed border-ember/20 bg-black/20 p-6 text-center text-mist">Nenhuma anotação encontrada.</p>}
+        {!entries.length && <p className="rounded-md border border-dashed border-lead bg-black/20 p-6 text-center text-mist">Nenhuma anotação encontrada.</p>}
       </div>
 
       {reader && <DiaryReader entry={reader} onClose={() => setReader(null)} />}
@@ -115,15 +115,15 @@ export default function CampaignDiaryTab({ campaignId, isMaster, currentUserId }
 
 function DiaryReader({ entry, onClose }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-3 backdrop-blur">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-3">
       <article className="gothic-panel max-h-[92vh] w-full max-w-2xl overflow-auto rounded-md p-4 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs uppercase tracking-[.2em] text-ember">{entry.marker || 'Diário'}</p>
-            <h2 className="font-display text-3xl text-white">{entry.title}</h2>
+            <p className="text-xs text-ember">{entry.marker || 'Diário'}</p>
+            <h2 className="font-display text-3xl text-bone">{entry.title}</h2>
             <p className="mt-1 text-xs text-mist">{entry.author_name} · {new Date(entry.created_at).toLocaleString('pt-BR')}</p>
           </div>
-          <button className="grid h-10 w-10 place-items-center rounded border border-white/15" onClick={onClose}><X size={18} /></button>
+          <button className="grid h-10 w-10 place-items-center rounded border-[3px] border-lead" onClick={onClose}><X size={18} /></button>
         </div>
         <p className="mt-5 whitespace-pre-wrap text-sm leading-relaxed text-mist">{entry.content}</p>
       </article>
@@ -135,24 +135,24 @@ function DiaryEditor({ editor, setEditor, onClose, onSubmit, isMaster }) {
   const entry = editor.entry;
   const update = (patch) => setEditor({ ...editor, entry: { ...entry, ...patch } });
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-3 backdrop-blur">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-3">
       <form onSubmit={onSubmit} className="gothic-panel max-h-[92vh] w-full max-w-2xl overflow-auto rounded-md p-4 sm:p-6">
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-display text-3xl text-ember">{editor.mode === 'edit' ? 'Editar anotação' : 'Nova anotação'}</h2>
-          <button type="button" className="grid h-10 w-10 place-items-center rounded border border-white/15" onClick={onClose}><X size={18} /></button>
+          <button type="button" className="grid h-10 w-10 place-items-center rounded border-[3px] border-lead" onClick={onClose}><X size={18} /></button>
         </div>
         <div className="mt-5 grid gap-3">
-          <input className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Título" value={entry.title} onChange={(event) => update({ title: event.target.value })} />
-          <select className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={entry.marker || ''} onChange={(event) => update({ marker: event.target.value })}>
+          <input className="rounded-md border-[3px] border-lead bg-black/30 px-3 py-3" placeholder="Título" value={entry.title} onChange={(event) => update({ title: event.target.value })} />
+          <select className="rounded-md border-[3px] border-lead bg-black/30 px-3 py-3" value={entry.marker || ''} onChange={(event) => update({ marker: event.target.value })}>
             {markers.map((marker) => <option key={marker || 'sem'} value={marker}>{marker || 'Sem marcador'}</option>)}
           </select>
           {isMaster && (
-            <label className="flex items-center gap-2 rounded-md border border-ember/15 bg-black/20 p-3 text-sm text-mist">
+            <label className="flex items-center gap-2 rounded-md border-[3px] border-lead bg-black/20 p-3 text-sm text-mist">
               <input type="checkbox" checked={Boolean(entry.isGmPrivate)} onChange={(event) => update({ isGmPrivate: event.target.checked })} />
               Diário privado do mestre
             </label>
           )}
-          <textarea className="min-h-64 rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Conteúdo" value={entry.content} onChange={(event) => update({ content: event.target.value })} />
+          <textarea className="min-h-64 rounded-md border-[3px] border-lead bg-black/30 px-3 py-3" placeholder="Conteúdo" value={entry.content} onChange={(event) => update({ content: event.target.value })} />
           <div className="grid gap-2 sm:flex sm:justify-end">
             <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={onClose}>Cancelar</Button>
             <Button className="w-full sm:w-auto">Salvar</Button>

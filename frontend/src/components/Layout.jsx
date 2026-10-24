@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { BookOpen, Home, MessageSquareText, Menu, MoreHorizontal, Palette, ScrollText, Settings, Shield, ShoppingBag, Skull, Swords, Users, X } from 'lucide-react';
+import { BookMarked, BookOpen, Home, MessageSquareText, Menu, MoreHorizontal, Palette, ScrollText, Settings, Shield, ShoppingBag, Skull, Swords, Users, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useAuth } from '../store/authStore';
 import { useMenuTransition } from '../hooks/useMenuTransition';
@@ -21,6 +21,7 @@ export default function Layout({ children }) {
     user && { to: '/dashboard', label: 'Dashboard' },
     { to: '/characters', label: 'Personagens' },
     { to: '/campaigns', label: 'Campanhas' },
+    { to: '/regras', label: 'Livro' },
     user && { to: '/powers', label: 'Biblioteca' },
     user && { to: '/feedback', label: 'Feedback' },
     user && { to: '/monsters', label: 'Monstros' },
@@ -38,6 +39,7 @@ export default function Layout({ children }) {
     user && { to: '/dashboard', label: 'Painel', icon: Home },
     { to: '/characters', label: 'Personagens / Fichas', icon: ScrollText },
     { to: '/campaigns', label: 'Campanhas / Mesas', icon: Swords },
+    { to: '/regras', label: 'Livro de regras', icon: BookMarked },
     user && { to: '/dashboard?tab=friends', label: 'Amigos', icon: Users },
     user && { to: '/monsters', label: 'Monstros', icon: Skull },
     inCampaignRoom && { to: `${location.pathname}?tab=diary`, label: 'Diário', icon: ScrollText },
@@ -113,12 +115,12 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen overflow-x-hidden pb-20 lg:pb-0" style={{ background: 'var(--bg-radial)' }}>
-      <nav className="sticky top-0 z-20 border-b border-ember/10 bg-abyss/90 backdrop-blur">
+      <nav className="sticky top-0 z-40 border-b-[4px] border-lead bg-abyss/95 shadow-[0_1px_0_rgb(var(--light)/.08)]">
         <div className={`mx-auto flex items-center justify-between gap-3 px-3 py-3 sm:px-4 ${onDashboard ? 'max-w-[1600px]' : 'max-w-7xl'}`}>
-          <Link to="/" className={`font-display text-2xl ${onDashboard ? 'text-[#9b72e8]' : 'text-ember'}`}>Lúgubre RPG</Link>
+          <Link to="/" className="font-display text-[1.75rem] leading-none text-ember">Lúgubre <span className="text-bone">RPG</span></Link>
           <button
             type="button"
-            className="grid h-10 w-10 place-items-center rounded-md border border-ember/25 text-ember lg:hidden"
+            className="btn btn-glass !min-h-10 !w-10 !p-0 lg:hidden"
             onClick={openMenu}
             aria-label="Abrir menu"
             aria-expanded={mobileMenu.mounted}
@@ -126,10 +128,10 @@ export default function Layout({ children }) {
           >
             <Menu size={18} />
           </button>
-          <div className="hidden min-w-0 items-center gap-3 text-sm lg:flex">
-            {links.map((link) => <NavLink key={link.to} to={link.to} className="text-mist hover:text-white">{link.label}</NavLink>)}
+          <div className="hidden min-w-0 items-center gap-1 lg:flex">
+            {links.map((link) => <NavLink key={link.to} to={link.to} className={({ isActive }) => `nav-link ${isActive ? 'is-active' : ''}`}>{link.label}</NavLink>)}
             {!user && (
-              <Link to="/login"><Button><Shield size={16} className="inline" /> Entrar</Button></Link>
+              <Link to="/login" className="ml-3"><Button className="!min-h-10"><Shield size={16} className="inline" /> Entrar</Button></Link>
             )}
           </div>
         </div>
@@ -138,8 +140,8 @@ export default function Layout({ children }) {
       {children}
 
       {location.pathname !== '/' && !onDashboard && (
-        <footer className="border-t border-ember/10 px-4 py-8 text-center text-sm text-mist">
-          Lúgubre RPG, fichas, campanhas e sombras bem organizadas.
+        <footer className="mt-10 border-t-[4px] border-lead px-4 py-8 text-center text-sm text-mist">
+          <span className="font-display text-lg text-ember">Lúgubre RPG</span> · Livro de regras 0.5 Beta
         </footer>
       )}
 
@@ -159,14 +161,13 @@ export default function Layout({ children }) {
             aria-label="Menu mobile"
             aria-hidden={!mobileMenu.interactive}
             inert={mobileMenu.interactive ? undefined : ''}
-            className={`absolute inset-x-0 bottom-0 max-h-[86vh] overflow-y-auto rounded-t-2xl border-t border-ember/30 bg-abyss px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 shadow-2xl shadow-black mobile-sheet-${mobileMenu.phase} ${mobileMenu.interactive ? 'pointer-events-auto' : 'pointer-events-none'}`}
+            className={`absolute inset-x-0 bottom-0 max-h-[86vh] overflow-y-auto border-t-[6px] border-lead bg-abyss px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4 shadow-2xl shadow-black mobile-sheet-${mobileMenu.phase} ${mobileMenu.interactive ? 'pointer-events-auto' : 'pointer-events-none'}`}
           >
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <p className="text-xs uppercase tracking-[.24em] text-ember/70">Navegação</p>
-                <h2 className="font-display text-2xl text-ember">Menu</h2>
+                <h2 className="font-display text-3xl text-ember">Menu</h2>
               </div>
-              <button ref={closeMenuButtonRef} type="button" className="grid h-11 w-11 place-items-center rounded-md border border-ember/25 text-ember" onClick={() => closeMenu()} aria-label="Fechar menu">
+              <button ref={closeMenuButtonRef} type="button" className="btn btn-glass !min-h-11 !w-11 !p-0" onClick={() => closeMenu()} aria-label="Fechar menu">
                 <X size={19} />
               </button>
             </div>
@@ -181,7 +182,7 @@ export default function Layout({ children }) {
                     onClick={(event) => navigateFromMenu(event, link.to)}
                     tabIndex={mobileMenu.interactive ? 0 : -1}
                     aria-disabled={!mobileMenu.interactive}
-                    className={() => `flex min-h-12 items-center gap-3 rounded-md border px-3 py-3 text-left text-sm font-semibold transition-colors ${activePath(link.to) ? 'border-ember/50 bg-ember/15 text-white' : 'border-white/10 bg-black/25 text-mist hover:border-ember/25 hover:text-white'}`}
+                    className={() => `flex min-h-12 items-center gap-3 rounded-md border-[3px] px-3 py-3 text-left text-sm font-semibold transition-colors ${activePath(link.to) ? 'lit border-lead' : 'border-lead bg-glass text-mist hover:text-bone'}`}
                   >
                     <Icon size={18} className="shrink-0" />
                     <span className="break-words leading-snug">{link.label}</span>
@@ -196,7 +197,7 @@ export default function Layout({ children }) {
         </div>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-ember/20 bg-abyss/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 shadow-2xl shadow-black/70 backdrop-blur lg:hidden" aria-label="Navegação principal mobile">
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t-[4px] border-lead bg-abyss/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 shadow-2xl shadow-black/70 backdrop-blur lg:hidden" aria-label="Navegação principal mobile">
         <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
           {bottomLinks.map((link) => {
             const Icon = link.icon;
@@ -205,7 +206,7 @@ export default function Layout({ children }) {
               <NavLink
                 key={link.to}
                 to={link.to}
-                className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-semibold transition-colors ${active ? 'bg-ember/15 text-ember' : 'text-mist hover:bg-white/5 hover:text-white'}`}
+                className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-semibold transition-colors ${active ? 'lit text-ember' : 'text-mist hover:text-bone'}`}
               >
                 <Icon size={19} />
                 <span>{link.label}</span>
@@ -214,7 +215,7 @@ export default function Layout({ children }) {
           })}
           <button
             type="button"
-            className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-semibold transition-colors ${mobileMenu.mounted ? 'bg-ember/15 text-ember' : 'text-mist hover:bg-white/5 hover:text-white'}`}
+            className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-semibold transition-colors ${mobileMenu.mounted ? 'lit text-ember' : 'text-mist hover:text-bone'}`}
             onClick={openMenu}
             aria-label="Menu"
             aria-expanded={mobileMenu.mounted}

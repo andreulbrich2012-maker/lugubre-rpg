@@ -12,9 +12,9 @@ export default function ProtectedRoute({ children, role }) {
   if (authLoading) {
     return (
       <main className="grid min-h-[calc(100vh-144px)] place-items-center px-4">
-        <div className="gothic-panel rounded-md p-6 text-center">
-          <span className="mx-auto block h-8 w-8 animate-spin rounded-full border-2 border-ember/30 border-t-ember" />
-          <p className="mt-4 text-sm text-mist">Verificando sua sessao...</p>
+        <div className="gothic-panel p-6 text-center">
+          <span className="spinner mx-auto" />
+          <p className="mt-4 text-sm text-mist">Verificando sua sessão...</p>
         </div>
       </main>
     );

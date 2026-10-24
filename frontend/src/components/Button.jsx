@@ -1,11 +1,15 @@
 import { forwardRef } from 'react';
 
+// Botoes sao paineis de vidro presos no chumbo: o primario e o vidro aceso (ambar), o fantasma e vidro escuro.
+const VARIANTS = {
+  primary: 'btn-lit',
+  ghost: 'btn-glass',
+  danger: 'btn-glass text-red-200 hover:text-red-100'
+};
+
 const Button = forwardRef(function Button({ children, className = '', variant = 'primary', ...props }, ref) {
-  const styles = variant === 'ghost'
-    ? 'border border-ember/30 bg-transparent text-ember hover:bg-ember/10'
-    : 'border border-blood/70 bg-blood text-white hover:bg-blood/80';
   return (
-    <button ref={ref} className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-md px-4 py-2 font-semibold soft-motion disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:translate-y-0 ${styles} ${className}`} {...props}>
+    <button ref={ref} className={`btn ${VARIANTS[variant] || VARIANTS.primary} ${className}`} {...props}>
       {children}
     </button>
   );

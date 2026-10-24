@@ -23,13 +23,16 @@ export function corsOrigin(origin, callback) {
 }
 
 const skipInTests = () => process.env.NODE_ENV === 'test';
+// Polling do feed (1,5 s) e movimento de token (~8/s) estourariam o limite geral; tem limite proprio.
+const isRealtime = (req) => (req.method === 'GET' && /^\/campaigns\/[^/]+\/events$/.test(req.path))
+  || (req.method === 'PATCH' && /^\/campaigns\/[^/]+\/tokens\/[^/]+$/.test(req.path));
 
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 600,
   standardHeaders: 'draft-8',
   legacyHeaders: false,
-  skip: skipInTests,
+  skip: (req) => skipInTests() || isRealtime(req),
   message: { message: 'Muitas requisicoes. Aguarde um pouco e tente novamente.' }
 });
 
@@ -40,4 +43,13 @@ export const authLimiter = rateLimit({
   legacyHeaders: false,
   skip: skipInTests,
   message: { message: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' }
+});
+
+export const realtimeLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 900,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  skip: (req) => skipInTests() || !isRealtime(req),
+  message: { message: 'Muitas atualizações seguidas. Aguarde um instante.' }
 });

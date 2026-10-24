@@ -1,0 +1,510 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-24T01:56:46+00:00",
+  "title": "Design System: Lúgubre RPG",
+  "extensions": {
+    "colorMeta": {
+      "abyss": {
+        "role": "neutral",
+        "displayName": "Abyss",
+        "canonical": "var(--color-abyss)",
+        "note": "Page ground. lugubre #0a0607, daltonismo #050a12.",
+        "tonalRamp": [
+          "#221e2f",
+          "#3b3451",
+          "#544973",
+          "#6d5f96",
+          "#8b7fae",
+          "#aaa2c3",
+          "#ccc7db",
+          "#f1eff5"
+        ]
+      },
+      "lead": {
+        "role": "neutral",
+        "displayName": "Lead",
+        "canonical": "var(--color-lead)",
+        "note": "All structural lines. lugubre #030102, daltonismo #010306.",
+        "tonalRamp": [
+          "#1f1f2e",
+          "#353550",
+          "#4b4b71",
+          "#626293",
+          "#8282ab",
+          "#a3a3c2",
+          "#c8c8da",
+          "#f0f0f5"
+        ]
+      },
+      "bone": {
+        "role": "neutral",
+        "displayName": "Bone",
+        "canonical": "var(--color-bone)",
+        "note": "Primary text. lugubre #efe0d6, daltonismo #f3f6fa.",
+        "tonalRamp": [
+          "#362c17",
+          "#5d4d27",
+          "#856d38",
+          "#ac8e49",
+          "#c1a76c",
+          "#d2be93",
+          "#e4d8be",
+          "#f7f4ed"
+        ]
+      },
+      "mist": {
+        "role": "neutral",
+        "displayName": "Mist",
+        "canonical": "var(--color-mist)",
+        "note": "Secondary text. lugubre #bba7a0, daltonismo #c9d3e0.",
+        "tonalRamp": [
+          "#2c2820",
+          "#4c4538",
+          "#6d6250",
+          "#8d8068",
+          "#a69b87",
+          "#beb6a7",
+          "#d8d3ca",
+          "#f4f3f0"
+        ]
+      },
+      "ember": {
+        "role": "primary",
+        "displayName": "Ember Light",
+        "canonical": "var(--color-ember)",
+        "note": "The one light (--light 224 166 58). lugubre #d9593f, daltonismo #ffc53d.",
+        "tonalRamp": [
+          "#422f0a",
+          "#735112",
+          "#a3731a",
+          "#d49521",
+          "#e3ad4a",
+          "#eac37b",
+          "#f3dbb0",
+          "#fcf5e9"
+        ]
+      },
+      "blood": {
+        "role": "secondary",
+        "displayName": "Blood Glass",
+        "canonical": "var(--color-blood)",
+        "note": "Danger/damage. lugubre #a3182f, daltonismo #1f5fd0.",
+        "tonalRamp": [
+          "#410c17",
+          "#701527",
+          "#9f1d38",
+          "#cf2649",
+          "#df4e6c",
+          "#e77e94",
+          "#f1b1bf",
+          "#fbe9ed"
+        ]
+      },
+      "glass-1": {
+        "role": "neutral",
+        "displayName": "Smoked Glass",
+        "canonical": "var(--glass-1)",
+        "note": "Pane fill top. lugubre #1a0d10, daltonismo #0c1626.",
+        "tonalRamp": [
+          "#231d2f",
+          "#3c3352",
+          "#554875",
+          "#6f5d98",
+          "#8c7eaf",
+          "#aba0c5",
+          "#cdc6dc",
+          "#f1eff5"
+        ]
+      },
+      "glass-2": {
+        "role": "neutral",
+        "displayName": "Smoked Glass Deep",
+        "canonical": "var(--glass-2)",
+        "note": "Pane fill bottom. lugubre #10080a, daltonismo #08101c.",
+        "tonalRamp": [
+          "#231d2f",
+          "#3d3352",
+          "#574974",
+          "#715e97",
+          "#8e7eaf",
+          "#ada1c4",
+          "#cec7dc",
+          "#f1eff5"
+        ]
+      },
+      "p-caos": {
+        "role": "tertiary",
+        "displayName": "Caos Glass",
+        "canonical": "var(--p-caos)",
+        "note": "Primordial glass; theme-independent.",
+        "tonalRamp": [
+          "#410c19",
+          "#70142c",
+          "#a01d3f",
+          "#cf2552",
+          "#df4e74",
+          "#e87d99",
+          "#f1b1c2",
+          "#fbe9ee"
+        ]
+      },
+      "p-gaia": {
+        "role": "tertiary",
+        "displayName": "Gaia Glass",
+        "canonical": "var(--p-gaia)",
+        "note": "Primordial glass; theme-independent.",
+        "tonalRamp": [
+          "#113b23",
+          "#1e673d",
+          "#2b9257",
+          "#37bd71",
+          "#5dd08e",
+          "#89dcac",
+          "#b8eacd",
+          "#ebf9f1"
+        ]
+      },
+      "p-ponto": {
+        "role": "tertiary",
+        "displayName": "Ponto Glass",
+        "canonical": "var(--p-ponto)",
+        "note": "Primordial glass; theme-independent.",
+        "tonalRamp": [
+          "#0c1941",
+          "#142c71",
+          "#1c3fa0",
+          "#2552d0",
+          "#4d74e0",
+          "#7d99e8",
+          "#b1c2f1",
+          "#e9eefb"
+        ]
+      },
+      "p-erebo": {
+        "role": "tertiary",
+        "displayName": "Érebo Glass",
+        "canonical": "var(--p-erebo)",
+        "note": "Primordial glass; theme-independent.",
+        "tonalRamp": [
+          "#211835",
+          "#39295c",
+          "#503a82",
+          "#684ca9",
+          "#876ebe",
+          "#a795d0",
+          "#cac0e3",
+          "#f0edf7"
+        ]
+      },
+      "p-nix": {
+        "role": "tertiary",
+        "displayName": "Nix Glass",
+        "canonical": "var(--p-nix)",
+        "note": "Primordial glass; theme-independent.",
+        "tonalRamp": [
+          "#13173a",
+          "#212764",
+          "#2f388e",
+          "#3c48b8",
+          "#616ccb",
+          "#8c93d9",
+          "#babee8",
+          "#ecedf9"
+        ]
+      },
+      "p-tartaro": {
+        "role": "tertiary",
+        "displayName": "Tártaro Glass",
+        "canonical": "var(--p-tartaro)",
+        "note": "Primordial glass; theme-independent.",
+        "tonalRamp": [
+          "#431c0a",
+          "#743111",
+          "#a54518",
+          "#d65a1f",
+          "#e57b48",
+          "#ec9e79",
+          "#f3c5af",
+          "#fcefe9"
+        ]
+      },
+      "p-eter": {
+        "role": "tertiary",
+        "displayName": "Éter Glass",
+        "canonical": "var(--p-eter)",
+        "note": "Primordial glass; theme-independent.",
+        "tonalRamp": [
+          "#12363a",
+          "#205d65",
+          "#2d8590",
+          "#3aacba",
+          "#60c1cd",
+          "#8bd2da",
+          "#b9e4e9",
+          "#ecf7f9"
+        ]
+      },
+      "p-ananque": {
+        "role": "tertiary",
+        "displayName": "Ananque Glass",
+        "canonical": "var(--p-ananque)",
+        "note": "Primordial glass; theme-independent.",
+        "tonalRamp": [
+          "#42300a",
+          "#725412",
+          "#a3771a",
+          "#d39b21",
+          "#e2b24b",
+          "#eac77b",
+          "#f2ddb0",
+          "#fcf6e9"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Hero and section-opener headlines (Grenze Gotisch)."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section titles and rulebook chapter titles."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card, panel, note and sheet titles; names; numerals."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All reading text and controls."
+      },
+      "lead": {
+        "displayName": "Lead",
+        "purpose": "Intro paragraphs in mist."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Badges, token names, tab labels."
+      }
+    },
+    "themes": [
+      {
+        "name": "sombrio",
+        "default": true,
+        "light": "224 166 58"
+      },
+      {
+        "name": "lugubre",
+        "light": "217 89 63"
+      },
+      {
+        "name": "daltonismo",
+        "light": "255 197 61",
+        "purpose": "colour-blind-safe set"
+      }
+    ],
+    "shadows": [
+      {
+        "name": "panel-seat",
+        "value": "0 1px 0 rgb(var(--light) / .06) inset, 0 24px 48px -20px rgba(0,0,0,.8)",
+        "purpose": "Every gothic panel."
+      },
+      {
+        "name": "lit-glow",
+        "value": "0 0 0 1px rgb(var(--light) / .5), 0 10px 30px -12px rgb(var(--light) / .7)",
+        "purpose": "Lit primary button."
+      },
+      {
+        "name": "glow",
+        "value": "0 0 40px -8px rgb(var(--light) / .45)",
+        "purpose": "Ambient light bloom (shadow-glow)."
+      },
+      {
+        "name": "token-active",
+        "value": "0 0 0 3px var(--color-lead), 0 0 26px 6px rgb(var(--light) / .65)",
+        "purpose": "Token whose turn it is."
+      },
+      {
+        "name": "object-drop",
+        "value": "drop-shadow(0 10px 24px rgba(0,0,0,.7))",
+        "purpose": "Free-standing glass objects (d20)."
+      },
+      {
+        "name": "field-focus",
+        "value": "0 0 0 1px rgb(var(--light) / .75), 0 0 18px -4px rgb(var(--light) / .45)",
+        "purpose": "Focused field."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-glass",
+        "value": "cubic-bezier(.16, 1, .3, 1)",
+        "purpose": "Default ease-out for light, glows, drawers, gauges, nav bar."
+      },
+      {
+        "name": "ease-lead-draw",
+        "value": "cubic-bezier(.65, 0, .35, 1)",
+        "purpose": "Lead lines drawing in (rose window)."
+      },
+      {
+        "name": "duration-state",
+        "value": ".2s–.35s",
+        "purpose": "Hover/colour/glow transitions."
+      },
+      {
+        "name": "duration-enter",
+        "value": "900ms in / 400ms out",
+        "purpose": "Menus, sheets, drawers."
+      },
+      {
+        "name": "d20-tumble",
+        "value": ".9s loop, .45s land",
+        "purpose": "Dice roll."
+      },
+      {
+        "name": "crack-in",
+        "value": ".5s",
+        "purpose": "Damage crack on target."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px",
+        "purpose": "Desktop nav replaces bottom tab bar."
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Lit Button",
+      "kind": "button",
+      "refersTo": "button-lit",
+      "description": "Primary action: amber glass lit from within.",
+      "html": "<button class=\"ds-btn ds-btn-lit\">Criar ficha</button>",
+      "css": ":host{--color-abyss:#08070b;--color-lead:#020203;--color-ember:#e0a63a;--color-mist:#b9b0a0;--color-bone:#ece4d2;--glass-1:#13101a;--glass-2:#0c0a10;--light:224 166 58;}.ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:2.75rem;padding:.55rem 1.15rem;border:3px solid var(--color-lead);border-radius:2px;font:700 16px/1.2 'Schibsted Grotesk',system-ui,sans-serif;letter-spacing:.02em;cursor:pointer;transition:box-shadow .35s cubic-bezier(.16,1,.3,1),filter .35s cubic-bezier(.16,1,.3,1),color .2s ease;}.ds-btn:focus-visible{outline:2px solid var(--color-ember);outline-offset:3px;}.ds-btn-lit{color:#1a1004;background:radial-gradient(120% 160% at 50% 0%,#ffe1a0 0,var(--color-ember) 45%,color-mix(in srgb,var(--color-ember) 55%,#3a1f00) 100%);box-shadow:0 0 0 1px rgb(var(--light)/.5),0 10px 30px -12px rgb(var(--light)/.7);}.ds-btn-lit:hover{filter:brightness(1.12);box-shadow:0 0 0 1px rgb(var(--light)/.8),0 14px 40px -10px rgb(var(--light)/.9);}"
+    },
+    {
+      "name": "Glass Button",
+      "kind": "button",
+      "refersTo": "button-glass",
+      "description": "Secondary action: smoked glass, ember text.",
+      "html": "<button class=\"ds-btn ds-btn-glass\">Ler o livro</button>",
+      "css": ":host{--color-abyss:#08070b;--color-lead:#020203;--color-ember:#e0a63a;--color-mist:#b9b0a0;--color-bone:#ece4d2;--glass-1:#13101a;--glass-2:#0c0a10;--light:224 166 58;}.ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;min-height:2.75rem;padding:.55rem 1.15rem;border:3px solid var(--color-lead);border-radius:2px;font:700 16px/1.2 'Schibsted Grotesk',system-ui,sans-serif;letter-spacing:.02em;cursor:pointer;transition:box-shadow .35s cubic-bezier(.16,1,.3,1),filter .35s cubic-bezier(.16,1,.3,1),color .2s ease;}.ds-btn:focus-visible{outline:2px solid var(--color-ember);outline-offset:3px;}.ds-btn-glass{color:var(--color-ember);background:linear-gradient(180deg,var(--glass-1),var(--glass-2));box-shadow:0 0 0 1px rgb(var(--light)/.18);}.ds-btn-glass:hover{color:#fff;box-shadow:0 0 0 1px rgb(var(--light)/.55),inset 0 0 24px -6px rgb(var(--light)/.35);}"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Text input set in lead; focus brightens the light ring.",
+      "html": "<input class=\"ds-field\" placeholder=\"Nome do personagem\">",
+      "css": ":host{--color-abyss:#08070b;--color-lead:#020203;--color-ember:#e0a63a;--color-mist:#b9b0a0;--color-bone:#ece4d2;--glass-1:#13101a;--glass-2:#0c0a10;--light:224 166 58;}.ds-field{width:100%;min-height:40px;padding:.75rem;border:2px solid var(--color-lead);border-radius:2px;background:rgba(0,0,0,.45);color:var(--color-bone);caret-color:var(--color-ember);font:400 16px/1.55 'Schibsted Grotesk',system-ui,sans-serif;box-shadow:0 0 0 1px rgb(var(--light)/.14);outline:none;}.ds-field::placeholder{color:color-mix(in srgb,var(--color-mist) 70%,transparent);}.ds-field:focus{box-shadow:0 0 0 1px rgb(var(--light)/.75),0 0 18px -4px rgb(var(--light)/.45);}"
+    },
+    {
+      "name": "Top Navigation",
+      "kind": "nav",
+      "refersTo": "nav-link",
+      "description": "Sticky lead-edged bar; active link gets a glowing ember bar.",
+      "html": "<nav class=\"ds-nav\"><span class=\"ds-mark\">Lúgubre <b>RPG</b></span><a class=\"ds-nav-link\" href=\"#\">Personagens</a><a class=\"ds-nav-link is-active\" href=\"#\">Campanhas</a><a class=\"ds-nav-link\" href=\"#\">Livro</a></nav>",
+      "css": ":host{--color-abyss:#08070b;--color-lead:#020203;--color-ember:#e0a63a;--color-mist:#b9b0a0;--color-bone:#ece4d2;--glass-1:#13101a;--glass-2:#0c0a10;--light:224 166 58;}.ds-nav{display:flex;align-items:center;gap:.25rem;padding:.75rem 1rem;background:rgb(8 7 11/.95);border-bottom:4px solid var(--color-lead);font-family:'Schibsted Grotesk',system-ui,sans-serif;}.ds-mark{font:400 1.75rem/1 'Grenze Gotisch',Georgia,serif;color:var(--color-ember);margin-right:auto;}.ds-mark b{font-weight:400;color:var(--color-bone);}.ds-nav-link{position:relative;padding:.5rem .75rem;color:var(--color-mist);font-weight:500;text-decoration:none;transition:color .2s ease;}.ds-nav-link:hover,.ds-nav-link.is-active{color:var(--color-bone);}.ds-nav-link::after{content:'';position:absolute;left:.75rem;right:.75rem;bottom:-.62rem;height:4px;background:var(--color-ember);box-shadow:0 0 14px rgb(var(--light)/.8);transform:scaleX(0);transition:transform .45s cubic-bezier(.16,1,.3,1);}.ds-nav-link.is-active::after{transform:scaleX(1);}.ds-nav-link:focus-visible{outline:2px solid var(--color-ember);outline-offset:3px;}"
+    },
+    {
+      "name": "Gothic Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Glass set in a 3px lead frame with inner light hairline and grain.",
+      "html": "<article class=\"ds-panel\"><h3>Dado de vidro</h3><p>Teste = 1d20 + atributo + treino.</p></article>",
+      "css": ":host{--color-abyss:#08070b;--color-lead:#020203;--color-ember:#e0a63a;--color-mist:#b9b0a0;--color-bone:#ece4d2;--glass-1:#13101a;--glass-2:#0c0a10;--light:224 166 58;}.ds-panel{padding:1.25rem;border:3px solid var(--color-lead);outline:1px solid rgb(var(--light)/.13);outline-offset:-4px;background:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\"),radial-gradient(140% 90% at 0% 0%,rgba(224,166,58,.05),transparent 60%),linear-gradient(180deg,rgba(19,16,26,.96),rgba(10,9,13,.98));box-shadow:0 1px 0 rgb(var(--light)/.06) inset,0 24px 48px -20px rgba(0,0,0,.8);color:var(--color-mist);font:400 16px/1.55 'Schibsted Grotesk',system-ui,sans-serif;transition:outline-color .25s ease;}.ds-panel:hover{outline-color:rgb(var(--light)/.4);}.ds-panel h3{margin:0 0 .5rem;font:400 1.875rem/1.2 'Grenze Gotisch',Georgia,serif;color:var(--color-bone);}.ds-panel p{margin:0;}"
+    },
+    {
+      "name": "Badge",
+      "kind": "chip",
+      "refersTo": "badge",
+      "description": "Short fact in a small lead frame.",
+      "html": "<span class=\"ds-badge\">Nível 3</span>",
+      "css": ":host{--color-abyss:#08070b;--color-lead:#020203;--color-ember:#e0a63a;--color-mist:#b9b0a0;--color-bone:#ece4d2;--glass-1:#13101a;--glass-2:#0c0a10;--light:224 166 58;}.ds-badge{display:inline-flex;align-items:center;gap:.25rem;border:2px solid var(--color-lead);border-radius:2px;background:var(--glass-2);padding:.1rem .5rem;font:700 .75rem/1.4 'Schibsted Grotesk',system-ui,sans-serif;color:var(--color-bone);box-shadow:0 0 0 1px rgb(var(--light)/.12);}"
+    },
+    {
+      "name": "Tabletop Token",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Glass medallion; state by lead: double = selected, dashed = hidden.",
+      "html": "<div class=\"ds-tokens\"><button class=\"ds-token\" style=\"--tc:#1f6a3f\">K</button><button class=\"ds-token is-selected\" style=\"--tc:#a4781a\">R</button><button class=\"ds-token is-hidden\" style=\"--tc:#7a1630\">G</button></div>",
+      "css": ":host{--color-abyss:#08070b;--color-lead:#020203;--color-ember:#e0a63a;--color-mist:#b9b0a0;--color-bone:#ece4d2;--glass-1:#13101a;--glass-2:#0c0a10;--light:224 166 58;}.ds-tokens{display:flex;gap:1.5rem;padding:1rem;background:#0e0c12;}.ds-token{width:56px;height:56px;border-radius:9999px;border:4px solid var(--color-lead);background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--tc) 55%,#fff),var(--tc) 55%,#000);color:var(--color-bone);font:400 1.25rem/1 'Grenze Gotisch',Georgia,serif;box-shadow:0 6px 14px rgba(0,0,0,.7);cursor:grab;}.ds-token:hover{box-shadow:0 0 0 3px var(--color-lead),0 0 26px 6px rgb(var(--light)/.65);}.ds-token:focus-visible{outline:2px solid var(--color-ember);outline-offset:3px;}.ds-token.is-selected{outline:3px double var(--color-ember);outline-offset:3px;}.ds-token.is-hidden{opacity:.55;border-style:dashed;}"
+    },
+    {
+      "name": "Glass Gauge",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Life/sanity/mana bar: lead frame, black well, Primordial glass fill.",
+      "html": "<div class=\"ds-gauge\"><span style=\"width:65%\"></span></div>",
+      "css": ":host{--color-abyss:#08070b;--color-lead:#020203;--color-ember:#e0a63a;--color-mist:#b9b0a0;--color-bone:#ece4d2;--glass-1:#13101a;--glass-2:#0c0a10;--light:224 166 58;}.ds-gauge{position:relative;width:240px;height:1.25rem;border:3px solid var(--color-lead);background:#000;overflow:hidden;}.ds-gauge>span{display:block;height:100%;background:#7a1630;box-shadow:inset 0 1px 0 rgba(255,255,255,.18);transition:width .5s cubic-bezier(.16,1,.3,1);}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Rose Window at Night",
+    "overview": "**Creative North Star: \"The Rose Window at Night\"**\n\nLúgubre is a cathedral stained-glass window seen from inside after dark. Black lead dominates every screen; colour lives only in deep, darkened glass panes, and those panes brighten only when light passes through them (hover, selection, the active route, the primary action). The light itself is one hue per theme (amber in the default \"sombrio\" theme), carried as the `--light` RGB triplet so every glow, focus ring and lit pane follows the theme.\n\nThe world spans the landing page, the rulebook, the character sheet, the campaign room and the virtual tabletop. Marketing and tool surfaces share the same materials: lead lines, frosted grain, glass panes and a gothic inscription face. Density changes from screen to screen; the materials do not. Game state is shown by the shape of the lead and the glass: a double lead line for selected, a dashed one for hidden, cracked glass for damage, grey dead glass for downed.\n\nThree themes switch through `data-theme` on the root: **sombrio** (default, amber light), **lúgubre** (blood-red glass, coral light) and **daltonismo** (blue glass, yellow light, a colour-blind-safe set). Components read only the CSS custom properties, never a theme's literal hex.",
+    "keyCharacteristics": [
+      "Lead (#020203 family) separates everything; there are no grey hairline borders.",
+      "The eight Primordial glass colours are always darkened, used as fills and never as neon.",
+      "One light hue per theme drives glows, focus, lit panes and the primary button.",
+      "The gothic display face is for headings and numerals. Every control and every line of reading text uses the grotesque.",
+      "Near-square corners (2px) everywhere except circular medallions (tokens, the d20 target)."
+    ],
+    "rules": [
+      {
+        "name": "The One Light Rule",
+        "body": "Light has one hue per theme, always read through `rgb(var(--light) / α)`. Glows, focus rings, lit panes and the primary button all use it. A second glow colour never appears beside it.",
+        "section": "colors"
+      },
+      {
+        "name": "The Dark Glass Rule",
+        "body": "Primordial colours are deep fills, lit by brightness or radial gradients. They are never raised to saturated neon and never used raw as text colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Theme-Variable Rule",
+        "body": "Components reference `var(--color-*)`, `var(--glass-*)` and `--light`, never one theme's literal hex, so all three themes (sombrio, lúgubre, daltonismo) stay correct.",
+        "section": "colors"
+      },
+      {
+        "name": "The Inscription Rule",
+        "body": "Grenze Gotisch sets headings, names and numerals only. Buttons, fields, nav, captions and body copy always use Schibsted Grotesk.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Count Rule",
+        "body": "Every number that changes (life, totals, attributes, dice) uses tabular figures.",
+        "section": "typography"
+      },
+      {
+        "name": "The Light-Through-Glass Rule",
+        "body": "A surface becomes \"active\" by letting light in: a radial gradient of light/.28 to light/.06 from the top over glass-1 (`.lit`). Do not lift it, scale it or recolour its border.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** separate regions with lead (3px frames and dividers, 6px section rules) instead of grey borders or background bands.",
+      "**Do** show \"on\" by letting light through the glass (`.lit`: radial light/.28 to light/.06 over glass-1).",
+      "**Do** read every glow, ring and tint through `rgb(var(--light) / α)` and the `--color-*` variables, so the three themes hold.",
+      "**Do** encode game state in the lead and glass: double for selected, dashed for hidden, cracked for damaged, grey for down.",
+      "**Do** keep corners at 2px, or 0 for panels. Circles are reserved for medallions and dice targets.",
+      "**Do** honour prefers-reduced-motion: dice, cracks, shakes, pings and floats drop to near-instant."
+    ],
+    "donts": [
+      "**Don't** use neon or saturated Primordial colours, or put raw glass colours on text. Mix them toward bone.",
+      "**Don't** add purple-castle glow, generic fantasy hero art or rounded SaaS cards. The world is lead and glass.",
+      "**Don't** set buttons, fields, navigation or reading text in Grenze Gotisch.",
+      "**Don't** reveal hidden numbers through the visual layer. Damage shows as a crack, never as a value on the target.",
+      "**Don't** introduce a second light hue in a theme, or hard offset shadows."
+    ]
+  }
+}

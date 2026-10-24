@@ -2,6 +2,8 @@ import { Dice5, Edit, Minus, Plus, Save, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import Button from '../components/Button';
+import RollGlass from '../components/character-sheet/RollGlass';
+import { primordialByName } from '../components/glass/primordiais';
 import CharacterSheetMobile from '../components/character-sheet/CharacterSheetMobile';
 import CharacterSheetLoading from '../components/character-sheet/CharacterSheetLoading';
 import { ResourceStepper } from '../components/character-sheet/ResourceStepper';
@@ -363,7 +365,7 @@ export default function CharacterSheet() {
     setQuickRoll({ sides, die, modifier, total: die + modifier });
   }
 
-  if (notFound) return <main className="mx-auto max-w-3xl px-4 py-16 text-center text-mist"><h1 className="font-display text-4xl text-ember">Ficha não encontrada</h1><p className="mt-3">Ela pode ter sido removida ou pertencer a outro armazenamento local.</p><Link className="mt-6 inline-block text-ember" to="/characters">Voltar para personagens</Link></main>;
+  if (notFound) return <main className="mx-auto max-w-3xl px-4 py-16 text-center text-mist"><h1 className="font-display text-4xl text-bone">Ficha não encontrada</h1><p className="mt-3">Ela pode ter sido removida ou pertencer a outro armazenamento local.</p><Link className="mt-6 inline-flex min-h-11 items-center text-ember underline" to="/characters">Voltar para personagens</Link></main>;
   if (!sheet || !draft) return <CharacterSheetLoading />;
 
   const inventory = editing ? draft.inventory : sheet.inventory || [];
@@ -374,8 +376,8 @@ export default function CharacterSheet() {
   const origin = sheet.origin_name || sheet.origin || 'Sem origem';
   const referenceWarnings = sheet.reference_warnings || [];
   return (
-    <main className="min-h-[calc(100vh-64px)] overflow-x-hidden bg-[#050506] pb-24 lg:px-4 lg:py-5">
-      {creationNotice && <div className="fixed left-1/2 top-20 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-md border border-emerald-400/30 bg-emerald-950/95 px-4 py-3 text-center text-sm text-emerald-100 shadow-xl" role="status">{creationNotice}</div>}
+    <main className="min-h-[calc(100vh-64px)] overflow-x-hidden pb-24 lg:px-4 lg:py-5">
+      {creationNotice && <div className="fixed left-1/2 top-20 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 pane px-4 py-3 text-center text-sm text-bone " role="status">{creationNotice}</div>}
       <CharacterSheetMobile
         sheet={sheet}
         draft={draft}
@@ -405,11 +407,11 @@ export default function CharacterSheet() {
         onQuickModifierChange={updateQuickModifier}
         onSwapReference={openReferenceSwap}
       />
-      <section data-testid="desktop-character-sheet" className="mx-auto hidden w-full max-w-[1480px] gap-4 rounded-md border border-ember/40 bg-[#101011] p-3 shadow-glow lg:grid xl:grid-cols-[minmax(360px,0.95fr)_minmax(520px,1.35fr)]">
+      <section data-testid="desktop-character-sheet" className="mx-auto hidden w-full max-w-[1480px] gap-4 p-3 lg:grid xl:grid-cols-[minmax(360px,0.95fr)_minmax(520px,1.35fr)]">
         <aside className="min-w-0 space-y-4">
           <header className="grid gap-3 sm:grid-cols-[96px_1fr]">
-            <div className="h-24 overflow-hidden border border-ember/30 bg-black/40">
-              {sheet.photo ? <img src={sheet.photo} alt="" className="h-full w-full object-cover" /> : <div className="h-full bg-[radial-gradient(circle,rgba(143,29,44,.38),transparent_58%)]" />}
+            <div className="pane h-24 overflow-hidden">
+              {sheet.photo ? <img src={sheet.photo} alt="" className="h-full w-full object-cover" /> : <div className="h-full bg-glass" />}
             </div>
             <div className="grid gap-2 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
               <InfoBlock label="Personagem" value={sheet.character_name} subLabel="Origem" subValue={origin} />
@@ -418,12 +420,12 @@ export default function CharacterSheet() {
           </header>
 
           <Panel id="sheet-attributes">
-            <h2 className="text-center font-display text-2xl text-white">Atributos</h2>
+            <h2 className="text-center font-display text-2xl text-bone">Atributos</h2>
             <div className="mt-4 grid grid-cols-2 gap-2 min-[520px]:grid-cols-5">
               {attributes.map(([key, label]) => (
-                <div key={key} className="rounded-full border-2 border-white/70 bg-white p-2 text-center text-black">
-                  <div className="text-3xl font-black">{sheet.attributes?.[key] ?? 2}</div>
-                  <div className="text-[10px] font-bold uppercase leading-tight">{label}</div>
+                <div key={key} className="pane p-2 text-center">
+                  <div className="tabular font-display text-4xl text-bone">{sheet.attributes?.[key] ?? 2}</div>
+                  <div className="text-xs font-bold leading-tight text-mist">{label}</div>
                 </div>
               ))}
             </div>
@@ -464,7 +466,7 @@ export default function CharacterSheet() {
         <section className="min-w-0 space-y-4">
           <Panel>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-display text-2xl text-ember">Ficha de jogo</h2>
+              <h2 className="font-display text-2xl text-bone">Ficha de jogo</h2>
               <div className="grid w-full gap-2 sm:flex sm:w-auto sm:flex-wrap">
                 <Link to={`/characters/${sheet.id}/edit`}><Button variant="ghost" className="w-full sm:w-auto"><Edit size={16} className="inline" /> Base</Button></Link>
                 {editing ? (
@@ -493,7 +495,7 @@ export default function CharacterSheet() {
           />
 
           <Panel id="sheet-skills">
-            <h2 className="font-display text-2xl text-ember">Perícias</h2>
+            <h2 className="font-display text-2xl text-bone">Perícias</h2>
             {editing && <PlayEditor draft={draft} setDraft={setDraft} skillsCatalog={skillsCatalog} onRoll={rollSkill} roll={skillRoll} />}
             {!editing && <SkillTable sheet={sheet} skills={sheet.skills || {}} skillBonuses={sheet.skill_bonuses || {}} skillsCatalog={skillsCatalog} onTrainingChange={updateSkillValue} onOtherChange={updateSkillOther} onRoll={rollSkill} roll={skillRoll} />}
           </Panel>
@@ -552,10 +554,10 @@ function PlayEditor({ draft, setDraft, skillsCatalog, onRoll, roll }) {
 
       <div className="grid gap-2 md:grid-cols-2">
         {rows.map((skill) => (
-          <div key={skill.key} className="grid grid-cols-[minmax(0,1fr)_72px_36px] items-center gap-2 border-b border-white/10 pb-2 text-sm">
-            <span className="truncate text-white">{skill.name}</span>
-            <input type="number" min="0" max="15" step="5" className="rounded border border-ember/20 bg-black/30 px-2 py-1 text-center" value={skill.value} onChange={(event) => updateSkill(skill.key, event.target.value)} />
-            <button type="button" className="grid h-8 w-8 place-items-center rounded border border-ember/30 text-ember" onClick={() => onRoll(skill, skill.value)}><Dice5 size={16} /></button>
+          <div key={skill.key} className="grid grid-cols-[minmax(0,1fr)_72px_44px] items-center gap-2 border-b-[3px] border-lead pb-2 text-sm">
+            <span className="truncate text-bone">{skill.name}</span>
+            <input type="number" min="0" max="15" step="5" className="pane px-2 py-1 text-center" value={skill.value} onChange={(event) => updateSkill(skill.key, event.target.value)} />
+            <button type="button" className="grid h-11 w-11 place-items-center border-[3px] border-lead text-ember" onClick={() => onRoll(skill, skill.value)}><Dice5 size={16} /></button>
           </div>
         ))}
       </div>
@@ -587,35 +589,35 @@ function InventoryPanel({ inventory, wallet, editing, draft, setDraft, onAdd, on
   return (
     <Panel id="sheet-inventory">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="font-display text-2xl text-ember">Inventário</h2>
+        <h2 className="font-display text-2xl text-bone">Inventário</h2>
         <Button type="button" variant="ghost" className="min-h-11 w-full sm:w-auto" onClick={onAdd}><Plus size={16} className="inline" /> Adicionar Item</Button>
       </div>
       <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
         {itemCategories.map((category) => (
-          <button key={category} type="button" className={`min-h-10 shrink-0 rounded border px-3 py-2 text-xs uppercase tracking-[.12em] soft-motion ${activeTab === category ? 'border-ember bg-ember/20 text-white' : 'border-white/10 bg-black/20 text-mist hover:text-white'}`} onClick={() => setActiveTab(category)}>
+          <button key={category} type="button" className={`min-h-11 shrink-0 border-[3px] px-3 py-2 text-sm soft-motion ${activeTab === category ? 'border-lead lit text-bone' : 'border-lead bg-glass text-mist hover:text-bone'}`} onClick={() => setActiveTab(category)}>
             {category}
           </button>
         ))}
       </div>
       {activeTab === 'Carteira' && <WalletPanel wallet={wallet} onChange={onWalletChange} />}
       {inventory.length > 0 && (
-        <p className="mt-2 text-xs uppercase tracking-[.18em] text-mist">
+        <p className="mt-2 text-xs text-mist">
           Peso total {inventory.reduce((sum, current) => sum + Number(current.weight || 0) * Number(current.quantity ?? 1), 0).toFixed(1)}
         </p>
       )}
       {!editing && (
         <ul className="mt-3 space-y-2 text-sm text-mist">
           {visibleInventory.length ? visibleInventory.map((item, index) => (
-            <li key={item.id || `${item.name}-${index}`} className="rounded border border-white/10 bg-black/25 px-3 py-2">
+            <li key={item.id || `${item.name}-${index}`} className="field !mt-0 min-h-11">
               <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
                 <div className="min-w-0">
-                  <span className="break-words text-white">{Number(item.quantity ?? 1)}x {item.name}</span>
+                  <span className="break-words text-bone">{Number(item.quantity ?? 1)}x {item.name}</span>
                   <span className="ml-2 text-xs text-mist">peso {Number(item.weight || 0)}</span>
-                  <span className="ml-2 rounded border border-ember/20 px-2 py-0.5 text-[11px] text-ember">{item.category || 'Outros'}</span>
+                  <span className="badge ml-2 text-ember">{item.category || 'Outros'}</span>
                   {item.description && <p className="mt-1 text-xs text-mist">{item.description}</p>}
                 </div>
                 <Button type="button" variant="ghost" className="min-h-11 justify-center" onClick={() => onEdit(item)}><Edit size={16} className="inline" /> Editar</Button>
-                <button type="button" className="inline-flex min-h-11 items-center justify-center gap-2 rounded border border-red-400/30 px-3 text-red-300 soft-motion hover:bg-red-950/30" onClick={() => onDelete(item)} aria-label="Excluir item"><Trash2 size={16} /> Excluir</button>
+                <button type="button" className="inline-flex min-h-11 items-center justify-center gap-2 border-[3px] border-lead px-3 text-bone soft-motion hover:bg-blood" onClick={() => onDelete(item)} aria-label="Excluir item"><Trash2 size={16} /> Excluir</button>
               </div>
             </li>
           )) : <li className="text-mist">{activeTab === 'Carteira' ? 'Nenhum item marcado como Carteira.' : 'Inventário vazio.'}</li>}
@@ -624,30 +626,30 @@ function InventoryPanel({ inventory, wallet, editing, draft, setDraft, onAdd, on
       {editing && (
         <div className="mt-4 space-y-3">
           {draft.inventory.map((current, index) => (
-            <div key={current.id || `${current.name}-${index}`} className="rounded border border-white/10 bg-black/25 p-3">
+            <div key={current.id || `${current.name}-${index}`} className="pane p-3">
               <div className="grid gap-2 sm:grid-cols-[90px_90px_1fr_120px_36px]">
                 <NumberInput placeholder="Quantidade" value={current.quantity ?? 1} onChange={(value) => updateItem(index, 'quantity', value)} />
                 <NumberInput placeholder="Peso" value={current.weight ?? 0} onChange={(value) => updateItem(index, 'weight', value)} />
-                <input placeholder="Nome" className="min-w-0 rounded border border-ember/20 bg-black/30 px-3 py-2" value={current.name || ''} onChange={(event) => updateItem(index, 'name', event.target.value)} />
-                <select className="rounded border border-ember/20 bg-black/30 px-3 py-2" value={current.category || 'Outros'} onChange={(event) => updateItem(index, 'category', event.target.value)}>
+                <input placeholder="Nome" className="field !mt-0 min-h-11" value={current.name || ''} onChange={(event) => updateItem(index, 'name', event.target.value)} />
+                <select className="field !mt-0 min-h-11" value={current.category || 'Outros'} onChange={(event) => updateItem(index, 'category', event.target.value)}>
                   {itemCategories.filter((category) => category !== 'Todos os itens').map((category) => <option key={category} value={category}>{category}</option>)}
                 </select>
-                <button type="button" className="grid h-10 place-items-center rounded border border-red-400/30 text-red-300" onClick={() => removeItem(index)}><Trash2 size={16} /></button>
+                <button type="button" className="grid h-11 place-items-center border-[3px] border-lead text-bone" onClick={() => removeItem(index)}><Trash2 size={16} /></button>
               </div>
-              <textarea placeholder="Descrição" className="mt-2 w-full rounded border border-ember/20 bg-black/30 px-3 py-2 text-sm" value={current.description || ''} onChange={(event) => updateItem(index, 'description', event.target.value)} />
+              <textarea placeholder="Descrição" className="mt-2 field !mt-0 text-sm" value={current.description || ''} onChange={(event) => updateItem(index, 'description', event.target.value)} />
             </div>
           ))}
-          <div className="rounded border border-ember/20 bg-black/20 p-3">
+          <div className="pane p-3">
             <div className="grid gap-2 sm:grid-cols-[90px_90px_1fr_120px_auto]">
               <NumberInput placeholder="Quantidade" value={item.quantity} onChange={(quantity) => setItem({ ...item, quantity })} />
               <NumberInput placeholder="Peso" value={item.weight} onChange={(weight) => setItem({ ...item, weight })} />
-              <input placeholder="Nome" className="min-w-0 rounded border border-ember/20 bg-black/30 px-3 py-2" value={item.name} onChange={(event) => setItem({ ...item, name: event.target.value })} />
-              <select className="rounded border border-ember/20 bg-black/30 px-3 py-2" value={item.category} onChange={(event) => setItem({ ...item, category: event.target.value })}>
+              <input placeholder="Nome" className="field !mt-0 min-h-11" value={item.name} onChange={(event) => setItem({ ...item, name: event.target.value })} />
+              <select className="field !mt-0 min-h-11" value={item.category} onChange={(event) => setItem({ ...item, category: event.target.value })}>
                 {itemCategories.filter((category) => category !== 'Todos os itens').map((category) => <option key={category} value={category}>{category}</option>)}
               </select>
               <Button type="button" variant="ghost" onClick={addItem}><Plus size={16} /></Button>
             </div>
-            <textarea placeholder="Descrição" className="mt-2 w-full rounded border border-ember/20 bg-black/30 px-3 py-2 text-sm" value={item.description} onChange={(event) => setItem({ ...item, description: event.target.value })} />
+            <textarea placeholder="Descrição" className="mt-2 field !mt-0 text-sm" value={item.description} onChange={(event) => setItem({ ...item, description: event.target.value })} />
           </div>
         </div>
       )}
@@ -668,17 +670,17 @@ function WalletPanel({ wallet, onChange }) {
   }
 
   return (
-    <section className="mt-3 rounded border border-ember/20 bg-black/25 p-3">
-      <h3 className="font-display text-xl text-white">Carteira</h3>
+    <section className="mt-3 pane p-3">
+      <h3 className="font-display text-xl text-bone">Carteira</h3>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <CoinField label="Bronze" rate={1} value={values.bronze} onChange={(value) => update('bronze', value)} onDecrease={() => adjust('bronze', -1)} onIncrease={() => adjust('bronze', 1)} />
         <CoinField label="Prata" rate={10} value={values.silver} onChange={(value) => update('silver', value)} onDecrease={() => adjust('silver', -1)} onIncrease={() => adjust('silver', 1)} />
         <CoinField label="Platina" rate={100} value={values.platinum} onChange={(value) => update('platinum', value)} onDecrease={() => adjust('platinum', -1)} onIncrease={() => adjust('platinum', 1)} />
         <CoinField label="Ouro" rate={500} value={values.gold} onChange={(value) => update('gold', value)} onDecrease={() => adjust('gold', -1)} onIncrease={() => adjust('gold', 1)} />
       </div>
-      <div className="mt-3 rounded border border-white/10 bg-black/30 p-3 text-center">
-        <p className="text-xs uppercase tracking-[.18em] text-mist">Total</p>
-        <p className="text-2xl font-black text-white">{total} Dracmas</p>
+      <div className="mt-3 pane p-3 text-center">
+        <p className="text-xs text-mist">Total</p>
+        <p className="tabular font-display text-3xl text-bone">{total} Dracmas</p>
       </div>
     </section>
   );
@@ -691,12 +693,12 @@ function CoinField({ label, rate, value, onChange, onDecrease, onIncrease }) {
         <span>{label}</span>
         <span className="text-xs text-ember">= {rate} Dracmas</span>
       </div>
-      <div className="grid grid-cols-[40px_1fr_40px] overflow-hidden rounded border border-ember/20 bg-black/30">
-        <button type="button" className="grid h-10 place-items-center border-r border-white/10 text-mist soft-motion hover:bg-white/10 hover:text-white" onClick={onDecrease} aria-label={`Diminuir ${label}`}>
+      <div className="grid grid-cols-[44px_1fr_44px] overflow-hidden pane">
+        <button type="button" className="grid h-11 place-items-center border-r-[3px] border-lead text-mist soft-motion hover:bg-glass hover:text-bone" onClick={onDecrease} aria-label={`Diminuir ${label}`}>
           <Minus size={16} />
         </button>
-        <NumberInput className="h-10 w-full rounded-none border-0 bg-transparent text-center" value={value} onChange={onChange} />
-        <button type="button" className="grid h-10 place-items-center border-l border-white/10 text-mist soft-motion hover:bg-white/10 hover:text-white" onClick={onIncrease} aria-label={`Aumentar ${label}`}>
+        <NumberInput className="h-11 w-full !border-0 !bg-transparent !shadow-none text-center" value={value} onChange={onChange} />
+        <button type="button" className="grid h-11 place-items-center border-l-[3px] border-lead text-mist soft-motion hover:bg-glass hover:text-bone" onClick={onIncrease} aria-label={`Aumentar ${label}`}>
           <Plus size={16} />
         </button>
       </div>
@@ -709,7 +711,7 @@ function QuickDicePanel({ modifier, roll, onRoll, onModifierChange }) {
     <Panel id="sheet-dice">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-display text-2xl text-ember">Role Dados Fácil</h2>
+          <h2 className="font-display text-2xl text-bone">Role Dados Fácil</h2>
           <p className="text-sm text-mist">Rolagens rápidas com soma modificadora.</p>
         </div>
         <label className="flex items-center gap-2 text-sm text-mist">
@@ -719,17 +721,20 @@ function QuickDicePanel({ modifier, roll, onRoll, onModifierChange }) {
       </div>
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
         {quickDice.map((sides) => (
-          <button key={sides} type="button" className="rounded border border-ember/25 bg-black/30 px-2 py-3 text-center soft-motion hover:bg-ember/10" onClick={() => onRoll(sides)}>
-            <span className="block font-bold text-white">Role</span>
-            <span className="text-xs uppercase tracking-[.18em] text-ember">d{sides}</span>
+          <button key={sides} type="button" className="pane px-2 py-3 text-center soft-motion hover-lit" onClick={() => onRoll(sides)}>
+            <span className="block font-bold text-bone">Role</span>
+            <span className="text-xs text-ember">d{sides}</span>
           </button>
         ))}
       </div>
       {roll && (
-        <div className="mt-4 rounded border border-ember/20 bg-black/35 p-3 text-sm">
-          <p className="font-display text-xl text-ember">d{roll.sides}</p>
-          <p className="text-mist">Dado {roll.die} {roll.modifier ? `· Soma ${roll.modifier > 0 ? '+' : ''}${roll.modifier}` : '· Soma 0'}</p>
-          <p className="mt-1 text-3xl font-black text-white">{roll.total}</p>
+        <div className="pane mt-4 flex items-center gap-4 p-3 text-sm">
+          <RollGlass roll={roll} value={roll.die} sides={roll.sides} size={84} />
+          <div>
+            <p className="font-display text-xl text-bone">d{roll.sides}</p>
+            <p className="tabular text-mist">Dado {roll.die} {roll.modifier ? `· Soma ${roll.modifier > 0 ? '+' : ''}${roll.modifier}` : '· Soma 0'}</p>
+            <p className="tabular mt-1 font-display text-4xl text-bone">{roll.total}</p>
+          </div>
         </div>
       )}
     </Panel>
@@ -741,7 +746,7 @@ function PowersPanel({ attacks, spells, editing, draft, setDraft, onRoll, onAdd,
     <Panel id="sheet-powers">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="font-display text-3xl text-ember">Poderes e Ataques</h2>
+          <h2 className="font-display text-3xl text-bone">Poderes e Ataques</h2>
           <p className="mt-1 text-sm text-mist">Ataques e magias organizados para consulta rápida durante a sessão.</p>
         </div>
         <div className="grid gap-2 sm:flex sm:shrink-0">
@@ -778,26 +783,26 @@ function PowerList({ title, field, items, editing, draft, setDraft, onRoll, onEd
   }
 
   return (
-    <section className="min-w-0 rounded-md border border-white/10 bg-black/20 p-3 sm:p-4">
+    <section className="min-w-0 pane p-3 sm:p-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="font-display text-2xl text-white">{title}</h3>
-        <span className="rounded-full border border-ember/20 bg-ember/10 px-3 py-1 text-xs font-semibold uppercase tracking-[.16em] text-ember">{items.length}</span>
+        <h3 className="font-display text-2xl text-bone">{title}</h3>
+        <span className="badge lit tabular text-ember">{items.length}</span>
       </div>
       <div className="mt-4 grid gap-3">
         {items.length ? items.map((item, index) => (
           <PowerCard key={item.id || `${item.name}-${index}`} item={item} field={field} editing={editing} index={index} onRoll={onRoll} onEdit={onEdit} onDelete={onDelete} onUpdate={updatePower} onRemove={removePower} />
-        )) : <p className="rounded-md border border-dashed border-white/10 bg-black/25 p-4 text-sm text-mist">Nenhum registro.</p>}
+        )) : <p className="border-2 border-dashed border-lead bg-glass p-4 text-sm text-mist">Nenhum registro.</p>}
       </div>
       {editing && (
-        <div className="mt-4 rounded-md border border-ember/20 bg-black/20 p-3">
-          <p className="mb-3 text-xs font-bold uppercase tracking-[.18em] text-ember">Adicionar rápido</p>
+        <div className="mt-4 pane p-3">
+          <p className="mb-3 text-xs font-bold text-ember">Adicionar rápido</p>
           <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_120px_100px_auto]">
-            <input placeholder="Nome" className="min-w-0 rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={power.name} onChange={(event) => setPower({ ...power, name: event.target.value })} />
-            <input placeholder="Dano" className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={power.damage} onChange={(event) => setPower({ ...power, damage: event.target.value })} />
+            <input placeholder="Nome" className="field !mt-0 min-h-11" value={power.name} onChange={(event) => setPower({ ...power, name: event.target.value })} />
+            <input placeholder="Dano" className="field !mt-0 min-h-11" value={power.damage} onChange={(event) => setPower({ ...power, damage: event.target.value })} />
             <NumberInput placeholder="Mana" value={power.manaCost} onChange={(manaCost) => setPower({ ...power, manaCost: field === 'spells' ? manaCost : 0 })} />
             <Button type="button" variant="ghost" className="min-h-11" onClick={addPower}><Plus size={16} className="inline" /> Adicionar</Button>
           </div>
-          <textarea placeholder="Descrição" className="mt-2 w-full rounded-md border border-ember/20 bg-black/30 px-3 py-3 text-sm" value={power.description} onChange={(event) => setPower({ ...power, description: event.target.value })} />
+          <textarea placeholder="Descrição" className="mt-2 field !mt-0 text-sm" value={power.description} onChange={(event) => setPower({ ...power, description: event.target.value })} />
         </div>
       )}
     </section>
@@ -821,20 +826,19 @@ function PowerCard({ item, field, editing, index, onRoll, onEdit, onDelete, onUp
       ];
 
   return (
-    <article className="min-w-0 rounded-md border border-white/10 bg-[linear-gradient(135deg,rgba(214,166,95,.08),rgba(0,0,0,.18))] p-3 shadow-lg shadow-black/20 sm:p-4">
+    <article className="min-w-0 border-[3px] border-lead p-3 sm:p-4">
       {!editing ? (
         <div className="flex h-full flex-col gap-4">
           <div className="min-w-0">
             <div className="flex items-start gap-3">
-              <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-md border border-ember/25 bg-[radial-gradient(circle,rgba(142,92,246,.25),transparent_62%)] text-sm font-bold uppercase text-ember">
+              <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden border-[3px] border-lead bg-glass text-sm font-bold text-bone" style={isSpell && primordialByName[item.element] ? { background: `color-mix(in srgb, ${primordialByName[item.element].color} 75%, #000)` } : undefined}>
                 {item.image ? <img src={item.image} alt={`Imagem de ${item.name}`} className="h-full w-full object-cover" /> : (isSpell ? String(item.element || 'Ér').slice(0, 2) : 'AT')}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold uppercase tracking-[.18em] text-ember/80">{isSpell ? 'Magia' : 'Ataque Normal'}</p>
-                <h4 className="mt-1 break-words font-display text-2xl leading-tight text-white">{item.name}</h4>
+                <h4 className="break-words font-display text-2xl leading-tight text-bone">{item.name}</h4>
               </div>
-              <div className="shrink-0 rounded-md border border-ember/20 bg-black/35 px-3 py-2 text-right">
-                <p className="text-[10px] font-bold uppercase tracking-[.16em] text-mist">Dano</p>
+              <div className="shrink-0 field !mt-0 min-h-11 text-right">
+                <p className="text-xs font-bold text-mist">Dano</p>
                 <p className="break-all font-semibold text-ember">{item.damage || '-'}</p>
               </div>
             </div>
@@ -845,13 +849,13 @@ function PowerCard({ item, field, editing, index, onRoll, onEdit, onDelete, onUp
           </div>
 
           {item.description ? (
-            <p className="rounded-md border border-white/10 bg-black/25 p-3 text-sm leading-relaxed text-mist">{item.description}</p>
+            <p className="pane p-3 text-sm leading-relaxed text-mist">{item.description}</p>
           ) : null}
 
           <div className="mt-auto grid gap-2 sm:grid-cols-3">
             <Button type="button" variant="ghost" className="min-h-11 justify-center" onClick={() => onRoll(item)}><Dice5 size={16} className="inline" /> Rolar</Button>
             <Button type="button" variant="ghost" className="min-h-11 justify-center" onClick={() => onEdit(item)}><Edit size={16} className="inline" /> Editar</Button>
-            <button type="button" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-red-400/30 px-4 py-2 font-semibold text-red-300 soft-motion hover:bg-red-950/30" onClick={() => onDelete(item)}>
+            <button type="button" className="inline-flex min-h-11 items-center justify-center gap-2 border-[3px] border-lead px-4 py-2 font-semibold text-bone soft-motion hover:bg-blood" onClick={() => onDelete(item)}>
               <Trash2 size={16} />
               Excluir
             </button>
@@ -860,29 +864,29 @@ function PowerCard({ item, field, editing, index, onRoll, onEdit, onDelete, onUp
       ) : (
         <div className="space-y-3">
           <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_120px_100px_auto]">
-            <input placeholder="Nome" className="min-w-0 rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={item.name || ''} onChange={(event) => onUpdate(index, 'name', event.target.value)} />
-            <input placeholder="Dano" className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={item.damage || ''} onChange={(event) => onUpdate(index, 'damage', event.target.value)} />
+            <input placeholder="Nome" className="field !mt-0 min-h-11" value={item.name || ''} onChange={(event) => onUpdate(index, 'name', event.target.value)} />
+            <input placeholder="Dano" className="field !mt-0 min-h-11" value={item.damage || ''} onChange={(event) => onUpdate(index, 'damage', event.target.value)} />
             <NumberInput placeholder="Mana" value={item.manaCost ?? 0} onChange={(value) => onUpdate(index, 'manaCost', isSpell ? value : 0)} />
-            <button type="button" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-red-400/30 px-3 py-2 text-red-300" onClick={() => onRemove(index)}><Trash2 size={16} /> Remover</button>
+            <button type="button" className="inline-flex min-h-11 items-center justify-center gap-2 border-[3px] border-lead px-3 py-2 text-bone" onClick={() => onRemove(index)}><Trash2 size={16} /> Remover</button>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {!isSpell ? (
               <>
-                <input placeholder="Perícia" className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={item.skill || ''} onChange={(event) => onUpdate(index, 'skill', event.target.value)} />
-                <input placeholder="Alcance" className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={item.range || ''} onChange={(event) => onUpdate(index, 'range', event.target.value)} />
+                <input placeholder="Perícia" className="field !mt-0 min-h-11" value={item.skill || ''} onChange={(event) => onUpdate(index, 'skill', event.target.value)} />
+                <input placeholder="Alcance" className="field !mt-0 min-h-11" value={item.range || ''} onChange={(event) => onUpdate(index, 'range', event.target.value)} />
               </>
             ) : (
-              <select className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={item.element || 'Érebo'} onChange={(event) => onUpdate(index, 'element', event.target.value)}>
+              <select className="field !mt-0 min-h-11" value={item.element || 'Érebo'} onChange={(event) => onUpdate(index, 'element', event.target.value)}>
                 {spellElements.map((element) => <option key={element} value={element}>{element}</option>)}
               </select>
             )}
-            <input placeholder="Imagem" className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={item.image || ''} onChange={(event) => onUpdate(index, 'image', event.target.value)} />
+            <input placeholder="Imagem" className="field !mt-0 min-h-11" value={item.image || ''} onChange={(event) => onUpdate(index, 'image', event.target.value)} />
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             <NumberInput placeholder="Crítico" value={item.criticalValue ?? 20} onChange={(value) => onUpdate(index, 'criticalValue', value)} />
             <NumberInput placeholder="Multiplicador" value={item.criticalMultiplier ?? 2} onChange={(value) => onUpdate(index, 'criticalMultiplier', value)} />
           </div>
-          <textarea placeholder="Descrição" className="w-full rounded-md border border-ember/20 bg-black/30 px-3 py-3 text-sm" value={item.description || ''} onChange={(event) => onUpdate(index, 'description', event.target.value)} />
+          <textarea placeholder="Descrição" className="field !mt-0 text-sm" value={item.description || ''} onChange={(event) => onUpdate(index, 'description', event.target.value)} />
         </div>
       )}
     </article>
@@ -891,9 +895,9 @@ function PowerCard({ item, field, editing, index, onRoll, onEdit, onDelete, onUp
 
 function PowerChip({ label, value }) {
   return (
-    <div className="min-w-0 rounded-md border border-white/10 bg-black/30 px-2.5 py-2">
-      <p className="text-[10px] font-bold uppercase tracking-[.14em] text-mist">{label}</p>
-      <p className="mt-0.5 break-words text-sm font-semibold text-white">{value || '-'}</p>
+    <div className="min-w-0 pane px-2.5 py-2">
+      <p className="text-xs font-bold text-mist">{label}</p>
+      <p className="mt-0.5 break-words text-sm font-semibold text-bone">{value || '-'}</p>
     </div>
   );
 }
@@ -903,9 +907,9 @@ function ReferenceWarnings({ warnings, onSwap }) {
   return (
     <div className="grid gap-3">
       {warnings.map((warning) => (
-        <article key={warning.type} className="rounded-md border border-amber-400/30 bg-amber-950/15 p-4">
-          <p className="text-sm font-semibold text-amber-100">{warning.message}</p>
-          <p className="mt-1 text-xs uppercase tracking-[.16em] text-mist">Atual: {warning.current_name || 'Registro removido'}</p>
+        <article key={warning.type} className="pane p-4">
+          <p className="text-sm font-semibold text-bone">{warning.message}</p>
+          <p className="mt-1 text-xs text-mist">Atual: {warning.current_name || 'Registro removido'}</p>
           <Button type="button" className="mt-3 min-h-11 w-full sm:w-auto" onClick={() => onSwap(warning)}>
             Trocar agora
           </Button>
@@ -924,18 +928,18 @@ function ReferenceSwapModal({ warning, options, status, onClose, onSave }) {
   }, [options]);
 
   return (
-    <ModalFrame title={config.title || 'Trocar referencia'} onClose={onClose}>
+    <ModalFrame title={config.title || 'Trocar referência'} onClose={onClose}>
       <div className="space-y-4">
         <p className="text-sm leading-relaxed text-mist">
           Escolha uma opção ativa para substituir {warning.current_name || 'o registro removido'}.
         </p>
         <label className="block text-sm text-mist">
           Nova opção
-          <select className="mt-1 min-h-11 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={selected} onChange={(event) => setSelected(event.target.value)} disabled={!options.length}>
+          <select className="field min-h-11" value={selected} onChange={(event) => setSelected(event.target.value)} disabled={!options.length}>
             {options.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
           </select>
         </label>
-        {!options.length && <p className="rounded border border-ember/20 bg-black/30 p-3 text-sm text-mist">{status || config.empty || 'Nenhuma opção ativa encontrada.'}</p>}
+        {!options.length && <p className="pane p-3 text-sm text-mist">{status || config.empty || 'Nenhuma opção ativa encontrada.'}</p>}
         {status && options.length > 0 && <p className="text-sm text-mist">{status}</p>}
         <div className="grid gap-2 pt-2 sm:flex sm:justify-end">
           <Button type="button" variant="ghost" className="min-h-11 w-full sm:w-auto" onClick={onClose}>Cancelar</Button>
@@ -961,17 +965,17 @@ function ItemModal({ state, onClose, onSave }) {
         </div>
         <label className="block text-sm text-mist">
           Nome do item
-          <input className="mt-1 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={form.name || ''} onChange={(event) => setForm({ ...form, name: event.target.value })} autoFocus />
+          <input className="field min-h-11" value={form.name || ''} onChange={(event) => setForm({ ...form, name: event.target.value })} autoFocus />
         </label>
         <label className="block text-sm text-mist">
           Categoria
-          <select className="mt-1 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={form.category || 'Outros'} onChange={(event) => setForm({ ...form, category: event.target.value })}>
+          <select className="field min-h-11" value={form.category || 'Outros'} onChange={(event) => setForm({ ...form, category: event.target.value })}>
             {itemCategories.filter((category) => category !== 'Todos os itens').map((category) => <option key={category} value={category}>{category}</option>)}
           </select>
         </label>
         <label className="block text-sm text-mist">
           Descrição opcional
-          <textarea className="mt-1 min-h-24 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={form.description || ''} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+          <textarea className="field min-h-24" value={form.description || ''} onChange={(event) => setForm({ ...form, description: event.target.value })} />
         </label>
         <div className="grid gap-2 pt-2 sm:flex sm:justify-end">
           <Button type="button" variant="ghost" className="min-h-11 w-full sm:w-auto" onClick={onClose}>Cancelar</Button>
@@ -992,7 +996,7 @@ function PowerModal({ state, skillsCatalog, onClose, onSave }) {
       <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); if (canSave) onSave({ ...form, manaCost: type === 'spells' ? Number(form.manaCost || 0) : 0 }, type); }}>
         <label className="block text-sm text-mist">
           Tipo
-          <select className="mt-1 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={type} onChange={(event) => setType(event.target.value)}>
+          <select className="field min-h-11" value={type} onChange={(event) => setType(event.target.value)}>
             <option value="attacks">Ataque Normal</option>
             <option value="spells">Magia</option>
           </select>
@@ -1000,11 +1004,11 @@ function PowerModal({ state, skillsCatalog, onClose, onSave }) {
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block text-sm text-mist">
             Nome
-            <input className="mt-1 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={form.name || ''} onChange={(event) => setForm({ ...form, name: event.target.value })} autoFocus />
+            <input className="field min-h-11" value={form.name || ''} onChange={(event) => setForm({ ...form, name: event.target.value })} autoFocus />
           </label>
           <label className="block text-sm text-mist">
             {type === 'spells' ? 'Dano ou efeito' : 'Dano'}
-            <input className="mt-1 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" placeholder="1d8+2" value={form.damage || ''} onChange={(event) => setForm({ ...form, damage: event.target.value })} />
+            <input className="field min-h-11" placeholder="1d8+2" value={form.damage || ''} onChange={(event) => setForm({ ...form, damage: event.target.value })} />
           </label>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -1013,7 +1017,7 @@ function PowerModal({ state, skillsCatalog, onClose, onSave }) {
           {type === 'attacks' && (
             <label className="block text-sm text-mist">
               Alcance
-              <input className="mt-1 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={form.range || '-'} onChange={(event) => setForm({ ...form, range: event.target.value })} />
+              <input className="field min-h-11" value={form.range || '-'} onChange={(event) => setForm({ ...form, range: event.target.value })} />
             </label>
           )}
           {type === 'spells' && <NumberField label="Custo de mana" value={form.manaCost ?? 0} onChange={(manaCost) => setForm({ ...form, manaCost })} />}
@@ -1021,7 +1025,7 @@ function PowerModal({ state, skillsCatalog, onClose, onSave }) {
         {type === 'attacks' && (
           <label className="block text-sm text-mist">
             Perícia
-            <select className="mt-1 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={form.skill || 'Luta'} onChange={(event) => setForm({ ...form, skill: event.target.value })}>
+            <select className="field min-h-11" value={form.skill || 'Luta'} onChange={(event) => setForm({ ...form, skill: event.target.value })}>
               {skillsCatalog.map((skill) => <option key={skill.key} value={skill.name}>{skill.name}</option>)}
             </select>
           </label>
@@ -1029,18 +1033,18 @@ function PowerModal({ state, skillsCatalog, onClose, onSave }) {
         {type === 'spells' && (
           <label className="block text-sm text-mist">
             Elemento
-            <select className="mt-1 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={form.element || 'Érebo'} onChange={(event) => setForm({ ...form, element: event.target.value })}>
+            <select className="field min-h-11" value={form.element || 'Érebo'} onChange={(event) => setForm({ ...form, element: event.target.value })}>
               {spellElements.map((element) => <option key={element} value={element}>{element}</option>)}
             </select>
           </label>
         )}
         <label className="block text-sm text-mist">
           Imagem opcional
-          <input className="mt-1 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" placeholder="URL ou data:image" value={form.image || ''} onChange={(event) => setForm({ ...form, image: event.target.value })} />
+          <input className="field min-h-11" placeholder="URL ou data:image" value={form.image || ''} onChange={(event) => setForm({ ...form, image: event.target.value })} />
         </label>
         <label className="block text-sm text-mist">
           Descrição opcional
-          <textarea className="mt-1 min-h-24 w-full rounded border border-ember/20 bg-black/40 px-3 py-2 text-white" value={form.description || ''} onChange={(event) => setForm({ ...form, description: event.target.value })} />
+          <textarea className="field min-h-24" value={form.description || ''} onChange={(event) => setForm({ ...form, description: event.target.value })} />
         </label>
         <div className="grid gap-2 pt-2 sm:flex sm:justify-end">
           <Button type="button" variant="ghost" className="min-h-11 w-full sm:w-auto" onClick={onClose}>Cancelar</Button>
@@ -1053,11 +1057,11 @@ function PowerModal({ state, skillsCatalog, onClose, onSave }) {
 
 function ModalFrame({ title, children, onClose }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 px-2 py-3 backdrop-blur-sm sm:px-4 sm:py-6">
-      <section className="max-h-[94vh] w-full max-w-xl overflow-y-auto rounded-md border border-ember/30 bg-[#0b0b0d] p-4 shadow-glow sm:p-5">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/80 px-2 py-3 sm:px-4 sm:py-6">
+      <section className="max-h-[94vh] w-full max-w-xl overflow-y-auto gothic-panel p-4 sm:p-5">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="font-display text-2xl text-ember">{title}</h2>
-          <button type="button" className="grid h-10 w-10 place-items-center rounded border border-white/15 text-mist soft-motion hover:bg-white/10" onClick={onClose} aria-label="Fechar"><X size={18} /></button>
+          <h2 className="font-display text-2xl text-bone">{title}</h2>
+          <button type="button" className="grid h-11 w-11 place-items-center border-[3px] border-lead bg-glass text-mist soft-motion hover:text-ember" onClick={onClose} aria-label="Fechar"><X size={18} /></button>
         </div>
         {children}
       </section>
@@ -1070,26 +1074,26 @@ function SkillTable({ sheet, skills, skillBonuses, skillsCatalog, onTrainingChan
     <>
       <div className="mt-4 grid gap-3 sm:hidden">
         {skillsCatalog.map((skill) => (
-          <article key={skill.key} className="rounded-md border border-white/10 bg-black/25 p-3">
+          <article key={skill.key} className="pane p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h3 className="truncate font-semibold text-white">{skill.name}</h3>
-                <p className="text-xs uppercase tracking-[.14em] text-ember">Dado ({sheet.attributes?.[skill.attribute] ?? 2})</p>
+                <h3 className="truncate font-semibold text-bone">{skill.name}</h3>
+                <p className="text-xs text-ember">Dado ({sheet.attributes?.[skill.attribute] ?? 2})</p>
               </div>
-              <button type="button" className="grid h-11 w-11 shrink-0 place-items-center rounded border border-ember/30 text-ember" onClick={() => onRoll(skill, skills?.[skill.key] ?? 0, skillBonuses?.[skill.key] ?? 0)}><Dice5 size={17} /></button>
+              <button type="button" className="grid h-11 w-11 shrink-0 place-items-center border-[3px] border-lead text-ember" onClick={() => onRoll(skill, skills?.[skill.key] ?? 0, skillBonuses?.[skill.key] ?? 0)}><Dice5 size={17} /></button>
             </div>
             <div className="mt-3 grid gap-2">
-              <label className="text-xs uppercase tracking-[.12em] text-mist">
+              <label className="text-xs text-mist">
                 Treino
-                <div className="mt-1 grid grid-cols-[44px_1fr_44px] items-center rounded border border-white/10 bg-black/25">
-                  <button type="button" className="h-11 text-mist hover:text-white" onClick={() => onTrainingChange(skill.key, Number(skills?.[skill.key] || 0) - 5)}>-</button>
-                  <span className="text-center text-blue-400">{skills?.[skill.key] ?? 0}</span>
-                  <button type="button" className="h-11 text-mist hover:text-white" onClick={() => onTrainingChange(skill.key, Number(skills?.[skill.key] || 0) + 5)}>+</button>
+                <div className="mt-1 grid grid-cols-[44px_1fr_44px] items-center pane">
+                  <button type="button" className="h-11 text-mist hover:text-bone" onClick={() => onTrainingChange(skill.key, Number(skills?.[skill.key] || 0) - 5)}>-</button>
+                  <span className="text-center text-bone">{skills?.[skill.key] ?? 0}</span>
+                  <button type="button" className="h-11 text-mist hover:text-bone" onClick={() => onTrainingChange(skill.key, Number(skills?.[skill.key] || 0) + 5)}>+</button>
                 </div>
               </label>
-              <label className="text-xs uppercase tracking-[.12em] text-mist">
+              <label className="text-xs text-mist">
                 Outros
-                <input type="number" className="mt-1 h-11 w-full rounded border border-white/10 bg-black/25 px-2 text-center text-mist" value={skillBonuses?.[skill.key] ?? 0} onChange={(event) => onOtherChange(skill.key, event.target.value)} />
+                <input type="number" className="field h-11 px-2 text-center" value={skillBonuses?.[skill.key] ?? 0} onChange={(event) => onOtherChange(skill.key, event.target.value)} />
               </label>
             </div>
           </article>
@@ -1097,21 +1101,21 @@ function SkillTable({ sheet, skills, skillBonuses, skillsCatalog, onTrainingChan
       </div>
       <div className="mt-4 hidden overflow-x-auto pb-2 sm:block">
         <div className="min-w-[560px]">
-          <div className="grid grid-cols-[minmax(120px,1fr)_52px_116px_64px_44px] gap-x-2 text-xs uppercase text-mist sm:grid-cols-[1fr_64px_132px_72px_44px] sm:gap-x-3">
+          <div className="grid grid-cols-[minmax(120px,1fr)_52px_116px_64px_44px] gap-x-2 text-xs text-mist sm:grid-cols-[1fr_64px_132px_72px_44px] sm:gap-x-3">
             <span>Perícia</span><span>Dado</span><span>Treino</span><span>Outros</span><span>Rolar</span>
           </div>
           <div className="mt-2 grid gap-x-5 2xl:grid-cols-2">
             {skillsCatalog.map((skill) => (
-              <div key={skill.key} className="grid grid-cols-[minmax(120px,1fr)_52px_116px_64px_44px] items-center gap-x-2 border-b border-white/10 py-2 text-sm sm:grid-cols-[1fr_64px_132px_72px_44px] sm:gap-x-3">
-                <span className="truncate text-white">{skill.name}</span>
+              <div key={skill.key} className="grid grid-cols-[minmax(120px,1fr)_52px_116px_64px_44px] items-center gap-x-2 border-b-[3px] border-lead py-2 text-sm sm:grid-cols-[1fr_64px_132px_72px_44px] sm:gap-x-3">
+                <span className="truncate text-bone">{skill.name}</span>
                 <span className="text-ember">({sheet.attributes?.[skill.attribute] ?? 2})</span>
-                <div className="grid grid-cols-[40px_1fr_40px] items-center rounded border border-white/10 bg-black/25">
-                  <button type="button" className="h-10 text-mist hover:text-white" onClick={() => onTrainingChange(skill.key, Number(skills?.[skill.key] || 0) - 5)}>-</button>
-                  <span className="text-center text-blue-400">{skills?.[skill.key] ?? 0}</span>
-                  <button type="button" className="h-10 text-mist hover:text-white" onClick={() => onTrainingChange(skill.key, Number(skills?.[skill.key] || 0) + 5)}>+</button>
+                <div className="grid grid-cols-[44px_1fr_44px] items-center pane">
+                  <button type="button" className="h-11 text-mist hover:text-bone" onClick={() => onTrainingChange(skill.key, Number(skills?.[skill.key] || 0) - 5)}>-</button>
+                  <span className="text-center text-bone">{skills?.[skill.key] ?? 0}</span>
+                  <button type="button" className="h-11 text-mist hover:text-bone" onClick={() => onTrainingChange(skill.key, Number(skills?.[skill.key] || 0) + 5)}>+</button>
                 </div>
-                <input type="number" className="h-10 w-full rounded border border-white/10 bg-black/25 px-2 text-center text-mist" value={skillBonuses?.[skill.key] ?? 0} onChange={(event) => onOtherChange(skill.key, event.target.value)} />
-                <button type="button" className="grid h-10 w-10 place-items-center rounded border border-ember/30 text-ember" onClick={() => onRoll(skill, skills?.[skill.key] ?? 0, skillBonuses?.[skill.key] ?? 0)}><Dice5 size={16} /></button>
+                <input type="number" className="field !mt-0 h-11 px-2 text-center" value={skillBonuses?.[skill.key] ?? 0} onChange={(event) => onOtherChange(skill.key, event.target.value)} />
+                <button type="button" className="grid h-11 w-11 place-items-center border-[3px] border-lead text-ember" onClick={() => onRoll(skill, skills?.[skill.key] ?? 0, skillBonuses?.[skill.key] ?? 0)}><Dice5 size={16} /></button>
               </div>
             ))}
           </div>
@@ -1125,9 +1129,9 @@ function SkillTable({ sheet, skills, skillBonuses, skillsCatalog, onTrainingChan
 function RollFeedback({ roll }) {
   if (!roll) return null;
   return (
-    <div className="mt-4 rounded-md border border-ember/30 bg-black/35 p-4">
-      <p className="font-display text-xl text-ember">{roll.name}</p>
-      <div className="mt-2 grid grid-cols-2 gap-2 text-center text-sm sm:grid-cols-5">
+    <div className="pane mt-4 p-4">
+      <div className="flex items-center gap-3"><RollGlass roll={roll} value={roll.die} size={72} /><p className="font-display text-xl text-bone">{roll.name}</p></div>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-center text-sm sm:grid-cols-5">
         <Metric label="D20" value={roll.die} />
         <Metric label="Base" value={roll.base ?? 0} />
         <Metric label="Treino" value={roll.training ?? roll.bonus ?? 0} />
@@ -1140,14 +1144,14 @@ function RollFeedback({ roll }) {
 
 function DamageFeedback({ roll }) {
   if (!roll) return null;
-  if (roll.error) return <p className="mt-4 rounded border border-red-400/30 bg-red-950/20 p-3 text-sm text-red-200">{roll.name}: {roll.error}</p>;
+  if (roll.error) return <p className="mt-4 border-[3px] border-lead bg-blood/40 p-3 text-sm text-bone">{roll.name}: {roll.error}</p>;
   return (
-    <div className="mt-4 rounded-md border border-ember/30 bg-black/35 p-4">
-      <p className="font-display text-xl text-ember">{roll.type}: {roll.name}</p>
+    <div className="pane mt-4 p-4">
+      <div className="flex items-center gap-3">{'attackRoll' in roll && <RollGlass roll={roll} value={roll.attackRoll} size={72} />}<p className="font-display text-xl text-bone">{roll.type}: {roll.name}</p></div>
       <p className="text-sm text-mist">{roll.damage} · rolagens {roll.rolls.join(', ')} {roll.bonus ? `· bônus ${roll.bonus > 0 ? '+' : ''}${roll.bonus}` : ''}</p>
       {'attackRoll' in roll && <p className="mt-1 text-sm text-mist">Ataque d20: {roll.attackRoll} · crítico {roll.criticalValue}+ · multiplicador x{roll.criticalMultiplier} · {roll.isCritical ? 'Crítico' : 'Normal'}</p>}
       {roll.isCritical && <p className="mt-1 text-sm text-ember">Base {roll.baseTotal} multiplicado por {roll.criticalMultiplier}</p>}
-      <div className="mt-2 text-center text-4xl font-black text-white">{roll.total}</div>
+      <div className="tabular mt-2 text-center font-display text-5xl text-bone">{roll.total}</div>
     </div>
   );
 }
@@ -1155,12 +1159,12 @@ function DamageFeedback({ roll }) {
 function SaveHistory({ saves }) {
   return (
     <Panel id="sheet-saves">
-      <h3 className="font-display text-xl text-ember">Últimos salvamentos</h3>
+      <h3 className="font-display text-xl text-bone">Últimos salvamentos</h3>
       <div className="mt-3 grid gap-2 md:grid-cols-3">
         {saves.length ? saves.map((save) => (
-          <div key={save.id || save.saved_at} className="rounded border border-ember/15 bg-black/25 p-3 text-sm">
-            <p className="text-white">{formatSaveDate(save.saved_at)}</p>
-            <p className="mt-1 text-xs uppercase tracking-[.18em] text-mist">{save.label || 'Snapshot'}</p>
+          <div key={save.id || save.saved_at} className="pane p-3 text-sm">
+            <p className="text-bone">{formatSaveDate(save.saved_at)}</p>
+            <p className="mt-1 text-xs text-mist">{save.label || 'Snapshot'}</p>
           </div>
         )) : <p className="text-sm text-mist">Nenhum salvamento registrado.</p>}
       </div>
@@ -1169,21 +1173,21 @@ function SaveHistory({ saves }) {
 }
 
 function InfoBlock({ label, value, subLabel, subValue }) {
-  return <div className="space-y-2 text-sm"><div className="grid grid-cols-[90px_1fr] gap-2"><span className="text-xs font-bold uppercase text-mist">{label}</span><span className="min-w-0 border-b border-white/50 pb-1 text-white">{value}</span></div><div className="grid grid-cols-[90px_1fr] gap-2"><span className="text-xs font-bold uppercase text-mist">{subLabel}</span><span className="min-w-0 border-b border-white/50 pb-1 text-white">{subValue}</span></div></div>;
+  return <div className="space-y-2 text-sm"><div className="grid grid-cols-[90px_1fr] gap-2"><span className="text-xs font-bold text-mist">{label}</span><span className="min-w-0 border-b-[3px] border-lead pb-1 text-bone">{value}</span></div><div className="grid grid-cols-[90px_1fr] gap-2"><span className="text-xs font-bold text-mist">{subLabel}</span><span className="min-w-0 border-b-[3px] border-lead pb-1 text-bone">{subValue}</span></div></div>;
 }
 
 function NumberField({ label, value, onChange }) {
-  return <label className="text-sm text-mist">{label}<NumberInput className="mt-1 w-full" value={value} onChange={onChange} /></label>;
+  return <label className="block text-sm text-mist">{label}<NumberInput className="mt-1" value={value} onChange={onChange} /></label>;
 }
 
 function NumberInput({ value, onChange, placeholder, className = '', allowNegative = false }) {
-  return <input type="number" min={allowNegative ? undefined : '0'} placeholder={placeholder} className={`min-w-0 rounded border border-ember/20 bg-black/30 px-3 py-2 ${className}`} value={value} onChange={(event) => onChange(Number(event.target.value))} />;
+  return <input type="number" min={allowNegative ? undefined : '0'} placeholder={placeholder} className={`field !mt-0 min-h-11 ${className}`} value={value} onChange={(event) => onChange(Number(event.target.value))} />;
 }
 
 function Panel({ children, id }) {
-  return <section id={id} className="scroll-mt-24 rounded-md border border-white/10 bg-black/20 p-3 sm:p-4">{children}</section>;
+  return <section id={id} className="scroll-mt-24 gothic-panel p-3 sm:p-4">{children}</section>;
 }
 
 function Metric({ label, value }) {
-  return <div className="border border-white/20 bg-black/25 p-3 text-center"><div className="text-3xl font-black">{value}</div><div className="text-xs uppercase text-mist">{label}</div></div>;
+  return <div className="pane p-3 text-center"><div className="tabular font-display text-4xl text-bone">{value}</div><div className="text-xs text-mist">{label}</div></div>;
 }

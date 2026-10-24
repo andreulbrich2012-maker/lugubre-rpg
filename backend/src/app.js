@@ -13,7 +13,8 @@ import userRoutes from './routes/user.routes.js';
 import powerRoutes from './routes/power.routes.js';
 import feedbackRoutes from './routes/feedback.routes.js';
 import developerRoutes from './routes/developer.routes.js';
-import { apiLimiter, authLimiter, corsOrigin } from './config/security.js';
+import { adminRulesMetaRouter, adminRulesRouter, rulesRouter } from './routes/rules.routes.js';
+import { apiLimiter, authLimiter, corsOrigin, realtimeLimiter } from './config/security.js';
 
 export function createApp() {
   const app = express();
@@ -34,6 +35,7 @@ export function createApp() {
   app.get('/health', (_, res) => res.json({ ok: true, name: 'Lúgubre RPG API' }));
   app.get('/api/health', (_, res) => res.json({ ok: true, name: 'Lúgubre RPG API' }));
   app.use('/api', apiLimiter);
+  app.use('/api', realtimeLimiter);
   app.use('/api/auth/login', authLimiter);
   app.use('/api/auth/register', authLimiter);
   app.use('/api/auth', authRoutes);
@@ -47,6 +49,9 @@ export function createApp() {
   app.use('/api/powers', powerRoutes);
   app.use('/api/feedbacks', feedbackRoutes);
   app.use('/api', developerRoutes);
+  app.use('/api/rules', rulesRouter);
+  app.use('/api/admin/rules', adminRulesRouter);
+  app.use('/api/admin/rules-meta', adminRulesMetaRouter);
   app.use('/api/admin', adminRoutes);
 
   app.use('/api', (req, res) => {
@@ -65,6 +70,12 @@ export function createApp() {
     }
     if (err?.code === '23505') {
       return res.status(409).json({ message: 'Já existe um item cadastrado com estes dados.' });
+    }
+    if (err?.code === '22P02') {
+      return res.status(404).json({ message: 'Registro não encontrado.' });
+    }
+    if (err?.type === 'entity.too.large') {
+      return res.status(413).json({ message: 'Envio grande demais. Reduza a imagem e tente de novo.' });
     }
     if (Number.isInteger(err?.status) && err.status >= 400 && err.status < 600) {
       return res.status(err.status).json({ message: err.message || 'Nao foi possivel concluir a operacao.' });

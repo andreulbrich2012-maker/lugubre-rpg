@@ -9,7 +9,8 @@
         "test": "npm run test --workspaces --if-present",
         "install:all": "npm install",
         "vercel-build": "npm run build",
-        "db:init": "npm run db:init --workspace backend"
+        "db:init": "npm run db:init --workspace backend",
+        "db:seed-rules": "npm run db:seed-rules --workspace backend"
     },
     "workspaces": [
         "backend",

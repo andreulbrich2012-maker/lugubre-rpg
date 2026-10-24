@@ -18,7 +18,7 @@ export default function MessageFormatter({ content }) {
   const cleanText = isAction ? text.trim().replace(/^\/(?:aç[aã]o|acao)\s+/i, '') : text;
 
   return (
-    <div className={isAction ? 'font-display text-base italic text-ember' : 'text-sm leading-relaxed text-white/90'}>
+    <div className={isAction ? 'font-display text-base italic text-ember' : 'text-sm leading-relaxed text-bone/90'}>
       {cleanText.split('\n').map((line, index) => (
         <p key={`${line}-${index}`} className={index > 0 ? 'mt-1' : ''}>
           {isAction && index === 0 ? 'Acao: ' : null}

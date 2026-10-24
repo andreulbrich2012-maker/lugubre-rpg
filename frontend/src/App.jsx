@@ -18,9 +18,10 @@ const Monsters = lazy(() => import('./pages/Monsters'));
 const PowerLibrary = lazy(() => import('./pages/PowerLibrary'));
 const Feedback = lazy(() => import('./pages/Feedback'));
 const Admin = lazy(() => import('./pages/Admin'));
+const Rulebook = lazy(() => import('./pages/Rulebook'));
 
 function RouteLoading() {
-  return <main className="grid min-h-[60vh] place-items-center" aria-label="Carregando página"><span className="h-9 w-9 animate-spin rounded-full border-2 border-ember/30 border-t-ember" /></main>;
+  return <main className="grid min-h-[60vh] place-items-center" aria-label="Carregando página"><span className="spinner" /></main>;
 }
 
 function isProtectedPath(pathname) {
@@ -58,6 +59,8 @@ export default function App() {
     <Layout>
       <Suspense fallback={<RouteLoading />}><Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/regras" element={<Rulebook />} />
+        <Route path="/regras/:slug" element={<Rulebook />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -71,7 +74,7 @@ export default function App() {
         <Route path="/powers" element={<ProtectedRoute><PowerLibrary /></ProtectedRoute>} />
         <Route path="/feedback" element={<ProtectedRoute><Feedback /></ProtectedRoute>} />
         <Route path="/admin" element={<ProtectedRoute role="admin"><Admin /></ProtectedRoute>} />
-        <Route path="*" element={<main className="mx-auto grid min-h-[65vh] max-w-xl place-items-center px-4 text-center"><div><p className="text-xs uppercase tracking-[.24em] text-ember">404</p><h1 className="mt-2 font-display text-4xl text-white">Caminho não encontrado</h1><p className="mt-3 text-mist">Esta passagem não existe ou foi removida.</p><Link to="/" className="mt-6 inline-flex min-h-11 items-center rounded-md border border-ember/35 px-4 text-ember">Voltar ao início</Link></div></main>} />
+        <Route path="*" element={<main className="mx-auto grid min-h-[65vh] max-w-xl place-items-center px-4 text-center"><div><p className="text-xs text-ember">404</p><h1 className="mt-2 font-display text-4xl text-bone">Caminho não encontrado</h1><p className="mt-3 text-mist">Esta passagem não existe ou foi removida.</p><Link to="/" className="mt-6 inline-flex min-h-11 items-center border-[3px] border-lead px-4 text-ember">Voltar ao início</Link></div></main>} />
       </Routes></Suspense>
     </Layout>
   );

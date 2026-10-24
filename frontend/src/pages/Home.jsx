@@ -1,286 +1,375 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import {
-  BookOpen,
-  Crown,
-  MessageSquareText,
-  ScrollText,
-  Shield,
-  Sparkles,
-  Swords,
-  Users,
-  Wand2,
-  Warehouse
-} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, Minus, Plus } from 'lucide-react';
 import Button from '../components/Button';
+import RoseWindow from '../components/glass/RoseWindow';
+import GlassD20 from '../components/glass/GlassD20';
+import Crack from '../components/glass/Crack';
+import { PRIMORDIAIS } from '../components/glass/primordiais';
 import { api } from '../lib/api';
+import { useAuth } from '../store/authStore';
 
-const lugubreImages = {
-  hero: '/images/lugubre/lugubre-hero.png',
-  portal: '/images/lugubre/lugubre-portal.jpg',
-  mountains: '/images/lugubre/lugubre-mountains.jpg',
-  throne: '/images/lugubre/lugubre-throne.jpg',
-  forest: '/images/lugubre/lugubre-moonlit-forest.jpg'
-};
-
-const diaryFallbackImages = [lugubreImages.forest, lugubreImages.mountains];
-
-const features = [
-  [ScrollText, 'Criador de Personagens', 'Monte fichas com raças, classes, origens, atributos, perícias, inventário, poderes e evolução em um único lugar.'],
-  [Swords, 'Campanhas Online', 'Crie mesas, convide jogadores, compartilhe fichas e mantenha cada sessão organizada.'],
-  [BookOpen, 'Biblioteca Integrada', 'Consulte magias, poderes e elementos sem interromper o ritmo da aventura.'],
-  [MessageSquareText, 'Chat em Tempo Real', 'Converse durante a campanha com mensagens persistentes e presença de personagem.'],
-  [Warehouse, 'Inventário e Economia', 'Controle itens, peso, defesa, carteira e compras de campanha com clareza.'],
-  [Wand2, 'Monstros e Poderes', 'Administre criaturas, ataques, magias e poderes de forma modular e expansível.'],
-  [Users, 'Comunidade e Feedback', 'Jogadores podem relatar bugs, sugerir melhorias e acompanhar respostas.'],
-  [Shield, 'Painel Administrativo', 'Admins mantêm raças, classes, origens, perícias, monstros e biblioteca vivos.']
+// Capitulos do livro de regras 0.5 Beta, na ordem do livro.
+const CHAPTERS = [
+  ['bem-vindo-a-lugubre', 'Bem-vindo a Lúgubre', 'O que é, como jogar e como usar o livro.'],
+  ['o-mundo-de-lugubre', 'O Mundo de Lúgubre', 'Os Oito Primordiais, a Ruptura, os Oito Reinos e a O.P.E.R.A.'],
+  ['criacao-de-personagem', 'Criação de Personagem', 'Atributos, Vida, Sanidade, Mana, perícias, raças e origens.'],
+  ['regras-do-sistema', 'Regras do Sistema', 'Dados e testes, ataques e crítico, Defesa e Esquiva, combate.'],
+  ['magias-e-poderes', 'Magias e Poderes', 'Os oito elementos e o custo de cada feitiço.'],
+  ['equipamentos', 'Equipamentos', 'Armas, armaduras, inventário e moedas.'],
+  ['criaturas', 'Criaturas', 'O bestiário inicial, por elemento e dificuldade.'],
+  ['guia-do-mestre', 'Guia do Mestre', 'Como conduzir a mesa e decidir o que o dado não decide.'],
+  ['referencia-e-desenvolvimento', 'Referência e Desenvolvimento', 'Tabelas rápidas e o que ainda está em teste no beta.']
 ];
-
-const highlights = [
-  ['Fichas vivas', 'Ajustes de vida, sanidade, mana, perícias e inventário ficam salvos para a próxima sessão.'],
-  ['Mesa conectada', 'Campanhas, chat, diário, loja e compartilhamento de ficha trabalham juntos.'],
-  ['Sistema em evolução', 'O painel admin permite expandir regras e conteúdo sem reescrever o projeto.']
-];
-
-const fallbackPosts = [
-  {
-    id: 'fallback-feedback',
-    title: 'Sistema de Feedback Adicionado',
-    short_description: 'Jogadores agora podem enviar sugestões, relatar bugs e acompanhar respostas da administração.',
-    image_url: lugubreImages.forest,
-    category: 'Sistema',
-    published_at: new Date().toISOString()
-  },
-  {
-    id: 'fallback-library',
-    title: 'Biblioteca de Magias e Poderes',
-    short_description: 'A biblioteca ganhou filtros, elementos e integração com as fichas.',
-    image_url: lugubreImages.mountains,
-    category: 'Novidade',
-    published_at: new Date(Date.now() - 86_400_000).toISOString()
-  }
-];
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'];
 
 function formatDate(value) {
-  if (!value) return 'Sem data';
-  return new Intl.DateTimeFormat('pt-BR').format(new Date(value));
+  if (!value) return '';
+  return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(value));
 }
 
 export default function Home() {
-  const [posts, setPosts] = useState(fallbackPosts);
+  const [posts, setPosts] = useState([]);
 
   useEffect(() => {
-    api.get('/developer-posts')
-      .then(({ data }) => setPosts(data?.length ? data : fallbackPosts))
-      .catch(() => setPosts(fallbackPosts));
+    api.get('/developer-posts').then(({ data }) => setPosts(Array.isArray(data) ? data : [])).catch(() => setPosts([]));
   }, []);
 
   return (
-    <main className="overflow-hidden bg-[#05040a]">
-      <HeroSection />
-      <AboutSection />
-      <FeatureSection />
-      <DeveloperDiarySection posts={posts} />
-      <FinalCallSection />
-      <LandingFooter />
+    <main className="overflow-hidden">
+      <Hero />
+      <div className="lead-rule" />
+      <Nave />
+      <div className="lead-rule" />
+      <Livro />
+      {posts.length > 0 && (
+        <>
+          <div className="lead-rule" />
+          <Diario posts={posts} />
+        </>
+      )}
+      <div className="lead-rule" />
+      <Fechamento />
+      <Rodape />
     </main>
   );
 }
 
-function HeroSection() {
-  return (
-    <section className="relative min-h-[78vh] overflow-hidden px-3 py-16 sm:px-4 sm:py-24 lg:min-h-[720px]">
-      <img
-        src={lugubreImages.hero}
-        alt=""
-        aria-hidden="true"
-        fetchPriority="high"
-        decoding="async"
-        className="absolute inset-0 h-full w-full scale-[1.04] object-cover object-[60%_center] opacity-95 sm:object-center"
-      />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_28%,rgba(134,92,246,.18),transparent_30%),radial-gradient(circle_at_18%_20%,rgba(199,163,91,.10),transparent_24%),linear-gradient(90deg,#05040a_0%,rgba(8,6,18,.82)_46%,rgba(5,4,10,.24)_100%)]" />
-      <div className="absolute inset-0 shadow-[inset_0_0_150px_46px_rgba(5,4,10,.38)]" />
-      <div className="absolute inset-x-0 bottom-0 h-56 bg-gradient-to-t from-[#05040a] via-[#05040a]/80 to-transparent" />
-      <div className="relative mx-auto flex min-h-[58vh] max-w-7xl items-center">
-        <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-ember/25 bg-black/35 px-3 py-2 text-xs font-semibold uppercase tracking-[.24em] text-ember">
-            <Sparkles size={15} /> Plataforma dark fantasy
-          </div>
-          <h1 className="mt-6 font-display text-5xl leading-none text-white sm:text-6xl lg:text-8xl">Lúgubre RPG</h1>
-          <p className="mt-6 max-w-2xl text-lg leading-relaxed text-mist sm:text-xl">
-            Crie personagens, conduza campanhas e escreva histórias onde as sombras também têm voz.
-          </p>
-          <div className="mt-8 grid gap-3 sm:flex sm:flex-wrap">
-            <Link to="/characters/new"><Button className="w-full px-5 py-3 sm:w-auto">Criar Personagem</Button></Link>
-            <Link to="/campaigns"><Button variant="ghost" className="w-full px-5 py-3 sm:w-auto">Entrar em Campanha</Button></Link>
-            <a href="#sistema" className="inline-flex min-h-11 items-center justify-center rounded-md px-4 py-2 text-sm font-semibold text-mist transition-colors hover:text-white">Conhecer o Sistema</a>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
+function Hero() {
+  const [active, setActive] = useState(null);
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const p = active != null ? PRIMORDIAIS[active] : null;
+  const ctaTo = user ? '/characters/new' : '/register';
 
-function AboutSection() {
   return (
-    <section id="sistema" className="mx-auto max-w-7xl px-3 py-14 sm:px-4 sm:py-20">
-      <div className="grid gap-8 lg:grid-cols-[0.88fr_1.12fr] lg:items-center">
-        <figure className="relative aspect-[4/3] overflow-hidden rounded-md border border-ember/20 bg-black/40 shadow-[0_24px_80px_rgba(0,0,0,.48)]">
-          <img
-            src={lugubreImages.portal}
-            alt="Portal arcano violeta em ruínas antigas"
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#05040a]/70 via-transparent to-blood/10" />
-          <figcaption className="absolute bottom-4 left-4 right-4 text-xs font-bold uppercase tracking-[.22em] text-ember">
-            Um portal para histórias que permanecem
-          </figcaption>
-        </figure>
-        <div className="lg:pl-4">
-          <p className="text-xs font-bold uppercase tracking-[.28em] text-ember">O que é</p>
-          <h2 className="mt-3 font-display text-4xl text-white sm:text-5xl">Uma mesa sombria, organizada como software premium.</h2>
-          <p className="mt-5 text-base leading-relaxed text-mist sm:text-lg">
-            Lúgubre RPG é uma plataforma de fantasia sombria feita para criar personagens, organizar campanhas,
-            registrar jornadas e transformar cada mesa em uma narrativa viva, sem perder tempo procurando regra,
-            ficha ou mensagem no meio da sessão.
-          </p>
+    <section className="relative isolate overflow-hidden px-4 pb-16 pt-5 sm:pt-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="relative mx-auto w-full max-w-[min(60svh,600px)]">
+          <RoseWindow active={active} onActive={setActive} onSelect={(item) => navigate(`/regras/${item.slug}`)} className="relative w-full">
+            <span className="font-display text-[clamp(1rem,3.4vw,2.6rem)] leading-none text-bone drop-shadow-[0_2px_10px_rgba(0,0,0,.9)]">Lúgubre</span>
+            <Link to={ctaTo} className="pointer-events-auto mt-[9%] hidden sm:block"><Button className="!px-5 !py-3 text-base">Criar ficha</Button></Link>
+          </RoseWindow>
         </div>
-      </div>
-      <div className="mt-10 grid gap-4 md:grid-cols-3">
-        {highlights.map(([title, text]) => (
-          <article key={title} className="gothic-panel rounded-md p-5">
-            <h3 className="font-display text-2xl text-white">{title}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-mist">{text}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
 
-function FeatureSection() {
-  return (
-    <section className="mx-auto max-w-7xl px-3 py-14 sm:px-4 sm:py-20">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[.28em] text-ember">Diferenciais</p>
-          <h2 className="mt-3 font-display text-4xl text-white">Tudo que sustenta a jornada.</h2>
+        <div className="mt-6 flex flex-wrap justify-center gap-3 sm:hidden">
+          <Link to={ctaTo} className="flex-1"><Button className="w-full !py-3 text-base">Criar minha ficha</Button></Link>
+          <Link to="/regras"><Button variant="ghost" className="!py-3">Ler o livro</Button></Link>
         </div>
-        <p className="max-w-xl text-sm leading-relaxed text-mist">Recursos pensados para mestres e jogadores manterem foco na história, não na bagunça da sessão.</p>
-      </div>
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {features.map(([Icon, title, text]) => (
-          <article key={title} className="gothic-panel soft-motion group rounded-md p-5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-md border border-blood/30 bg-blood/15 text-ember transition-colors group-hover:border-ember/50">
-              <Icon size={21} />
-            </div>
-            <h3 className="mt-4 font-display text-2xl text-white">{title}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-mist">{text}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
 
-function DeveloperDiarySection({ posts }) {
-  return (
-    <section className="mx-auto max-w-7xl px-3 py-14 sm:px-4 sm:py-20">
-      <div className="gothic-panel rounded-md p-4 sm:p-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="mt-6 grid gap-8 lg:grid-cols-[1.3fr_1fr] lg:items-end">
+          <h1 className="font-display text-5xl leading-[.95] text-bone xl:text-6xl">
+            Oito Primordiais. Uma mesa.<br /><span className="text-ember">Nenhuma ferida esquecida.</span>
+          </h1>
           <div>
-            <p className="text-xs font-bold uppercase tracking-[.28em] text-ember">Projeto vivo</p>
-            <h2 className="mt-3 font-display text-4xl text-white">Diário do Desenvolvedor</h2>
+            <p className="max-w-md text-lg text-mist">
+              O RPG dark fantasy Lúgubre inteiro no navegador: fichas que guardam cada ferida, campanhas com
+              mesa virtual e dados, e o livro de regras 0.5 Beta para consultar no meio da sessão.
+            </p>
+            <div className="mt-5 min-h-[4.5rem] border-t-[3px] border-lead pt-3" aria-live="polite">
+              {p ? (
+                <p className="text-mist">
+                  <span className="font-display text-2xl" style={{ color: `color-mix(in srgb, ${p.hex} 40%, #f4ecd8)` }}>{p.name}</span>
+                  <span className="mx-2 text-lead">·</span>{p.domain}{' '}
+                  <Link to={`/regras/${p.slug}`} className="inline-flex items-center gap-1 font-bold text-ember underline decoration-2 underline-offset-4 hover:text-bone">
+                    Ler no livro <ArrowRight size={15} />
+                  </Link>
+                </p>
+              ) : (
+                <p className="text-mist">Passe a luz pelo vitral: cada vidro é um Primordial e abre o capítulo dele no livro.</p>
+              )}
+            </div>
           </div>
-          <p className="max-w-xl text-sm leading-relaxed text-mist">
-            Um mural de atualizações para acompanhar o que nasceu, o que foi refinado e o que ainda espreita no caminho.
-          </p>
-        </div>
-        <div className="mt-7 grid gap-4 lg:grid-cols-3">
-          {posts.slice(0, 6).map((post, index) => <DeveloperPostCard key={post.id} post={post} fallbackIndex={index} />)}
         </div>
       </div>
     </section>
   );
 }
 
-function DeveloperPostCard({ post, fallbackIndex }) {
-  const [broken, setBroken] = useState(false);
-  const fallbackImage = diaryFallbackImages[fallbackIndex % diaryFallbackImages.length];
-  const legacyPlaceholder = post.image_url?.startsWith('/assets/');
-  const image = !broken && post.image_url && !legacyPlaceholder ? post.image_url : fallbackImage;
+/* A nave: tres lancetas mostram o sistema funcionando (exemplos, nao dados reais). */
+function Nave() {
   return (
-    <article className="soft-motion overflow-hidden rounded-md border border-white/10 bg-black/25">
-      <div className="relative aspect-[16/9] overflow-hidden bg-black/40">
-        <img src={image} alt={`Arte de fantasia sombria para a atualização ${post.title}`} loading="lazy" decoding="async" className="h-full w-full object-cover opacity-85 transition-transform duration-500 hover:scale-105" onError={() => setBroken(true)} />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-        <span className="absolute left-3 top-3 rounded-full border border-ember/30 bg-black/55 px-3 py-1 text-xs font-bold uppercase tracking-[.16em] text-ember">
-          {post.category || 'Atualização'}
-        </span>
+    <section className="relative px-4 py-20 sm:py-28" aria-labelledby="nave-title">
+      <div className="mx-auto max-w-7xl">
+        <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr] lg:items-end">
+          <h2 id="nave-title" className="font-display text-5xl leading-none text-bone sm:text-6xl">A mesa inteira,<br />sem sair da página.</h2>
+          <p className="max-w-xl text-lg text-mist lg:justify-self-end">
+            Mexa nos vidros abaixo: é assim que a ficha, o dado e o mapa se comportam numa sessão de verdade.
+            O mestre guarda o segredo; os jogadores veem o efeito.
+          </p>
+        </div>
+        <div className="mt-14 grid gap-6 lg:grid-cols-3">
+          <Lanceta title="Ficha viva" caption="Atributos começam em 2. Esquiva = 15 − Agilidade. Cada ajuste fica salvo para a próxima sessão.">
+            <FichaDemo />
+          </Lanceta>
+          <Lanceta title="Dado de vidro" caption="Teste = 1d20 + atributo + treino. O mestre decide se acertou e quanto doeu; ninguém vê a vida do monstro." tall>
+            <DadoDemo />
+          </Lanceta>
+          <Lanceta title="Mesa virtual" caption="Mapa em pixel art (feito à mão ou por IA) ou imagem sua. Movimento livre, com WASD ou arrastando.">
+            <MesaDemo />
+          </Lanceta>
+        </div>
+        <p className="mt-6 text-sm text-mist">Exemplos ilustrativos. A sua mesa usa as suas fichas.</p>
       </div>
-      <div className="p-4">
-        <p className="text-xs uppercase tracking-[.2em] text-mist">{formatDate(post.published_at)}</p>
-        <h3 className="mt-2 font-display text-2xl text-white">{post.title}</h3>
-        <p className="mt-2 text-sm leading-relaxed text-mist">{post.short_description}</p>
+    </section>
+  );
+}
+
+function Lanceta({ title, caption, children, tall }) {
+  return (
+    <article className={`lanceta gothic-panel relative flex flex-col ${tall ? 'lg:-mt-10' : ''}`}>
+      <svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 z-10 h-28 w-full">
+        <path d="M0,40 Q0,9 50,0 Q100,9 100,40" fill="none" stroke="var(--color-lead)" strokeWidth="8" vectorEffect="non-scaling-stroke" />
+      </svg>
+      <div className="lanceta-glass relative grid min-h-[300px] place-items-center px-5 pb-6 pt-20">{children}</div>
+      <div className="border-t-[3px] border-lead px-5 py-5">
+        <h3 className="font-display text-3xl text-bone">{title}</h3>
+        <p className="mt-2 text-mist">{caption}</p>
       </div>
     </article>
   );
 }
 
-function FinalCallSection() {
+function FichaDemo() {
+  const attrs = [['Força', 2], ['Agilidade', 4], ['Presença', 2], ['Intelecto', 3], ['Vigor', 2]];
+  const [vida, setVida] = useState(41);
+  const max = 63;
   return (
-    <section className="mx-auto max-w-7xl px-3 py-14 sm:px-4 sm:py-20">
-      <div className="relative overflow-hidden rounded-md border border-ember/20 bg-black p-6 shadow-glow sm:p-10">
-        <img src={lugubreImages.throne} alt="" aria-hidden="true" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover object-center opacity-45" />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,4,10,.98)_0%,rgba(5,4,10,.90)_48%,rgba(20,9,38,.54)_100%)]" />
-        <div className="absolute inset-0 shadow-[inset_0_0_110px_35px_rgba(5,4,10,.62)]" />
-        <div className="relative max-w-3xl">
-          <Crown className="text-ember" size={34} />
-          <h2 className="mt-4 font-display text-4xl text-white">O grimório está aberto.</h2>
-          <p className="mt-3 text-mist">Entre no sistema, crie sua próxima ficha ou reúna sua mesa antes que a névoa feche o caminho.</p>
-          <div className="mt-6 grid gap-3 sm:flex sm:flex-wrap">
-            <Link to="/login"><Button className="w-full sm:w-auto">Entrar no Sistema</Button></Link>
-            <Link to="/register"><Button variant="ghost" className="w-full sm:w-auto">Criar Conta</Button></Link>
+    <div className="w-full max-w-xs">
+      <p className="font-display text-2xl text-bone">Kael Vorn</p>
+      <p className="text-sm text-mist">Nocthar · Alquimista · nível 3</p>
+      <dl className="mt-4 grid grid-cols-5 gap-1 text-center">
+        {attrs.map(([name, value]) => (
+          <div key={name} className="border-2 border-lead bg-black/40 py-2">
+            <dt className="text-[11px] uppercase tracking-wider text-mist">{name.slice(0, 3)}</dt>
+            <dd className="font-display text-2xl text-bone tabular">{value}</dd>
           </div>
+        ))}
+      </dl>
+      <div className="mt-4 flex items-center justify-between text-sm">
+        <span className="text-mist">Esquiva</span>
+        <span className="tabular text-bone">15 − 4 = <strong className="text-ember">11</strong></span>
+      </div>
+      <div className="mt-3">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-mist">Vida</span>
+          <span className="tabular text-bone">{vida} / {max}</span>
         </div>
+        <div className="mt-1 flex items-center gap-2">
+          <button type="button" className="btn btn-glass !min-h-9 !px-2" aria-label="Tirar 1 de vida" onClick={() => setVida((v) => Math.max(0, v - 1))}><Minus size={16} /></button>
+          <div className="relative h-4 flex-1 border-2 border-lead bg-black/60">
+            <div className="h-full bg-[#7a1630] transition-[width] duration-500" style={{ width: `${(vida / max) * 100}%`, boxShadow: 'inset 0 0 10px rgba(255,180,180,.35)' }} />
+            {vida < max && (
+              <svg viewBox="0 0 24 24" aria-hidden="true" className="pointer-events-none absolute -top-[6px] h-7 w-7" style={{ left: `calc(${(vida / max) * 100}% - 14px)` }}>
+                <path d="M12,0 L9,8 L14,12 L10,24" fill="none" stroke="var(--color-abyss)" strokeWidth="4" />
+                <path d="M12,0 L9,8 L14,12 L10,24 M14,12 L20,15" fill="none" stroke="#f4ecd8" strokeOpacity=".85" strokeWidth="1.4" />
+              </svg>
+            )}
+          </div>
+          <button type="button" className="btn btn-glass !min-h-9 !px-2" aria-label="Curar 1 de vida" onClick={() => setVida((v) => Math.min(max, v + 1))}><Plus size={16} /></button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DadoDemo() {
+  const [rolling, setRolling] = useState(false);
+  const [value, setValue] = useState(null);
+  const [hit, setHit] = useState(1);
+  const timeout = useRef();
+  useEffect(() => () => clearTimeout(timeout.current), []);
+
+  function roll() {
+    setRolling(true);
+    clearTimeout(timeout.current);
+    timeout.current = setTimeout(() => {
+      const d = 1 + Math.floor(Math.random() * 20);
+      setValue(d);
+      setRolling(false);
+      if (d >= 8) timeout.current = setTimeout(() => setHit((n) => n + 1), 500);
+    }, 1100);
+  }
+
+  const total = value != null ? value + 4 + 5 : null;
+  return (
+    <div className="flex w-full flex-col items-center gap-5">
+      <div className="flex items-center gap-6">
+        <GlassD20 value={value} rolling={rolling} onClick={roll} disabled={rolling} size={118} label="Rolar ataque de Kael" />
+        <figure className="flex flex-col items-center gap-1.5">
+          <div key={hit} className={`relative h-24 w-24 overflow-hidden rounded-full border-4 border-lead bg-[radial-gradient(circle_at_35%_30%,#6b5596,#3a2a5e_60%,#000)] ${hit > 1 ? 'hit-shake' : ''}`}>
+            <Crack on={hit > 0} seed={hit} />
+          </div>
+          <figcaption className="font-display text-lg text-bone">Gorak</figcaption>
+        </figure>
+      </div>
+      <p className="min-h-[3rem] text-center text-sm text-mist" aria-live="polite">
+        {rolling && 'Rolando…'}
+        {!rolling && value == null && 'Toque no d20 para atacar o Gorak.'}
+        {!rolling && value != null && (
+          <>
+            <span className="tabular text-bone">d20 {value} + Agilidade 4 + treino 5 = <strong className="text-ember">{total}</strong></span>
+            <br />
+            {value >= 8 ? 'O Gorak tomou dano.' : 'O mestre disse que errou.'}
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
+function MesaDemo() {
+  const boardRef = useRef(null);
+  const [tokens, setTokens] = useState([
+    { id: 'kael', label: 'K', name: 'Kael', x: 0.18, y: 0.55, color: '#a4781a' },
+    { id: 'lys', label: 'L', name: 'Lys', x: 0.32, y: 0.72, color: '#2a7c86' },
+    { id: 'gorak', label: 'G', name: 'Gorak', x: 0.74, y: 0.22, color: '#7a1630' }
+  ]);
+  const drag = useRef(null);
+
+  return (
+    <div
+      ref={boardRef}
+      className="mesa-demo relative aspect-[7/6] w-full max-w-xs touch-none border-4 border-lead"
+      onPointerMove={(event) => {
+        if (!drag.current) return;
+        const rect = boardRef.current.getBoundingClientRect();
+        const x = Math.max(0.08, Math.min(0.92, (event.clientX - rect.left) / rect.width));
+        const y = Math.max(0.08, Math.min(0.92, (event.clientY - rect.top) / rect.height));
+        setTokens((list) => list.map((t) => (t.id === drag.current ? { ...t, x, y } : t)));
+      }}
+      onPointerUp={() => { drag.current = null; }}
+      onPointerLeave={() => { drag.current = null; }}
+    >
+      {tokens.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          aria-label={`Token ${t.name}`}
+          onPointerDown={(event) => { event.currentTarget.releasePointerCapture?.(event.pointerId); drag.current = t.id; }}
+          className="absolute grid h-[16%] w-[14%] -translate-x-1/2 -translate-y-1/2 cursor-grab place-items-center rounded-full border-[3px] border-lead font-display text-xl text-bone active:cursor-grabbing"
+          style={{ left: `${t.x * 100}%`, top: `${t.y * 100}%`, background: `radial-gradient(circle at 35% 30%, color-mix(in srgb, ${t.color} 60%, #fff), ${t.color} 60%, #000)` }}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function Livro() {
+  return (
+    <section className="px-4 py-20 sm:py-28" aria-labelledby="livro-title">
+      <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[.8fr_1.2fr]">
+        <div className="lg:sticky lg:top-28 lg:self-start">
+          <h2 id="livro-title" className="font-display text-5xl leading-none text-bone sm:text-6xl">O livro está no site.</h2>
+          <p className="mt-5 max-w-md text-lg text-mist">
+            O Livro de Regras 0.5 Beta inteiro, organizado e pesquisável. Quando o livro muda, o site muda junto:
+            as regras ficam guardadas no banco, não presas no código.
+          </p>
+          <Link to="/regras" className="mt-8 inline-block"><Button className="px-6">Abrir o livro <ArrowRight size={18} /></Button></Link>
+        </div>
+        <ol className="border-t-[3px] border-lead">
+          {CHAPTERS.map(([slug, title, desc], i) => (
+            <li key={slug} className="border-b-[3px] border-lead">
+              <Link to={`/regras/${slug}`} className="chapter-row group grid grid-cols-[3.5rem_1fr_auto] items-baseline gap-4 py-5 pr-2">
+                <span className="font-display text-2xl text-ember/70 transition-colors group-hover:text-ember">{ROMAN[i]}</span>
+                <span>
+                  <span className="block font-display text-3xl text-bone">{title}</span>
+                  <span className="mt-1 block text-mist">{desc}</span>
+                </span>
+                <ArrowRight className="text-mist transition-transform duration-300 group-hover:translate-x-1 group-hover:text-ember" size={20} />
+              </Link>
+            </li>
+          ))}
+        </ol>
       </div>
     </section>
   );
 }
 
-function LandingFooter() {
+function Diario({ posts }) {
+  return (
+    <section className="px-4 py-20 sm:py-24" aria-labelledby="diario-title">
+      <div className="mx-auto max-w-7xl">
+        <h2 id="diario-title" className="font-display text-5xl leading-none text-bone">Diário do desenvolvedor</h2>
+        <p className="mt-4 max-w-xl text-lg text-mist">O sistema está em beta. Aqui fica o que nasceu, o que foi refinado e o que ainda espreita no caminho.</p>
+        <ul className="mt-10 border-t-[3px] border-lead">
+          {posts.slice(0, 6).map((post) => (
+            <li key={post.id} className="grid gap-2 border-b-[3px] border-lead py-6 sm:grid-cols-[16rem_1fr] sm:gap-6">
+              <p className="text-mist"><time dateTime={post.published_at}>{formatDate(post.published_at)}</time> · {post.category || 'Atualização'}</p>
+              <div>
+                <h3 className="font-display text-2xl text-bone">{post.title}</h3>
+                {post.short_description && <p className="mt-1 max-w-2xl text-mist">{post.short_description}</p>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+function Fechamento() {
+  const { user } = useAuth();
+  return (
+    <section className="relative isolate overflow-hidden px-4 py-24 text-center sm:py-32">
+      <h2 className="font-display text-5xl leading-none text-bone sm:text-7xl">O grimório está aberto.</h2>
+      <p className="mx-auto mt-5 max-w-lg text-lg text-mist">Crie sua próxima ficha ou reúna sua mesa antes que a névoa feche o caminho.</p>
+      <div className="mt-9 flex flex-wrap justify-center gap-3">
+        {user ? (
+          <Link to="/dashboard"><Button className="px-6">Ir para o painel</Button></Link>
+        ) : (
+          <>
+            <Link to="/register"><Button className="px-6">Criar conta</Button></Link>
+            <Link to="/login"><Button variant="ghost">Já tenho conta</Button></Link>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function Rodape() {
   const links = [
-    ['Discord', '#'],
-    ['GitHub', 'https://github.com/andreulbrich2012-maker/lugubre-rpg'],
+    ['Livro de regras', '/regras'],
     ['Biblioteca', '/powers'],
-    ['Documentação', '#sistema'],
-    ['Equipe', '#sistema'],
     ['Feedback', '/feedback'],
-    ['Entrar', '/login']
+    ['GitHub', 'https://github.com/andreulbrich2012-maker/lugubre-rpg']
   ];
   return (
-    <section className="border-t border-ember/10 bg-black/35 px-3 py-10 sm:px-4">
-      <div className="mx-auto grid max-w-7xl gap-6 md:grid-cols-[1fr_1.2fr]">
+    <footer className="border-t-[6px] border-lead bg-black/50 px-4 py-10">
+      <div className="mx-auto flex max-w-7xl flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h2 className="font-display text-3xl text-ember">Lúgubre RPG</h2>
-          <p className="mt-2 max-w-md text-sm text-mist">Software de fantasia sombria para fichas, campanhas e histórias que merecem permanecer.</p>
-          <p className="mt-4 text-xs uppercase tracking-[.2em] text-mist">Versão 1.0 · 2026</p>
+          <p className="font-display text-3xl text-ember">Lúgubre RPG</p>
+          <p className="mt-1 text-sm text-mist">Livro de regras 0.5 Beta · 2026</p>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {links.map(([label, href]) => (
-            <LinkOrAnchor key={label} href={href} className="rounded-md border border-white/10 bg-white/[.03] px-3 py-2 text-sm text-mist transition-colors hover:border-ember/30 hover:text-white">
-              {label}
-            </LinkOrAnchor>
-          ))}
-        </div>
+        <nav className="flex flex-wrap gap-x-6 gap-y-2" aria-label="Rodapé">
+          {links.map(([label, href]) => (href.startsWith('http')
+            ? <a key={label} href={href} className="text-mist hover:text-bone">{label}</a>
+            : <Link key={label} to={href} className="text-mist hover:text-bone">{label}</Link>))}
+        </nav>
       </div>
-    </section>
+    </footer>
   );
-}
-
-function LinkOrAnchor({ href, children, className }) {
-  if (href.startsWith('http') || href.startsWith('#')) return <a href={href} className={className}>{children}</a>;
-  return <Link to={href} className={className}>{children}</Link>;
 }

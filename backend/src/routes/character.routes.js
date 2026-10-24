@@ -280,7 +280,8 @@ async function normalizeCharacter(body, currentSkills = null, { requireReference
   };
 }
 
-async function enrich(row) {
+// Catalogos carregados uma vez por requisicao (antes: 4 consultas por ficha na listagem).
+export async function loadCatalogs() {
   const [racesResult, classesResult, originsResult, skillsResult] = await Promise.all([
     tryQuery('select * from races order by name'),
     tryQuery('select * from classes order by name'),
@@ -293,6 +294,11 @@ async function enrich(row) {
     originsResult?.rows || getLocalCatalog('origins', { includeDeleted: true }),
     skillsResult?.rows || getLocalCatalog('skills')
   ]);
+  return { races, classes, origins, skillsCatalog };
+}
+
+export async function enrich(row, catalogs = null) {
+  const { races, classes, origins, skillsCatalog } = catalogs || await loadCatalogs();
   const attributes = parseJsonField(row.attributes, baseAttributes());
   const inventory = parseJsonField(row.inventory, []);
   const attacks = parseJsonField(row.attacks, []);
@@ -386,7 +392,8 @@ router.get('/', async (req, res) => {
     [req.user.id]
   );
   const rows = result?.rows || await listLocalCharacters(req.user.id);
-  res.json(await Promise.all(rows.map(enrich)));
+  const catalogs = await loadCatalogs();
+  res.json(await Promise.all(rows.map((row) => enrich(row, catalogs))));
 });
 
 router.post('/', async (req, res, next) => {
@@ -557,8 +564,10 @@ router.get('/:id', async (req, res) => {
 });
 
 router.put('/:id', async (req, res) => {
-  const current = await getLocalCharacter(req.params.id, req.user.id);
-  const data = await normalizeCharacter(req.body, current?.skills || req.body.skills);
+  // treino de pericias atual vem do banco (antes lia so do localStore e ficava vazio com Postgres)
+  const current = await findOwnedCharacter(req.params.id, req.user.id);
+  if (!current) return res.status(404).json({ message: 'Ficha não encontrada.' });
+  const data = await normalizeCharacter(req.body, parseJsonField(current.skills, null) || req.body.skills);
   const result = await tryQuery(
     `update characters set player_name=$1, character_name=$2, photo=$3, race_id=$4, class_id=$5,
      origin_id=$6, origin=$7, level=$8, life_current=$9, life_max=$10, sanity_current=$11, sanity_max=$12,

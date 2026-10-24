@@ -52,10 +52,9 @@ export default function FeedbackForm({ onSubmit, loading }) {
   }
 
   return (
-    <form onSubmit={submit} className="gothic-panel rounded-md p-4 sm:p-6">
+    <form onSubmit={submit} className="gothic-panel p-4 sm:p-6">
       <div>
-        <p className="text-xs uppercase tracking-[.24em] text-ember/70">Sua voz no sistema</p>
-        <h2 className="font-display text-3xl text-ember">Enviar feedback</h2>
+        <h2 className="font-display text-3xl text-bone">Enviar feedback</h2>
         <p className="mt-2 text-sm text-mist">Conte o que quebrou, o que pode melhorar ou que ideia deveria ganhar forma.</p>
       </div>
 
@@ -85,7 +84,7 @@ export default function FeedbackForm({ onSubmit, loading }) {
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
         <label className="block text-sm text-mist">
           Imagem/anexo opcional
-          <span className="mt-1 flex min-h-12 cursor-pointer items-center gap-3 rounded-md border border-dashed border-ember/25 bg-black/30 px-3 py-3 text-sm text-mist hover:border-ember/45">
+          <span className="mt-1 flex min-h-12 cursor-pointer items-center gap-3 border-[3px] border-dashed border-lead bg-glass px-3 py-3 text-sm text-mist hover:text-bone">
             <ImagePlus size={18} className="text-ember" />
             {form.attachmentUrl ? 'Imagem anexada' : 'Selecionar imagem'}
             <input type="file" accept="image/*" className="hidden" onChange={(event) => readAttachment(event.target.files?.[0])} />
@@ -94,7 +93,7 @@ export default function FeedbackForm({ onSubmit, loading }) {
         <LoadingButton loading={loading} loadingText="Enviando..." className="min-h-12 w-full sm:w-auto">Enviar feedback</LoadingButton>
       </div>
 
-      {form.attachmentUrl && <img src={form.attachmentUrl} alt="Prévia do anexo" className="mt-4 max-h-56 w-full rounded-md border border-ember/15 object-cover" />}
+      {form.attachmentUrl && <img src={form.attachmentUrl} alt="Prévia do anexo" className="mt-4 max-h-56 w-full border-[3px] border-lead object-cover" />}
       {error && <div className="mt-4"><Alert type="error">{error}</Alert></div>}
     </form>
   );

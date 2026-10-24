@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Edit, Trash2 } from 'lucide-react';
 import Button from '../Button';
+import { primordialByName } from '../glass/primordiais';
 import EntityImage from '../EntityImage';
 import { api } from '../../lib/api';
 import MonsterForm from './MonsterForm';
@@ -59,7 +60,7 @@ export default function AdminMonstersPage() {
       }
       await load();
     } catch (err) {
-      setMessage({ type: 'error', text: err?.response?.data?.message || 'Nao foi possivel deletar o monstro.' });
+      setMessage({ type: 'error', text: err?.response?.data?.message || 'Não foi possível deletar o monstro.' });
     } finally {
       setDeletingId('');
     }
@@ -86,24 +87,24 @@ export default function AdminMonstersPage() {
 
       <section className="gothic-panel rounded-md p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <h2 className="font-display text-3xl text-ember">Monstros cadastrados</h2>
+          <h2 className="font-display text-3xl text-bone">Monstros cadastrados</h2>
           <p className="text-sm text-mist">{monsters.length} registros</p>
         </div>
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           {monsters.map((monster) => (
-            <article key={monster.id} className="rounded-md border border-ember/15 bg-black/25 p-4">
+            <article key={monster.id} className="pane p-4">
               <div className="grid gap-4 sm:grid-cols-[110px_1fr]">
-                <EntityImage src={monster.image_url} label="Monstro" name={monster.name} className="aspect-[4/3] w-full sm:aspect-square" compact />
+                <EntityImage src={monster.image_url} label="Monstro" name={monster.name} tint={primordialByName[monster.category]?.color} className="aspect-[4/3] w-full sm:aspect-square" compact />
                 <div>
-                  <p className="text-xs uppercase tracking-[.2em] text-ember/70">{monster.category}</p>
-                  <h3 className="font-display text-2xl text-white">{monster.name}</h3>
+                  <h3 className="font-display text-2xl text-bone">{monster.name}</h3>
+                  <p className="text-sm text-mist">{monster.category}</p>
                   <p className="text-sm text-mist">Vida {monster.min_health} a {monster.max_health} · Armadura {monster.armor}</p>
                   <p className="mt-2 line-clamp-2 text-sm text-mist">{monster.description || 'Sem descrição.'}</p>
                   <div className="mt-3 grid gap-2 sm:flex sm:flex-wrap">
                     <Button type="button" variant="ghost" className="w-full px-3 py-1.5 text-sm sm:w-auto" onClick={() => editMonster(monster)}>
                       <span className="inline-flex items-center gap-2"><Edit size={15} /> Editar</span>
                     </Button>
-                    <Button type="button" variant="ghost" data-admin-delete-id={monster.id} data-admin-delete-endpoint="monsters" className="w-full px-3 py-1.5 text-sm text-red-200 sm:w-auto" onClick={() => setConfirmDelete(monster)}>
+                    <Button type="button" variant="ghost" data-admin-delete-id={monster.id} data-admin-delete-endpoint="monsters" className="w-full px-3 py-1.5 text-sm text-bone sm:w-auto" onClick={() => setConfirmDelete(monster)}>
                       <span className="inline-flex items-center gap-2"><Trash2 size={15} /> Deletar</span>
                     </Button>
                   </div>
@@ -130,11 +131,11 @@ function ConfirmDialog({ title, onCancel, onConfirm, loading = false }) {
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/75 p-4">
       <section className="gothic-panel max-h-[90vh] w-full max-w-md overflow-auto rounded-md p-4 sm:p-6">
-        <h2 className="font-display text-3xl text-ember">{title}</h2>
+        <h2 className="font-display text-3xl text-bone">{title}</h2>
         <p className="mt-3 text-sm leading-relaxed text-mist">Tem certeza que deseja deletar este item? Essa ação não poderá ser desfeita.</p>
         <div className="mt-6 grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
           <Button type="button" variant="ghost" disabled={loading} className="w-full sm:w-auto" onClick={onCancel}>Cancelar</Button>
-          <Button type="button" disabled={loading} className="w-full border-red-500/70 bg-red-900/70 hover:bg-red-800 sm:w-auto" onClick={onConfirm}>{loading ? 'Deletando...' : 'Deletar'}</Button>
+          <Button variant="danger" type="button" disabled={loading} className="w-full  sm:w-auto" onClick={onConfirm}>{loading ? 'Deletando...' : 'Deletar'}</Button>
         </div>
       </section>
     </div>

@@ -18,9 +18,14 @@ import {
   updateLocalCampaignMessage
 } from '../db/localStore.js';
 import { requireAuth } from '../middleware/auth.js';
+import { boolish, sendError, uuidParam } from '../utils/http.js';
+import { assertCampaignMaster, dbMember, isMaster, requireCampaignMember } from '../utils/campaignAccess.js';
+import { emitEvent } from '../utils/events.js';
+import { registerCampaignV2Routes } from './campaign.v2.js';
 
 const router = Router();
 router.use(requireAuth);
+for (const param of ['id', 'userId', 'messageId', 'entryId', 'shopId', 'itemId', 'requestId']) router.param(param, uuidParam);
 
 const memberColors = ['#d6a65f', '#9b8ac7', '#4fb6a8', '#cf6f8f', '#8fb3ff', '#d08a3e', '#8bd17c', '#e0d27a'];
 const campaignSchema = z.object({
@@ -41,29 +46,29 @@ const diarySchema = z.object({
   content: z.string().min(1).max(12000),
   marker: z.string().optional().default(''),
   characterId: z.string().uuid().optional().nullable(),
-  isGmPrivate: z.coerce.boolean().optional().default(false)
+  isGmPrivate: boolish.optional().default(false)
 });
 const shopCategories = ['Taverna', 'Ferreiro', 'Alquimista', 'Mercado Geral', 'Loja Mística', 'Estábulo', 'Alfaiate', 'Contrabandista', 'Templo', 'Biblioteca', 'Armazém', 'Curandeiro'];
 const shopSchema = z.object({
   name: z.string().min(2).max(120),
   description: z.string().optional().default(''),
   category: z.string().min(2),
-  visibleToPlayers: z.coerce.boolean().default(true)
+  visibleToPlayers: boolish.default(true)
 });
 const shopItemSchema = z.object({
   name: z.string().min(1).max(140),
   description: z.string().optional().default(''),
-  priceDracmas: z.coerce.number().min(0).default(0),
-  stock: z.coerce.number().min(0).default(1),
+  priceDracmas: z.coerce.number().int().min(0).default(0),
+  stock: z.coerce.number().int().min(0).default(1),
   category: z.string().optional().default('Outros'),
   weight: z.coerce.number().min(0).default(0),
-  available: z.coerce.boolean().default(true),
+  available: boolish.default(true),
   note: z.string().optional().default('')
 });
 const purchaseSchema = z.object({
   itemId: z.string().uuid(),
-  characterId: z.string().uuid(),
-  quantity: z.coerce.number().min(1).max(99).default(1)
+  characterId: z.string().uuid().optional().nullable(),
+  quantity: z.coerce.number().int().min(1).max(99).default(1)
 });
 const purchaseDecisionSchema = z.object({
   note: z.string().optional().default('')
@@ -82,10 +87,6 @@ function parseJson(value, fallback) {
   } catch {
     return fallback;
   }
-}
-
-function isMaster(member, campaign, user) {
-  return user.role === 'admin' || member?.role === 'master' || campaign?.master_id === user.id;
 }
 
 function normalizeShopCategory(category) {
@@ -122,33 +123,6 @@ function walletFromTotal(total) {
   return { bronze, silver, platinum, gold };
 }
 
-async function requireCampaignMember(campaignId, user) {
-  const member = await dbMember(campaignId, user.id);
-  if (!member) {
-    const error = new Error('Você não participa desta campanha.');
-    error.status = 403;
-    throw error;
-  }
-  const campaignResult = await query('select * from campaigns where id = $1', [campaignId]);
-  const campaign = campaignResult.rows[0];
-  if (!campaign) {
-    const error = new Error('Campanha não encontrada.');
-    error.status = 404;
-    throw error;
-  }
-  return { member, campaign, master: isMaster(member, campaign, user) };
-}
-
-async function assertCampaignMaster(campaignId, user) {
-  const context = await requireCampaignMember(campaignId, user);
-  if (!context.master) {
-    const error = new Error('Apenas o mestre pode fazer esta ação.');
-    error.status = 403;
-    throw error;
-  }
-  return context;
-}
-
 function sharedCharacter(row) {
   if (!row?.shared_character_id) return null;
   return {
@@ -171,17 +145,6 @@ function sharedCharacter(row) {
     attacks: parseJson(row.attacks, []),
     spells: parseJson(row.spells, [])
   };
-}
-
-async function dbMember(campaignId, userId) {
-  const result = await tryQuery(
-    `select cm.*, c.master_id, c.name as campaign_name
-     from campaign_members cm
-     join campaigns c on c.id = cm.campaign_id
-     where cm.campaign_id = $1 and cm.user_id = $2`,
-    [campaignId, userId]
-  );
-  return result?.rows?.[0] || null;
 }
 
 async function assertOwnedCharacter(characterId, userId) {
@@ -240,8 +203,10 @@ async function loadDbMembers(campaignId, viewer) {
   return result.rows.map((row) => {
     const displayName = row.character_name || row.name || 'Jogador';
     const displayAvatar = row.character_photo || row.profile_image_url || '';
+    // dados da ficha so vao em shared_character (antes vazavam no topo do objeto para todos)
+    const { life_current, life_max, sanity_current, sanity_max, mana, mana_max, defense, attributes, skills, skill_bonuses, inventory, attacks, spells, ...publicRow } = row;
     return {
-      ...row,
+      ...publicRow,
       color: row.color || memberColor(row.user_id),
       display_name: displayName,
       display_avatar: displayAvatar,
@@ -250,10 +215,21 @@ async function loadDbMembers(campaignId, viewer) {
   });
 }
 
-async function loadDbMessages(campaignId) {
+async function loadDbMessages(campaignId, { after = null, messageId = null } = {}) {
+  const params = [campaignId];
+  let filter = '';
+  if (messageId) {
+    params.push(messageId);
+    filter = `and m.id = $${params.length}`;
+  } else if (after) {
+    params.push(after);
+    filter = `and m.created_at > $${params.length}`;
+  }
   const result = await query(
-    `select
+    `select * from (select
        m.id,
+       m.message_type,
+       m.meta,
        m.campaign_id,
        m.user_id,
        m.character_id,
@@ -270,10 +246,11 @@ async function loadDbMessages(campaignId) {
      join users u on u.id = m.user_id
      left join campaign_members cm on cm.campaign_id = m.campaign_id and cm.user_id = m.user_id
      left join characters ch on ch.id = coalesce(cm.shared_character_id, cm.character_id, m.character_id)
-     where m.campaign_id = $1 and m.deleted_at is null
-     order by m.created_at asc
-     limit 200`,
-    [campaignId]
+     where m.campaign_id = $1 and m.deleted_at is null ${filter}
+     order by m.created_at desc
+     limit 200) latest
+     order by created_at asc`,
+    params
   );
   return result.rows.map((row) => ({
     ...row,
@@ -331,13 +308,14 @@ router.post('/join', async (req, res) => {
            updated_at = now()`,
         [campaign.rows[0].id, req.user.id, body.characterId || null, memberColor(req.user.id)]
       );
+      await emitEvent(campaign.rows[0].id, 'members:changed', { userId: req.user.id, action: 'joined' }, 'all', req.user.id);
       return res.json(campaign.rows[0]);
     }
     const local = await joinLocalCampaign(body.inviteCode, req.user.id, body.characterId || null);
     if (!local) return res.status(404).json({ message: 'Convite inválido.' });
     res.json(local);
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível entrar na campanha.' });
+    sendError(res, error, 'Não foi possível entrar na campanha.');
   }
 });
 
@@ -346,8 +324,21 @@ router.get('/:id', async (req, res) => {
   if (member) {
     const campaign = await query('select * from campaigns where id = $1', [req.params.id]);
     const members = await loadDbMembers(req.params.id, req.user);
+    const master = isMaster(member, campaign.rows[0], req.user);
+    // ?light=1: para polling/reabertura rapida, sem mensagens nem fichas completas
+    if (req.query.light === '1' || req.query.light === 'true') {
+      return res.json({
+        campaign: campaign.rows[0],
+        members: members.map(({ shared_character: sheet, attributes, skills, skill_bonuses, inventory, attacks, spells, ...rest }) => ({
+          ...rest,
+          shared_character: sheet ? { id: sheet.id, character_name: sheet.character_name, photo: sheet.photo, level: sheet.level } : null
+        })),
+        role: member.role,
+        isMaster: master
+      });
+    }
     const messages = await loadDbMessages(req.params.id);
-    return res.json({ campaign: campaign.rows[0], members, messages, role: member.role });
+    return res.json({ campaign: campaign.rows[0], members, messages, role: member.role, isMaster: master });
   }
   const local = await getLocalCampaignRoom(req.params.id, req.user.id);
   if (!local) return res.status(403).json({ message: 'Você não participa desta campanha.' });
@@ -367,7 +358,7 @@ router.put('/:id', async (req, res) => {
     if (!campaign) return res.status(404).json({ message: 'Campanha não encontrada.' });
     res.json(campaign);
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível editar a campanha.' });
+    sendError(res, error, 'Não foi possível editar a campanha.');
   }
 });
 
@@ -385,7 +376,7 @@ router.delete('/:id', async (req, res) => {
     }
     res.status(204).end();
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível excluir a campanha.' });
+    sendError(res, error, 'Não foi possível excluir a campanha.');
   }
 });
 
@@ -403,13 +394,14 @@ router.post('/:id/leave', async (req, res) => {
     );
     if (result) {
       if (result.rowCount === 0) return res.status(400).json({ message: 'O mestre deve excluir a campanha.' });
+      await emitEvent(req.params.id, 'members:changed', { userId: req.user.id, action: 'left' }, 'all', req.user.id);
       return res.status(204).end();
     }
     const left = await leaveLocalCampaign(req.params.id, req.user.id);
     if (!left) return res.status(404).json({ message: 'Campanha não encontrada.' });
     res.status(204).end();
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível sair da campanha.' });
+    sendError(res, error, 'Não foi possível sair da campanha.');
   }
 });
 
@@ -433,13 +425,14 @@ router.delete('/:id/members/:userId', async (req, res) => {
         [req.params.id, req.params.userId]
       );
       if (!result.rowCount) return res.status(404).json({ message: 'Jogador não encontrado.' });
+      await emitEvent(req.params.id, 'members:changed', { userId: req.params.userId, action: 'removed' }, 'all', req.user.id);
       return res.status(204).end();
     }
     const removed = await removeLocalCampaignMember(req.params.id, req.user.id, req.params.userId, req.user.role);
     if (!removed) return res.status(404).json({ message: 'Jogador não encontrado.' });
     res.status(204).end();
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível remover o jogador.' });
+    sendError(res, error, 'Não foi possível remover o jogador.');
   }
 });
 
@@ -456,13 +449,19 @@ router.put('/:id/members/me/character', async (req, res) => {
     );
     if (result) {
       if (!result.rowCount) return res.status(403).json({ message: 'Você não participa desta campanha.' });
-      return res.json(result.rows[0]);
+      const characterId = body.characterId || null;
+      await emitEvent(req.params.id, 'character:shared', { userId: req.user.id, characterId }, 'all', req.user.id);
+      await emitEvent(req.params.id, 'members:changed', { userId: req.user.id, action: 'character' }, 'all', req.user.id);
+      return res.json({
+        ...result.rows[0],
+        notice: characterId ? 'Personagem compartilhado com o mestre.' : 'Personagem retirado da campanha.'
+      });
     }
     const member = await updateLocalCampaignMemberCharacter(req.params.id, req.user.id, body.characterId || null);
     if (!member) return res.status(403).json({ message: 'Você não participa desta campanha.' });
     res.json(member);
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível compartilhar o personagem.' });
+    sendError(res, error, 'Não foi possível compartilhar o personagem.');
   }
 });
 
@@ -479,19 +478,24 @@ router.put('/:id/members/:userId/color', async (req, res) => {
         [body.color, req.params.id, req.params.userId]
       );
       if (!result.rowCount) return res.status(404).json({ message: 'Jogador não encontrado.' });
+      await emitEvent(req.params.id, 'members:changed', { userId: req.params.userId, action: 'color' }, 'all', req.user.id);
       return res.json(result.rows[0]);
     }
     const updated = await updateLocalCampaignMemberColor(req.params.id, req.user.id, req.params.userId, body.color, req.user.role);
     if (!updated) return res.status(404).json({ message: 'Jogador não encontrado.' });
     res.json(updated);
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível alterar a cor.' });
+    sendError(res, error, 'Não foi possível alterar a cor.');
   }
 });
 
 router.get('/:id/messages', async (req, res) => {
   const member = await dbMember(req.params.id, req.user.id);
-  if (member) return res.json(await loadDbMessages(req.params.id));
+  if (member) {
+    const after = req.query.after ? new Date(String(req.query.after)) : null;
+    if (after && Number.isNaN(after.getTime())) return res.status(400).json({ message: 'Parâmetro after inválido. Use a data created_at da última mensagem.' });
+    return res.json(await loadDbMessages(req.params.id, { after: after?.toISOString() || null }));
+  }
   const local = await getLocalCampaignRoom(req.params.id, req.user.id);
   if (!local) return res.status(403).json({ message: 'Você não participa desta campanha.' });
   res.json(local.messages);
@@ -508,14 +512,15 @@ router.post('/:id/messages', async (req, res) => {
          returning id, campaign_id, user_id, character_id, content, edited_at, created_at, updated_at`,
         [req.params.id, req.user.id, member.shared_character_id || member.character_id || null, body.content.trim()]
       );
-      const messages = await loadDbMessages(req.params.id);
-      return res.status(201).json(messages.find((message) => message.id === rows[0].id) || rows[0]);
+      const [message] = await loadDbMessages(req.params.id, { messageId: rows[0].id });
+      await emitEvent(req.params.id, 'message:created', { message: message || rows[0] }, 'all', req.user.id);
+      return res.status(201).json(message || rows[0]);
     }
     const local = await createLocalMessage(req.params.id, req.user.id, body.content.trim());
     if (!local) return res.status(403).json({ message: 'Você não participa desta campanha.' });
     res.status(201).json(local);
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível enviar a mensagem.' });
+    sendError(res, error, 'Não foi possível enviar a mensagem.');
   }
 });
 
@@ -535,14 +540,15 @@ router.put('/:id/messages/:messageId', async (req, res) => {
          where id = $2 and campaign_id = $3`,
         [body.content.trim(), req.params.messageId, req.params.id]
       );
-      const messages = await loadDbMessages(req.params.id);
-      return res.json(messages.find((message) => message.id === req.params.messageId));
+      const [message] = await loadDbMessages(req.params.id, { messageId: req.params.messageId });
+      await emitEvent(req.params.id, 'message:updated', { message }, 'all', req.user.id);
+      return res.json(message);
     }
     const local = await updateLocalCampaignMessage(req.params.id, req.user.id, req.params.messageId, body.content.trim());
     if (!local) return res.status(404).json({ message: 'Mensagem não encontrada.' });
     res.json(local);
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível editar a mensagem.' });
+    sendError(res, error, 'Não foi possível editar a mensagem.');
   }
 });
 
@@ -555,20 +561,21 @@ router.delete('/:id/messages/:messageId', async (req, res) => {
         [req.params.messageId, req.params.id]
       );
       if (!existing.rowCount) return res.status(404).json({ message: 'Mensagem não encontrada.' });
-      const canDelete = existing.rows[0].user_id === req.user.id || member.role === 'master' || req.user.role === 'admin';
+      const canDelete = existing.rows[0].user_id === req.user.id || isMaster(member, { master_id: member.master_id }, req.user);
       if (!canDelete) return res.status(403).json({ message: 'Você não pode excluir mensagens de outros jogadores.' });
       await query(
         `update messages set deleted_at = now(), updated_at = now()
          where id = $1 and campaign_id = $2`,
         [req.params.messageId, req.params.id]
       );
+      await emitEvent(req.params.id, 'message:deleted', { messageId: req.params.messageId }, 'all', req.user.id);
       return res.status(204).end();
     }
     const deleted = await deleteLocalCampaignMessage(req.params.id, req.user.id, req.user.role, req.params.messageId);
     if (!deleted) return res.status(404).json({ message: 'Mensagem não encontrada.' });
     res.status(204).end();
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível excluir a mensagem.' });
+    sendError(res, error, 'Não foi possível excluir a mensagem.');
   }
 });
 
@@ -613,7 +620,7 @@ router.get('/:id/diary', async (req, res) => {
     const members = master ? await loadDbMembers(req.params.id, req.user) : [];
     res.json({ entries: entries.rows, members, role: member.role, isMaster: master, campaign });
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível carregar o diário.' });
+    sendError(res, error, 'Não foi possível carregar o diário.');
   }
 });
 
@@ -631,7 +638,7 @@ router.post('/:id/diary', async (req, res) => {
     );
     res.status(201).json(created.rows[0]);
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível criar a anotação.' });
+    sendError(res, error, 'Não foi possível criar a anotação.');
   }
 });
 
@@ -643,30 +650,33 @@ router.put('/:id/diary/:entryId', async (req, res) => {
     const existing = await query('select * from campaign_diary_entries where id = $1 and campaign_id = $2', [req.params.entryId, req.params.id]);
     if (!existing.rowCount) return res.status(404).json({ message: 'Anotação não encontrada.' });
     if (existing.rows[0].user_id !== req.user.id) return res.status(403).json({ message: 'Você só pode editar seu próprio diário.' });
+    const characterId = Object.prototype.hasOwnProperty.call(req.body || {}, 'characterId') ? body.characterId || null : existing.rows[0].character_id;
     const updated = await query(
       `update campaign_diary_entries
        set title=$1, content=$2, marker=$3, character_id=$4, is_gm_private=$5, updated_at=now()
        where id=$6 and campaign_id=$7 and user_id=$8
        returning *`,
-      [body.title.trim(), body.content.trim(), body.marker || '', body.characterId || null, Boolean(master && body.isGmPrivate), req.params.entryId, req.params.id, req.user.id]
+      [body.title.trim(), body.content.trim(), body.marker || '', characterId, Boolean(master && body.isGmPrivate), req.params.entryId, req.params.id, req.user.id]
     );
     res.json(updated.rows[0]);
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível editar a anotação.' });
+    sendError(res, error, 'Não foi possível editar a anotação.');
   }
 });
 
 router.delete('/:id/diary/:entryId', async (req, res) => {
   try {
-    await requireCampaignMember(req.params.id, req.user);
+    const { master } = await requireCampaignMember(req.params.id, req.user);
+    // mestre pode excluir entradas dos jogadores (moderacao), mas nao as privadas de outro mestre
     const deleted = await query(
-      'delete from campaign_diary_entries where id = $1 and campaign_id = $2 and user_id = $3',
-      [req.params.entryId, req.params.id, req.user.id]
+      `delete from campaign_diary_entries
+       where id = $1 and campaign_id = $2 and (user_id = $3 or ($4 and is_gm_private = false))`,
+      [req.params.entryId, req.params.id, req.user.id, master]
     );
     if (!deleted.rowCount) return res.status(404).json({ message: 'Anotação não encontrada.' });
     res.status(204).end();
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível excluir a anotação.' });
+    sendError(res, error, 'Não foi possível excluir a anotação.');
   }
 });
 
@@ -717,7 +727,7 @@ router.get('/:id/shops', async (req, res) => {
   try {
     res.json(await loadShopPayload(req.params.id, req.user));
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível carregar lojas.' });
+    sendError(res, error, 'Não foi possível carregar lojas.');
   }
 });
 
@@ -732,7 +742,7 @@ router.post('/:id/shops', async (req, res) => {
     );
     res.status(201).json(created.rows[0]);
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível criar loja.' });
+    sendError(res, error, 'Não foi possível criar loja.');
   }
 });
 
@@ -748,7 +758,7 @@ router.put('/:id/shops/:shopId', async (req, res) => {
     if (!updated.rowCount) return res.status(404).json({ message: 'Loja não encontrada.' });
     res.json(updated.rows[0]);
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível editar loja.' });
+    sendError(res, error, 'Não foi possível editar loja.');
   }
 });
 
@@ -759,7 +769,7 @@ router.delete('/:id/shops/:shopId', async (req, res) => {
     if (!deleted.rowCount) return res.status(404).json({ message: 'Loja não encontrada.' });
     res.status(204).end();
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível excluir loja.' });
+    sendError(res, error, 'Não foi possível excluir loja.');
   }
 });
 
@@ -776,7 +786,7 @@ router.post('/:id/shops/:shopId/items', async (req, res) => {
     );
     res.status(201).json(created.rows[0]);
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível criar item.' });
+    sendError(res, error, 'Não foi possível criar item.');
   }
 });
 
@@ -794,7 +804,7 @@ router.put('/:id/shop-items/:itemId', async (req, res) => {
     if (!updated.rowCount) return res.status(404).json({ message: 'Item não encontrado.' });
     res.json(updated.rows[0]);
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível editar item.' });
+    sendError(res, error, 'Não foi possível editar item.');
   }
 });
 
@@ -809,7 +819,7 @@ router.delete('/:id/shop-items/:itemId', async (req, res) => {
     if (!deleted.rowCount) return res.status(404).json({ message: 'Item não encontrado.' });
     res.status(204).end();
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível remover item.' });
+    sendError(res, error, 'Não foi possível remover item.');
   }
 });
 
@@ -817,6 +827,7 @@ router.post('/:id/purchase-requests', async (req, res) => {
   try {
     await requireCampaignMember(req.params.id, req.user);
     const body = purchaseSchema.parse(req.body);
+    if (!body.characterId) return res.status(400).json({ message: 'Escolha um personagem para comprar.' });
     await assertOwnedCharacter(body.characterId, req.user.id);
     const item = await query(
       `select i.*, s.campaign_id, s.visible_to_players
@@ -835,7 +846,7 @@ router.post('/:id/purchase-requests', async (req, res) => {
     );
     res.status(201).json(created.rows[0]);
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível solicitar compra.' });
+    sendError(res, error, 'Não foi possível solicitar compra.');
   }
 });
 
@@ -940,7 +951,7 @@ router.put('/:id/purchase-requests/:requestId/approve', async (req, res) => {
   try {
     res.json(await decidePurchase(req, 'approved'));
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível aprovar compra.' });
+    sendError(res, error, 'Não foi possível aprovar compra.');
   }
 });
 
@@ -948,8 +959,10 @@ router.put('/:id/purchase-requests/:requestId/deny', async (req, res) => {
   try {
     res.json(await decidePurchase(req, 'denied'));
   } catch (error) {
-    res.status(error.status || 400).json({ message: error.message || 'Não foi possível negar compra.' });
+    sendError(res, error, 'Não foi possível negar compra.');
   }
 });
+
+registerCampaignV2Routes(router);
 
 export default router;

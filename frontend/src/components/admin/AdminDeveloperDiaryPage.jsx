@@ -112,25 +112,25 @@ export default function AdminDeveloperDiaryPage() {
   return (
     <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
       <form onSubmit={save} className="gothic-panel rounded-md p-4 sm:p-5">
-        <h2 className="font-display text-3xl text-ember">{editingId ? 'Editar publicação' : 'Nova publicação'}</h2>
+        <h2 className="font-display text-3xl text-bone">{editingId ? 'Editar publicação' : 'Nova publicação'}</h2>
         <div className="mt-5 grid gap-3">
-          <input className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Título" value={form.title} onChange={(event) => patch({ title: event.target.value })} />
-          <textarea className="min-h-24 rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Descrição curta" value={form.shortDescription} onChange={(event) => patch({ shortDescription: event.target.value })} />
-          <textarea className="min-h-32 rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Descrição completa opcional" value={form.fullDescription} onChange={(event) => patch({ fullDescription: event.target.value })} />
+          <input className="field !mt-0" placeholder="Título" value={form.title} onChange={(event) => patch({ title: event.target.value })} />
+          <textarea className="min-h-24 field !mt-0" placeholder="Descrição curta" value={form.shortDescription} onChange={(event) => patch({ shortDescription: event.target.value })} />
+          <textarea className="min-h-32 field !mt-0" placeholder="Descrição completa opcional" value={form.fullDescription} onChange={(event) => patch({ fullDescription: event.target.value })} />
           <div className="grid gap-3 sm:grid-cols-2">
-            <select className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={form.category} onChange={(event) => patch({ category: event.target.value })}>
+            <select className="field !mt-0" value={form.category} onChange={(event) => patch({ category: event.target.value })}>
               {categories.map((category) => <option key={category} value={category}>{category}</option>)}
             </select>
-            <input type="date" className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={form.publishedAt} onChange={(event) => patch({ publishedAt: event.target.value })} />
+            <input type="date" className="field !mt-0" value={form.publishedAt} onChange={(event) => patch({ publishedAt: event.target.value })} />
           </div>
-          <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md border border-ember/25 bg-black/20 px-3 py-2 text-sm font-semibold text-ember hover:bg-ember/10">
+          <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 field !mt-0 text-sm font-semibold text-ember hover-lit">
             <ImagePlus size={16} />
             Enviar imagem
             <input className="hidden" type="file" accept="image/*" onChange={(event) => readImage(event.target.files?.[0])} />
           </label>
-          <input className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Ou cole uma URL de imagem" value={form.imageUrl} onChange={(event) => patch({ imageUrl: event.target.value })} />
-          {form.imageUrl && <img src={form.imageUrl} alt="Prévia da publicação" className="aspect-[16/9] w-full rounded-md border border-white/10 object-cover" />}
-          <label className="flex min-h-11 items-center gap-3 rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-mist">
+          <input className="field !mt-0" placeholder="Ou cole uma URL de imagem" value={form.imageUrl} onChange={(event) => patch({ imageUrl: event.target.value })} />
+          {form.imageUrl && <img src={form.imageUrl} alt="Prévia da publicação" className="aspect-[16/9] w-full border-[3px] border-lead object-cover" />}
+          <label className="flex min-h-11 items-center gap-3 field !mt-0 text-sm text-mist">
             <input type="checkbox" checked={form.isVisible} onChange={(event) => patch({ isVisible: event.target.checked })} />
             Visível na Landing Page
           </label>
@@ -145,31 +145,30 @@ export default function AdminDeveloperDiaryPage() {
       <section className="gothic-panel rounded-md p-4 sm:p-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[.22em] text-ember/70">Landing Page</p>
-            <h2 className="font-display text-3xl text-ember">Diário do Desenvolvedor</h2>
+            <h2 className="font-display text-3xl text-bone">Diário do Desenvolvedor</h2>
           </div>
           <p className="text-sm text-mist">{posts.length} publicações</p>
         </div>
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           {posts.map((post) => (
-            <article key={post.id} className="rounded-md border border-ember/15 bg-black/25 p-4">
-              <div className="aspect-[16/9] overflow-hidden rounded border border-white/10 bg-black/35">
-                {post.image_url ? <img src={post.image_url} alt={`Imagem de ${post.title}`} className="h-full w-full object-cover" /> : <div className="h-full bg-[radial-gradient(circle,rgba(111,67,214,.35),transparent_60%)]" />}
+            <article key={post.id} className="pane p-4">
+              <div className="aspect-[16/9] overflow-hidden pane">
+                {post.image_url ? <img src={post.image_url} alt={`Imagem de ${post.title}`} className="h-full w-full object-cover" /> : <div className="h-full bg-glass" />}
               </div>
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs uppercase tracking-[.16em] text-mist">
-                <span className="rounded-full border border-ember/20 px-2 py-1 text-ember">{post.category || 'Atualização'}</span>
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-mist">
+                <span className="badge text-ember">{post.category || 'Atualização'}</span>
                 <span>{String(post.published_at || '').slice(0, 10)}</span>
                 <span>{post.is_visible ? 'Visível' : 'Oculta'}</span>
               </div>
-              <h3 className="mt-2 font-display text-2xl text-white">{post.title}</h3>
+              <h3 className="mt-2 font-display text-2xl text-bone">{post.title}</h3>
               <p className="mt-1 text-sm text-mist">{post.short_description}</p>
               <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
                 <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => startEdit(post)}><Edit size={15} /> Editar</Button>
-                <Button type="button" variant="ghost" data-admin-delete-id={post.id} data-admin-delete-endpoint="developer-posts" className="w-full text-red-200 sm:w-auto" onClick={() => setConfirmDelete(post)}><Trash2 size={15} /> Deletar</Button>
+                <Button type="button" variant="ghost" data-admin-delete-id={post.id} data-admin-delete-endpoint="developer-posts" className="w-full text-bone sm:w-auto" onClick={() => setConfirmDelete(post)}><Trash2 size={15} /> Deletar</Button>
               </div>
             </article>
           ))}
-          {!posts.length && <p className="rounded-md border border-dashed border-ember/20 p-6 text-center text-mist">Nenhuma publicação cadastrada.</p>}
+          {!posts.length && <p className="border-[3px] border-dashed border-lead p-6 text-center text-mist">Nenhuma publicação cadastrada.</p>}
         </div>
       </section>
 
@@ -189,11 +188,11 @@ function ConfirmDialog({ title, onCancel, onConfirm, loading = false }) {
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/75 p-4">
       <section className="gothic-panel max-h-[90vh] w-full max-w-md overflow-auto rounded-md p-4 sm:p-6">
-        <h2 className="font-display text-3xl text-ember">{title}</h2>
+        <h2 className="font-display text-3xl text-bone">{title}</h2>
         <p className="mt-3 text-sm leading-relaxed text-mist">Tem certeza que deseja deletar esta publicação? Essa ação não poderá ser desfeita.</p>
         <div className="mt-6 grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
           <Button type="button" variant="ghost" disabled={loading} className="w-full sm:w-auto" onClick={onCancel}>Cancelar</Button>
-          <Button type="button" disabled={loading} className="w-full border-red-500/70 bg-red-900/70 hover:bg-red-800 sm:w-auto" onClick={onConfirm}>{loading ? 'Deletando...' : 'Deletar'}</Button>
+          <Button variant="danger" type="button" disabled={loading} className="w-full  sm:w-auto" onClick={onConfirm}>{loading ? 'Deletando...' : 'Deletar'}</Button>
         </div>
       </section>
     </div>

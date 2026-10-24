@@ -3,14 +3,14 @@ import MessageFormatter from './MessageFormatter';
 
 function MessageAvatar({ message }) {
   if (message.user_avatar) {
-    return <img src={message.user_avatar} alt={`Avatar de ${message.user_name || 'participante'}`} className="h-8 w-8 rounded-full border border-white/15 object-cover" />;
+    return <img src={message.user_avatar} alt={`Avatar de ${message.user_name || 'participante'}`} className="h-8 w-8 rounded-full border-[3px] border-lead object-cover" />;
   }
 
   const initial = message.user_name?.trim()?.[0]?.toUpperCase() || '?';
   return (
     <div
-      className="grid h-8 w-8 place-items-center rounded-full border border-white/15 text-xs font-bold text-black"
-      style={{ backgroundColor: message.color || '#d6a65f' }}
+      className="grid h-8 w-8 place-items-center rounded-full border-[3px] border-lead text-xs font-bold text-black"
+      style={{ backgroundColor: message.color || 'var(--color-ember)' }}
     >
       {initial}
     </div>
@@ -32,27 +32,27 @@ export default function CampaignMessageBubble({ message, currentUserId, canDelet
       {!isMine ? <MessageAvatar message={message} /> : null}
       <div className={`group max-w-[82%] sm:max-w-[68%] ${isMine ? 'items-end' : 'items-start'} flex flex-col`}>
         <div className={`mb-1 flex items-center gap-2 text-[11px] ${isMine ? 'justify-end' : 'justify-start'}`}>
-          <span className="font-semibold" style={{ color: message.color || '#d6a65f' }}>{message.user_name || 'Jogador'}</span>
+          <span className="font-semibold" style={{ color: message.color || 'var(--color-ember)' }}>{message.user_name || 'Jogador'}</span>
           <span className="text-mist/70">{messageTime(message.created_at)}</span>
           {message.edited_at ? <span className="text-ember/80">editado</span> : null}
         </div>
         <div
-          className={`rounded-2xl border px-3 py-2 shadow-lg ${
+          className={`rounded-md border px-3 py-2 shadow-lg ${
             isMine
-              ? 'rounded-br-sm border-ember/25 bg-ember/15'
-              : 'rounded-bl-sm border-white/10 bg-black/45'
+              ? 'rounded-br-sm border-lead bg-ember/15'
+              : 'rounded-bl-sm border-lead bg-black/45'
           } ${isAction ? 'border-ember/40 bg-ember/10' : ''}`}
-          style={{ borderLeftColor: !isMine ? message.color || '#d6a65f' : undefined }}
+          style={{ borderLeftColor: !isMine ? message.color || 'var(--color-ember)' : undefined }}
         >
           {editing ? (
             <div className="space-y-2">
               <textarea
                 value={editText}
                 onChange={(event) => onEditText(event.target.value)}
-                className="min-h-24 w-full rounded-md border border-ember/20 bg-black/40 px-3 py-2 text-sm outline-none focus:border-ember/60"
+                className="min-h-24 w-full rounded-md border-[3px] border-lead bg-black/40 px-3 py-2 text-sm outline-none focus:border-ember/60"
               />
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={onCancelEdit} className="rounded-md border border-white/10 px-3 py-1 text-xs text-mist hover:bg-white/5">
+                <button type="button" onClick={onCancelEdit} className="rounded-md border-[3px] border-lead px-3 py-1 text-xs text-mist hover:bg-glass">
                   Cancelar
                 </button>
                 <button type="button" onClick={onSaveEdit} className="inline-flex items-center gap-1 rounded-md border border-ember/50 bg-ember/15 px-3 py-1 text-xs text-ember hover:bg-ember/25">
@@ -68,7 +68,7 @@ export default function CampaignMessageBubble({ message, currentUserId, canDelet
         {!editing ? (
           <div className={`mt-1 flex gap-1 opacity-100 sm:opacity-0 sm:transition sm:group-hover:opacity-100 ${isMine ? 'justify-end' : 'justify-start'}`}>
             {isMine ? (
-              <button type="button" onClick={onStartEdit} className="rounded border border-white/10 p-1 text-mist hover:text-ember" title="Editar">
+              <button type="button" onClick={onStartEdit} className="rounded border-[3px] border-lead p-1 text-mist hover:text-ember" title="Editar">
                 <Pencil className="h-3.5 w-3.5" />
               </button>
             ) : null}

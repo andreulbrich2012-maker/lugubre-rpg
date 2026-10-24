@@ -89,7 +89,7 @@ export default function AdminPowerLibraryPage() {
       setMessage({ type: 'success', text: 'Magia/poder deletado.' });
       await load();
     } catch (err) {
-      setMessage({ type: 'error', text: err?.response?.data?.message || 'Nao foi possivel deletar.' });
+      setMessage({ type: 'error', text: err?.response?.data?.message || 'Não foi possível deletar.' });
     } finally {
       setDeletingId('');
     }
@@ -100,30 +100,30 @@ export default function AdminPowerLibraryPage() {
   return (
     <div className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
       <form onSubmit={save} className="gothic-panel rounded-md p-4 sm:p-5">
-        <h2 className="font-display text-3xl text-ember">{editingId ? 'Editar magia/poder' : 'Nova magia/poder'}</h2>
+        <h2 className="font-display text-3xl text-bone">{editingId ? 'Editar magia/poder' : 'Nova magia/poder'}</h2>
         <div className="mt-5 grid gap-3">
-          <input className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Nome" value={form.name} onChange={(event) => patch({ name: event.target.value })} />
+          <input className="field !mt-0" placeholder="Nome" value={form.name} onChange={(event) => patch({ name: event.target.value })} />
           <div className="grid gap-3 sm:grid-cols-2">
-            <select className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={form.type} onChange={(event) => patch({ type: event.target.value })}>
+            <select className="field !mt-0" value={form.type} onChange={(event) => patch({ type: event.target.value })}>
               {powerTypes.map((type) => <option key={type} value={type}>{type}</option>)}
             </select>
-            <select className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={form.element} onChange={(event) => patch({ element: event.target.value })} disabled={form.type !== 'magia'}>
+            <select className="field !mt-0" value={form.element} onChange={(event) => patch({ element: event.target.value })} disabled={form.type !== 'magia'}>
               {powerElements.map((element) => <option key={element} value={element}>{element}</option>)}
             </select>
           </div>
-          <textarea className="min-h-28 rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Descrição" value={form.description} onChange={(event) => patch({ description: event.target.value })} />
+          <textarea className="min-h-28 field !mt-0" placeholder="Descrição" value={form.description} onChange={(event) => patch({ description: event.target.value })} />
           <div className="grid gap-3 sm:grid-cols-2">
             <NumberField label="Mana" value={form.manaCost} onChange={(manaCost) => patch({ manaCost })} />
             <NumberField label="Nível recomendado" value={form.recommendedLevel} onChange={(recommendedLevel) => patch({ recommendedLevel })} />
           </div>
-          <input className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Dano/fórmula, ex: 1d10+2" value={form.damageFormula} onChange={(event) => patch({ damageFormula: event.target.value })} />
+          <input className="field !mt-0" placeholder="Dano/fórmula, ex: 1d10+2" value={form.damageFormula} onChange={(event) => patch({ damageFormula: event.target.value })} />
           <div className="grid gap-3 sm:grid-cols-2">
-            <input className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Alcance" value={form.range} onChange={(event) => patch({ range: event.target.value })} />
-            <input className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Duração" value={form.duration} onChange={(event) => patch({ duration: event.target.value })} />
+            <input className="field !mt-0" placeholder="Alcance" value={form.range} onChange={(event) => patch({ range: event.target.value })} />
+            <input className="field !mt-0" placeholder="Duração" value={form.duration} onChange={(event) => patch({ duration: event.target.value })} />
           </div>
-          <input className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Requisito" value={form.requirement} onChange={(event) => patch({ requirement: event.target.value })} />
-          <input className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Classe recomendada" value={form.recommendedClass} onChange={(event) => patch({ recommendedClass: event.target.value })} />
-          <input className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Imagem opcional" value={form.imageUrl} onChange={(event) => patch({ imageUrl: event.target.value })} />
+          <input className="field !mt-0" placeholder="Requisito" value={form.requirement} onChange={(event) => patch({ requirement: event.target.value })} />
+          <input className="field !mt-0" placeholder="Classe recomendada" value={form.recommendedClass} onChange={(event) => patch({ recommendedClass: event.target.value })} />
+          <input className="field !mt-0" placeholder="Imagem opcional" value={form.imageUrl} onChange={(event) => patch({ imageUrl: event.target.value })} />
           {message && <Alert type={message.type}>{message.text}</Alert>}
           <div className="grid gap-2 sm:flex sm:flex-wrap">
             <LoadingButton loading={loading} loadingText="Salvando..." className="w-full sm:w-auto">{editingId ? 'Salvar edição' : 'Criar'}</LoadingButton>
@@ -133,7 +133,7 @@ export default function AdminPowerLibraryPage() {
       </form>
 
       <section className="gothic-panel rounded-md p-4 sm:p-5">
-        <h2 className="font-display text-3xl text-ember">Biblioteca cadastrada</h2>
+        <h2 className="font-display text-3xl text-bone">Biblioteca cadastrada</h2>
         <div className="mt-5 grid gap-4 lg:grid-cols-2">
           {powers.map((power) => (
             <PowerCard
@@ -143,12 +143,12 @@ export default function AdminPowerLibraryPage() {
               adminActions={(
                 <>
                   <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => startEdit(power)}><Edit size={15} /> Editar</Button>
-                  <Button type="button" variant="ghost" data-admin-delete-id={power.id} data-admin-delete-endpoint="powers" className="w-full text-red-200 sm:w-auto" onClick={() => setConfirmDelete(power)}><Trash2 size={15} /> Deletar</Button>
+                  <Button type="button" variant="ghost" data-admin-delete-id={power.id} data-admin-delete-endpoint="powers" className="w-full text-bone sm:w-auto" onClick={() => setConfirmDelete(power)}><Trash2 size={15} /> Deletar</Button>
                 </>
               )}
             />
           ))}
-          {!powers.length && <p className="rounded-md border border-dashed border-ember/20 p-6 text-center text-mist">Nenhum item cadastrado.</p>}
+          {!powers.length && <p className="border-[3px] border-dashed border-lead p-6 text-center text-mist">Nenhum item cadastrado.</p>}
         </div>
       </section>
       {confirmDelete && (
@@ -167,7 +167,7 @@ function NumberField({ label, value, onChange }) {
   return (
     <label className="text-sm text-mist">
       {label}
-      <input type="number" min="0" className="mt-1 w-full rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={value ?? 0} onChange={(event) => onChange(Number(event.target.value) || 0)} />
+      <input type="number" min="0" className="field !mt-0" value={value ?? 0} onChange={(event) => onChange(Number(event.target.value) || 0)} />
     </label>
   );
 }
@@ -176,11 +176,11 @@ function ConfirmDialog({ title, onCancel, onConfirm, loading = false }) {
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/75 p-4">
       <section className="gothic-panel max-h-[90vh] w-full max-w-md overflow-auto rounded-md p-4 sm:p-6">
-        <h2 className="font-display text-3xl text-ember">{title}</h2>
-        <p className="mt-3 text-sm leading-relaxed text-mist">Tem certeza que deseja deletar este item? Essa acao nao podera ser desfeita.</p>
+        <h2 className="font-display text-3xl text-bone">{title}</h2>
+        <p className="mt-3 text-sm leading-relaxed text-mist">Tem certeza que deseja deletar este item? Essa ação não poderá ser desfeita.</p>
         <div className="mt-6 grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
           <Button type="button" variant="ghost" disabled={loading} className="w-full sm:w-auto" onClick={onCancel}>Cancelar</Button>
-          <Button type="button" disabled={loading} className="w-full border-red-500/70 bg-red-900/70 hover:bg-red-800 sm:w-auto" onClick={onConfirm}>{loading ? 'Deletando...' : 'Deletar'}</Button>
+          <Button variant="danger" type="button" disabled={loading} className="w-full  sm:w-auto" onClick={onConfirm}>{loading ? 'Deletando...' : 'Deletar'}</Button>
         </div>
       </section>
     </div>

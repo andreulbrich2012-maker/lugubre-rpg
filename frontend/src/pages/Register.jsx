@@ -17,13 +17,13 @@ export default function Register() {
 
   function validate() {
     const next = {};
-    if (!form.name.trim()) next.name = 'Nome obrigatorio.';
-    if (!form.email.trim()) next.email = 'Email obrigatorio.';
-    else if (!emailPattern.test(form.email)) next.email = 'Informe um email valido.';
-    if (!form.password) next.password = 'Senha obrigatoria.';
+    if (!form.name.trim()) next.name = 'Nome obrigatório.';
+    if (!form.email.trim()) next.email = 'Email obrigatório.';
+    else if (!emailPattern.test(form.email)) next.email = 'Informe um email válido.';
+    if (!form.password) next.password = 'Senha obrigatória.';
     else if (form.password.length < 8) next.password = 'A senha deve ter pelo menos 8 caracteres.';
     if (!form.confirmPassword) next.confirmPassword = 'Confirme sua senha.';
-    else if (form.confirmPassword !== form.password) next.confirmPassword = 'As senhas nao conferem.';
+    else if (form.confirmPassword !== form.password) next.confirmPassword = 'As senhas não conferem.';
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -32,7 +32,7 @@ export default function Register() {
     event.preventDefault();
     setMessage(null);
     if (!validate()) {
-      setMessage({ type: 'error', text: 'Preencha todos os campos obrigatorios.' });
+      setMessage({ type: 'error', text: 'Preencha todos os campos obrigatórios.' });
       return;
     }
     setLoading(true);
@@ -56,7 +56,7 @@ export default function Register() {
         <Field label="Confirmar senha" type="password" value={form.confirmPassword} error={errors.confirmPassword} onChange={(confirmPassword) => setForm({ ...form, confirmPassword })} />
         {message && <Alert type={message.type}>{message.text}</Alert>}
         <LoadingButton loading={loading} loadingText="Criando conta..." className="w-full">Criar conta</LoadingButton>
-        <p className="text-sm text-mist">Ja tem conta? <Link className="text-ember hover:text-white" to="/login">Entrar</Link></p>
+        <p className="text-sm text-mist">Já tem conta? <Link className="inline-flex min-h-11 items-center text-ember underline hover:text-bone" to="/login">Entrar</Link></p>
       </form>
     </AuthShell>
   );

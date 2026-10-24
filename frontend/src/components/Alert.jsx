@@ -1,12 +1,13 @@
 export default function Alert({ type = 'info', children }) {
+  // Vidro colorido preso no chumbo: so a cor do vidro diz o tipo (sem borda lateral).
   const styles = {
-    error: 'border-red-400/40 bg-red-950/35 text-red-100',
-    success: 'border-emerald-400/40 bg-emerald-950/30 text-emerald-100',
-    info: 'border-ember/30 bg-ember/10 text-mist'
+    error: 'bg-blood/30 text-bone',
+    success: 'bg-[color-mix(in_srgb,var(--p-gaia)_35%,transparent)] text-bone',
+    info: 'bg-glass text-mist'
   };
 
   return (
-    <div className={`rounded-md border px-3 py-2 text-sm shadow-lg shadow-black/20 soft-motion ${styles[type]}`}>
+    <div role={type === 'error' ? 'alert' : undefined} className={`border-[3px] border-lead px-3 py-2 text-sm outline outline-1 -outline-offset-4 outline-ember/10 soft-motion ${styles[type]}`}>
       {children}
     </div>
   );

@@ -1,5 +1,6 @@
 import { query } from './db/pool.js';
 import { verifyToken } from './middleware/auth.js';
+import { emitEvent } from './utils/events.js';
 
 export async function requireSocketAuth(socket, next) {
   try {
@@ -52,12 +53,16 @@ export function registerChatHandlers(io, socket) {
          returning id, campaign_id, user_id, character_id, content, edited_at, created_at, updated_at`,
         [campaignId, socket.user.id, membership.rows[0].shared_character_id || membership.rows[0].character_id || null, message]
       );
-      io.to(`campaign:${campaignId}`).emit('campaign:message:new', {
+      const payload = {
         ...rows[0],
+        message_type: 'text',
         user_name: socket.user.name,
         user_avatar: socket.user.profile_image_url || '',
         color: membership.rows[0].color || '#d6a65f'
-      });
+      };
+      io.to(`campaign:${campaignId}`).emit('campaign:message:new', payload);
+      // o feed de eventos e a fonte de verdade (em producao nao ha socket)
+      await emitEvent(campaignId, 'message:created', { message: payload }, 'all', socket.user.id);
     } catch {
       socket.emit('campaign:error', { message: 'Não foi possível enviar a mensagem.' });
     }

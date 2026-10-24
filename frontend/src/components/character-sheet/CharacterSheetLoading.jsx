@@ -1,12 +1,12 @@
 function Skeleton({ className }) {
-  return <div className={`animate-pulse rounded-md bg-white/[.07] ${className}`} />;
+  return <div className={`animate-pulse border-[3px] border-lead bg-glass motion-reduce:animate-none ${className}`} />;
 }
 
 export default function CharacterSheetLoading() {
   return (
-    <main className="min-h-[calc(100vh-64px)] overflow-hidden bg-[#050506] pb-24" aria-label="Carregando ficha" aria-busy="true">
+    <main className="min-h-[calc(100vh-64px)] overflow-hidden bg-abyss pb-24" aria-label="Carregando ficha" aria-busy="true">
       <section className="lg:hidden">
-        <div className="border-b border-white/10 bg-[#080709] p-3">
+        <div className="border-b-[3px] border-lead bg-glass p-3">
           <div className="flex items-center gap-3"><Skeleton className="h-14 w-14 shrink-0" /><div className="flex-1 space-y-2"><Skeleton className="h-5 w-36" /><Skeleton className="h-3 w-52 max-w-full" /></div><Skeleton className="h-11 w-11" /></div>
         </div>
         <div className="grid grid-cols-4 gap-1 p-2">{Array.from({ length: 7 }, (_, index) => <Skeleton key={index} className="h-11" />)}</div>

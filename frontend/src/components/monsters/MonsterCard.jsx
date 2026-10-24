@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronUp, HeartPulse, Shield } from 'lucide-react';
 import Button from '../Button';
 import EntityImage from '../EntityImage';
+import { primordialByName } from '../glass/primordiais';
 import MonsterDetails from './MonsterDetails';
 import MonsterPngDownloadButton from './MonsterPngDownloadButton';
 
@@ -15,15 +16,17 @@ export default function MonsterCard({ monster, rollResult, onRoll, onWarning }) 
   }
 
   return (
-    <article className="gothic-panel soft-motion overflow-hidden rounded-md">
+    <article className="gothic-panel soft-motion overflow-hidden">
       <div className="grid gap-4 p-4 sm:grid-cols-[150px_1fr]">
-        <EntityImage src={monster.image_url} label="Monstro" name={monster.name} className="aspect-[4/3] w-full sm:aspect-square" />
+        <EntityImage src={monster.image_url} label="Monstro" name={monster.name} tint={primordialByName[monster.category]?.color} className="aspect-[4/3] w-full sm:aspect-square" />
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs uppercase tracking-[.22em] text-ember/70">{monster.category}</p>
-              <h2 className="break-words font-display text-3xl text-white">{monster.name}</h2>
-              <p className="text-sm text-mist">{monster.difficulty}</p>
+              <h2 className="break-words font-display text-3xl text-bone">{monster.name}</h2>
+              <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-mist">
+                <span className="badge" style={primordialByName[monster.category] ? { background: `color-mix(in srgb, ${primordialByName[monster.category].color} 70%, #000)` } : undefined}>{monster.category}</span>
+                {monster.difficulty}
+              </p>
             </div>
             <MonsterPngDownloadButton monster={monster} onWarning={onWarning} />
           </div>
@@ -31,7 +34,7 @@ export default function MonsterCard({ monster, rollResult, onRoll, onWarning }) 
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <Metric icon={HeartPulse} label="Vida" value={`${monster.min_health} a ${monster.max_health}`} />
             <Metric icon={Shield} label="Armadura" value={monster.armor} />
-            <label className="rounded-md border border-ember/15 bg-black/25 p-3 text-sm text-mist">
+            <label className="pane p-3 text-sm text-mist">
               Vida nesta campanha
               <input
                 type="number"
@@ -39,7 +42,7 @@ export default function MonsterCard({ monster, rollResult, onRoll, onWarning }) 
                 max={monster.max_health}
                 value={sessionHealth}
                 onChange={(event) => updateSessionHealth(event.target.value)}
-                className="mt-1 w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2 text-white"
+                className="field !mt-0 text-bone"
               />
             </label>
           </div>
@@ -53,12 +56,11 @@ export default function MonsterCard({ monster, rollResult, onRoll, onWarning }) 
       </div>
 
       {open && (
-        <div className="border-t border-ember/10 p-4">
+        <div className="border-t-[3px] border-lead p-4">
           <MonsterDetails monster={monster} onRoll={onRoll} />
           {rollResult?.monster?.id === monster.id && (
-            <div className="mt-4 rounded-md border border-ember/30 bg-ember/10 p-4">
-              <p className="text-xs uppercase tracking-[.22em] text-ember">Resultado</p>
-              <h3 className="mt-1 font-display text-2xl text-white">{rollResult.monster.name}</h3>
+            <div className="mt-4 border-[3px] border-lead lit p-4">
+              <h3 className="mt-1 font-display text-2xl text-bone">{rollResult.monster.name}</h3>
               <p className="text-sm text-mist">Ataque: {rollResult.attack.name}</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-4">
                 <RollInfo label="Dado" value={rollResult.attack.damage_formula} />
@@ -76,18 +78,18 @@ export default function MonsterCard({ monster, rollResult, onRoll, onWarning }) 
 
 function Metric({ icon: Icon, label, value }) {
   return (
-    <div className="rounded-md border border-ember/15 bg-black/25 p-3">
-      <p className="flex items-center gap-2 text-xs uppercase tracking-[.18em] text-mist"><Icon size={14} /> {label}</p>
-      <p className="mt-1 font-display text-2xl text-white">{value}</p>
+    <div className="pane p-3">
+      <p className="flex items-center gap-2 text-xs text-mist"><Icon size={14} /> {label}</p>
+      <p className="tabular mt-1 font-display text-2xl text-bone">{value}</p>
     </div>
   );
 }
 
 function RollInfo({ label, value }) {
   return (
-    <div className="rounded-md border border-white/10 bg-black/25 p-3">
-      <p className="text-xs uppercase tracking-[.16em] text-mist">{label}</p>
-      <p className="mt-1 text-lg font-semibold text-white">{value}</p>
+    <div className="pane p-3">
+      <p className="text-xs text-mist">{label}</p>
+      <p className="tabular mt-1 text-lg font-semibold text-bone">{value}</p>
     </div>
   );
 }

@@ -50,14 +50,14 @@ export default function UserMenu({ user, onSettings }) {
       <button
         ref={triggerRef}
         type="button"
-        className="flex items-center gap-3 rounded-md border border-ember/20 bg-black/25 px-3 py-2 text-left soft-motion"
+        className="flex items-center gap-3 min-h-11 border-[3px] border-lead bg-glass px-3 py-2 text-left outline outline-1 -outline-offset-4 outline-ember/15 hover:outline-ember/40 soft-motion"
         onClick={toggleMenu}
         aria-label="Abrir menu da conta"
         aria-expanded={menu.mounted}
         aria-controls="account-menu"
       >
         <Avatar user={user} size="sm" />
-        <span className="hidden text-sm text-white sm:block">{user?.name}</span>
+        <span className="hidden text-sm text-bone sm:block">{user?.name}</span>
         <Settings size={17} className="text-ember" />
       </button>
       {menu.mounted && (
@@ -68,9 +68,9 @@ export default function UserMenu({ user, onSettings }) {
           aria-hidden={!menu.interactive}
           inert={menu.interactive ? undefined : ''}
           data-menu-phase={menu.phase}
-          className={`absolute right-0 z-30 mt-2 w-52 rounded-md border border-ember/20 bg-abyss/95 p-2 shadow-2xl backdrop-blur account-menu-${menu.phase} ${menu.interactive ? 'pointer-events-auto' : 'pointer-events-none'}`}
+          className={`absolute right-0 z-30 mt-2 w-52 gothic-panel p-2 account-menu-${menu.phase} ${menu.interactive ? 'pointer-events-auto' : 'pointer-events-none'}`}
         >
-          <button ref={settingsRef} role="menuitem" tabIndex={menu.interactive ? 0 : -1} className="flex w-full items-center gap-2 rounded px-3 py-2 text-sm text-mist hover:bg-ember/10 hover:text-white" onClick={openSettings}>
+          <button ref={settingsRef} role="menuitem" tabIndex={menu.interactive ? 0 : -1} className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-sm text-mist hover-lit" onClick={openSettings}>
             <Settings size={16} />
             Configurações
           </button>

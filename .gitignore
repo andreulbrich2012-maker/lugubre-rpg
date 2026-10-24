@@ -10,3 +10,7 @@ backend/.env
 .env*
 data/
 Fotos/
+
+# capturas de revisao do impeccable
+frontend/.impeccable/review/
+frontend/.impeccable/mocks/

@@ -179,7 +179,7 @@ export default function CampaignShopsTab({ campaignId, isMaster, characters = []
     <section className="gothic-panel rounded-md p-4 sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[.24em] text-ember/70">Economia</p>
+          <p className="text-xs text-ember/70">Economia</p>
           <h2 className="font-display text-3xl text-ember">Lojas da Campanha</h2>
           <p className="mt-1 text-sm text-mist">Itens em Dracmas, pedidos de compra e estoque controlado pelo mestre.</p>
         </div>
@@ -192,7 +192,7 @@ export default function CampaignShopsTab({ campaignId, isMaster, characters = []
             key={category}
             type="button"
             onClick={() => setActiveCategory(category)}
-            className={`min-h-10 shrink-0 rounded-md border px-3 py-2 text-sm ${activeCategory === category ? 'border-ember/60 bg-ember/15 text-white' : 'border-white/10 bg-black/25 text-mist'}`}
+            className={`min-h-10 shrink-0 rounded-md border px-3 py-2 text-sm ${activeCategory === category ? 'border-ember/60 bg-ember/15 text-bone' : 'border-lead bg-black/25 text-mist'}`}
           >
             {category}
           </button>
@@ -204,11 +204,11 @@ export default function CampaignShopsTab({ campaignId, isMaster, characters = []
       <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="grid gap-4 lg:grid-cols-2">
           {visibleShops.map((shop) => (
-            <article key={shop.id} className="rounded-md border border-ember/15 bg-black/25 p-4">
+            <article key={shop.id} className="rounded-md border-[3px] border-lead bg-black/25 p-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <p className="text-xs uppercase tracking-[.18em] text-ember">{shop.category}</p>
-                  <h3 className="break-words font-display text-2xl text-white">{shop.name}</h3>
+                  <p className="text-xs text-ember">{shop.category}</p>
+                  <h3 className="break-words font-display text-2xl text-bone">{shop.name}</h3>
                   <p className="mt-1 text-sm text-mist">{shop.description || 'Sem descrição.'}</p>
                   {!shop.visible_to_players && <p className="mt-2 text-xs text-amber-200">Oculta para jogadores</p>}
                 </div>
@@ -229,10 +229,10 @@ export default function CampaignShopsTab({ campaignId, isMaster, characters = []
 
               <div className="mt-4 space-y-2">
                 {(shop.items || []).map((item) => (
-                  <div key={item.id} className="rounded-md border border-white/10 bg-black/25 p-3">
+                  <div key={item.id} className="rounded-md border-[3px] border-lead bg-black/25 p-3">
                     <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-start">
                       <div>
-                        <h4 className="font-semibold text-white">{item.name}</h4>
+                        <h4 className="font-semibold text-bone">{item.name}</h4>
                         <p className="text-sm text-mist">{item.description || item.note || 'Item disponível.'}</p>
                         <p className="mt-2 text-xs text-ember">{item.price_dracmas} Dracmas · estoque {item.stock}</p>
                       </div>
@@ -251,20 +251,20 @@ export default function CampaignShopsTab({ campaignId, isMaster, characters = []
                     </div>
                   </div>
                 ))}
-                {!shop.items?.length && <p className="rounded-md border border-dashed border-white/10 p-3 text-sm text-mist">Nenhum item cadastrado.</p>}
+                {!shop.items?.length && <p className="rounded-md border border-dashed border-lead p-3 text-sm text-mist">Nenhum item cadastrado.</p>}
               </div>
             </article>
           ))}
-          {!visibleShops.length && <p className="rounded-md border border-dashed border-ember/20 bg-black/20 p-6 text-center text-mist">{loading ? 'Carregando lojas...' : 'Nenhuma loja nesta classificação.'}</p>}
+          {!visibleShops.length && <p className="rounded-md border border-dashed border-lead bg-black/20 p-6 text-center text-mist">{loading ? 'Carregando lojas...' : 'Nenhuma loja nesta classificação.'}</p>}
         </div>
 
         {isMaster && (
-          <aside className="rounded-md border border-ember/15 bg-black/25 p-4">
+          <aside className="rounded-md border-[3px] border-lead bg-black/25 p-4">
             <h3 className="font-display text-2xl text-ember">Pedidos</h3>
             <div className="mt-3 space-y-3">
               {requests.map((request) => (
-                <div key={request.id} className="rounded-md border border-white/10 bg-black/25 p-3">
-                  <p className="font-semibold text-white">{request.item_name} x{request.quantity}</p>
+                <div key={request.id} className="rounded-md border-[3px] border-lead bg-black/25 p-3">
+                  <p className="font-semibold text-bone">{request.item_name} x{request.quantity}</p>
                   <p className="text-xs text-mist">{request.buyer_name} · {request.total_price} Dracmas · {request.status}</p>
                   {request.status === 'pending' && (
                     <div className="mt-3 grid grid-cols-2 gap-2">
@@ -293,12 +293,12 @@ function ShopForm({ editor, setEditor, onClose, onSubmit }) {
   return (
     <Modal title={editor.mode === 'edit' ? 'Editar loja' : 'Nova loja'} onClose={onClose}>
       <form onSubmit={onSubmit} className="grid gap-3">
-        <input className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Nome da loja" value={shop.name} onChange={(event) => update({ name: event.target.value })} />
-        <select className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={shop.category} onChange={(event) => update({ category: event.target.value })}>
+        <input className="rounded-md border-[3px] border-lead bg-black/30 px-3 py-3" placeholder="Nome da loja" value={shop.name} onChange={(event) => update({ name: event.target.value })} />
+        <select className="rounded-md border-[3px] border-lead bg-black/30 px-3 py-3" value={shop.category} onChange={(event) => update({ category: event.target.value })}>
           {shopCategories.map((category) => <option key={category} value={category}>{category}</option>)}
         </select>
-        <textarea className="min-h-28 rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Descrição" value={shop.description || ''} onChange={(event) => update({ description: event.target.value })} />
-        <label className="flex items-center gap-2 rounded-md border border-ember/15 bg-black/20 p-3 text-sm text-mist">
+        <textarea className="min-h-28 rounded-md border-[3px] border-lead bg-black/30 px-3 py-3" placeholder="Descrição" value={shop.description || ''} onChange={(event) => update({ description: event.target.value })} />
+        <label className="flex items-center gap-2 rounded-md border-[3px] border-lead bg-black/20 p-3 text-sm text-mist">
           <input type="checkbox" checked={Boolean(shop.visibleToPlayers ?? shop.visible_to_players)} onChange={(event) => update({ visibleToPlayers: event.target.checked })} />
           Visível para jogadores
         </label>
@@ -317,21 +317,21 @@ function ItemForm({ editor, setEditor, onClose, onSubmit }) {
   return (
     <Modal title={editor.mode === 'edit' ? 'Editar item' : 'Novo item'} onClose={onClose}>
       <form onSubmit={onSubmit} className="grid gap-3">
-        <input className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Nome do item" value={item.name} onChange={(event) => update({ name: event.target.value })} />
-        <textarea className="min-h-24 rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Descrição" value={item.description || ''} onChange={(event) => update({ description: event.target.value })} />
+        <input className="rounded-md border-[3px] border-lead bg-black/30 px-3 py-3" placeholder="Nome do item" value={item.name} onChange={(event) => update({ name: event.target.value })} />
+        <textarea className="min-h-24 rounded-md border-[3px] border-lead bg-black/30 px-3 py-3" placeholder="Descrição" value={item.description || ''} onChange={(event) => update({ description: event.target.value })} />
         <div className="grid gap-3 sm:grid-cols-3">
           <NumberField label="Preço" value={item.priceDracmas ?? item.price_dracmas} onChange={(priceDracmas) => update({ priceDracmas })} />
           <NumberField label="Estoque" value={item.stock} onChange={(stock) => update({ stock })} />
           <NumberField label="Peso" value={item.weight} onChange={(weight) => update({ weight })} />
         </div>
-        <select className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={item.category || editor.shop.category} onChange={(event) => update({ category: event.target.value })}>
+        <select className="rounded-md border-[3px] border-lead bg-black/30 px-3 py-3" value={item.category || editor.shop.category} onChange={(event) => update({ category: event.target.value })}>
           {shopCategories.map((category) => <option key={category} value={category}>{category}</option>)}
         </select>
-        <label className="flex items-center gap-2 rounded-md border border-ember/15 bg-black/20 p-3 text-sm text-mist">
+        <label className="flex items-center gap-2 rounded-md border-[3px] border-lead bg-black/20 p-3 text-sm text-mist">
           <input type="checkbox" checked={Boolean(item.available ?? true)} onChange={(event) => update({ available: event.target.checked })} />
           Disponível
         </label>
-        <input className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" placeholder="Observação opcional" value={item.note || ''} onChange={(event) => update({ note: event.target.value })} />
+        <input className="rounded-md border-[3px] border-lead bg-black/30 px-3 py-3" placeholder="Observação opcional" value={item.note || ''} onChange={(event) => update({ note: event.target.value })} />
         <div className="grid gap-2 sm:flex sm:justify-end">
           <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button>Salvar item</Button>
@@ -346,13 +346,13 @@ function PurchaseModal({ purchase, setPurchase, characters, onClose, onSubmit })
   return (
     <Modal title="Solicitar compra" onClose={onClose}>
       <form onSubmit={onSubmit} className="grid gap-3">
-        <div className="rounded-md border border-ember/15 bg-black/25 p-3">
-          <h3 className="font-display text-2xl text-white">{purchase.item.name}</h3>
+        <div className="rounded-md border-[3px] border-lead bg-black/25 p-3">
+          <h3 className="font-display text-2xl text-bone">{purchase.item.name}</h3>
           <p className="text-sm text-mist">{purchase.shop.name}</p>
           <p className="mt-2 text-ember">{total} Dracmas</p>
         </div>
         <NumberField label="Quantidade" value={purchase.quantity} onChange={(quantity) => setPurchase({ ...purchase, quantity })} />
-        <select className="rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={purchase.characterId || ''} onChange={(event) => setPurchase({ ...purchase, characterId: event.target.value })}>
+        <select className="rounded-md border-[3px] border-lead bg-black/30 px-3 py-3" value={purchase.characterId || ''} onChange={(event) => setPurchase({ ...purchase, characterId: event.target.value })}>
           <option value="">Sem personagem vinculado</option>
           {characters.map((character) => <option key={character.id} value={character.id}>{character.character_name}</option>)}
         </select>
@@ -369,18 +369,18 @@ function NumberField({ label, value, onChange }) {
   return (
     <label className="text-sm text-mist">
       {label}
-      <input type="number" min="0" className="mt-1 w-full rounded-md border border-ember/20 bg-black/30 px-3 py-3" value={value ?? 0} onChange={(event) => onChange(Number(event.target.value) || 0)} />
+      <input type="number" min="0" className="mt-1 w-full rounded-md border-[3px] border-lead bg-black/30 px-3 py-3" value={value ?? 0} onChange={(event) => onChange(Number(event.target.value) || 0)} />
     </label>
   );
 }
 
 function Modal({ title, onClose, children }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-3 backdrop-blur">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-3">
       <section className="gothic-panel max-h-[92vh] w-full max-w-2xl overflow-auto rounded-md p-4 sm:p-6">
         <div className="mb-5 flex items-center justify-between gap-3">
           <h2 className="font-display text-3xl text-ember">{title}</h2>
-          <button type="button" className="grid h-10 w-10 place-items-center rounded border border-white/15" onClick={onClose}><X size={18} /></button>
+          <button type="button" className="grid h-10 w-10 place-items-center rounded border-[3px] border-lead" onClick={onClose}><X size={18} /></button>
         </div>
         {children}
       </section>

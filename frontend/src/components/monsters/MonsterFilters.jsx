@@ -1,3 +1,4 @@
+import { primordialByName } from '../glass/primordiais';
 import { monsterCategories, monsterCategoryDescriptions } from './monsterUtils';
 
 export default function MonsterFilters({ activeCategory, onChange }) {
@@ -7,7 +8,7 @@ export default function MonsterFilters({ activeCategory, onChange }) {
         <button
           type="button"
           onClick={() => onChange('')}
-          className={`min-h-11 shrink-0 rounded-md border px-4 py-2 text-sm font-semibold transition-colors ${!activeCategory ? 'border-ember/60 bg-ember/15 text-white' : 'border-ember/15 bg-black/20 text-mist hover:text-white'}`}
+          className={`min-h-11 shrink-0 border-[3px] border-lead px-4 py-2 text-sm font-semibold transition-colors ${!activeCategory ? 'lit text-bone' : 'bg-glass text-mist hover:text-bone'}`}
         >
           Todos
         </button>
@@ -16,14 +17,15 @@ export default function MonsterFilters({ activeCategory, onChange }) {
             type="button"
             key={category}
             onClick={() => onChange(category)}
-            className={`min-h-11 shrink-0 rounded-md border px-4 py-2 text-sm font-semibold transition-colors ${activeCategory === category ? 'border-ember/60 bg-ember/15 text-white' : 'border-ember/15 bg-black/20 text-mist hover:text-white'}`}
+            className={`inline-flex min-h-11 shrink-0 items-center gap-2 border-[3px] border-lead px-4 py-2 text-sm font-semibold transition-colors ${activeCategory === category ? 'lit text-bone' : 'bg-glass text-mist hover:text-bone'}`}
           >
+            <span className="h-3 w-3 border-2 border-lead" style={{ background: primordialByName[category]?.color }} aria-hidden="true" />
             {category}
           </button>
         ))}
       </div>
       {activeCategory && (
-        <div className="rounded-md border border-ember/20 bg-black/25 p-3 text-sm text-mist">
+        <div className="pane p-3 text-sm text-mist">
           {monsterCategoryDescriptions[activeCategory]}
         </div>
       )}

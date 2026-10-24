@@ -138,13 +138,13 @@ export default function Admin() {
   return (
     <main className="mx-auto max-w-7xl px-3 pb-24 pt-6 sm:px-4 sm:py-10">
       <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-        <h1 className="font-display text-4xl text-ember">Administração</h1>
-        <div className="grid grid-cols-2 rounded-md border border-ember/15 bg-black/25 p-1 sm:flex">
-          <button type="button" className={`min-h-10 rounded px-3 py-2 text-sm ${adminSection === 'catalogs' ? 'bg-ember/15 text-white' : 'text-mist hover:text-white'}`} onClick={() => setAdminSection('catalogs')}>Catálogos</button>
-          <button type="button" className={`min-h-10 rounded px-3 py-2 text-sm ${adminSection === 'monsters' ? 'bg-ember/15 text-white' : 'text-mist hover:text-white'}`} onClick={() => setAdminSection('monsters')}>Monstros</button>
-          <button type="button" className={`min-h-10 rounded px-3 py-2 text-sm ${adminSection === 'powers' ? 'bg-ember/15 text-white' : 'text-mist hover:text-white'}`} onClick={() => setAdminSection('powers')}>Biblioteca</button>
-          <button type="button" className={`min-h-10 rounded px-3 py-2 text-sm ${adminSection === 'developer' ? 'bg-ember/15 text-white' : 'text-mist hover:text-white'}`} onClick={() => setAdminSection('developer')}>Diário</button>
-          <button type="button" className={`min-h-10 rounded px-3 py-2 text-sm ${adminSection === 'feedbacks' ? 'bg-ember/15 text-white' : 'text-mist hover:text-white'}`} onClick={() => setAdminSection('feedbacks')}>Feedback</button>
+        <h1 className="font-display text-4xl text-bone">Administração</h1>
+        <div className="grid grid-cols-2 pane p-1 sm:flex">
+          <button type="button" className={`min-h-11 px-3 py-2 text-sm ${adminSection === 'catalogs' ? 'lit text-bone' : 'text-mist hover:text-bone'}`} onClick={() => setAdminSection('catalogs')}>Catálogos</button>
+          <button type="button" className={`min-h-11 px-3 py-2 text-sm ${adminSection === 'monsters' ? 'lit text-bone' : 'text-mist hover:text-bone'}`} onClick={() => setAdminSection('monsters')}>Monstros</button>
+          <button type="button" className={`min-h-11 px-3 py-2 text-sm ${adminSection === 'powers' ? 'lit text-bone' : 'text-mist hover:text-bone'}`} onClick={() => setAdminSection('powers')}>Biblioteca</button>
+          <button type="button" className={`min-h-11 px-3 py-2 text-sm ${adminSection === 'developer' ? 'lit text-bone' : 'text-mist hover:text-bone'}`} onClick={() => setAdminSection('developer')}>Diário</button>
+          <button type="button" className={`min-h-11 px-3 py-2 text-sm ${adminSection === 'feedbacks' ? 'lit text-bone' : 'text-mist hover:text-bone'}`} onClick={() => setAdminSection('feedbacks')}>Feedback</button>
         </div>
       </div>
 
@@ -170,14 +170,14 @@ export default function Admin() {
         <Panel title="Classes" onSubmit={addClass}>
           <Input placeholder="Nome" value={klass.name} onChange={(name) => setKlass({ ...klass, name })} />
           <Input placeholder="Descrição curta" value={klass.description} onChange={(description) => setKlass({ ...klass, description })} />
-          <textarea className="w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" placeholder="Progressão nível 1" value={klass.progression[0].feature} onChange={(event) => setKlass({ ...klass, progression: [{ level: 1, mana: 0, feature: event.target.value }] })} />
+          <textarea className="field !mt-0" placeholder="Progressão nível 1" value={klass.progression[0].feature} onChange={(event) => setKlass({ ...klass, progression: [{ level: 1, mana: 0, feature: event.target.value }] })} />
           <Button disabled={actionLoading}>{actionLoading ? 'Salvando...' : 'Adicionar classe'}</Button>
           <List items={catalog.classes} endpoint="classes" onEdit={(item) => { setMessage(null); setEditor({ type: 'classes', item: { ...item } }); }} onRemove={(endpoint, item) => setConfirmDelete({ endpoint, item })} />
         </Panel>
 
         <Panel title="Origens" onSubmit={addOrigin}>
           <Input placeholder="Nome" value={origin.name} onChange={(name) => setOrigin({ ...origin, name })} />
-          <textarea className="w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" placeholder="Descrição" value={origin.description} onChange={(event) => setOrigin({ ...origin, description: event.target.value })} />
+          <textarea className="field !mt-0" placeholder="Descrição" value={origin.description} onChange={(event) => setOrigin({ ...origin, description: event.target.value })} />
           <ModifierGrid title="Bônus de perícias" keysList={catalog.skills.map((item) => item.key)} labels={catalog.skills} values={origin.skillModifiers} onChange={(skillModifiers) => setOrigin({ ...origin, skillModifiers })} />
           <Button disabled={actionLoading}>{actionLoading ? 'Salvando...' : 'Adicionar origem'}</Button>
           <List items={catalog.origins} endpoint="origins" onEdit={(item) => { setMessage(null); setEditor({ type: 'origins', item: { ...item, skill_modifiers: { ...(item.skill_modifiers || {}) } } }); }} onRemove={(endpoint, item) => setConfirmDelete({ endpoint, item })} />
@@ -186,7 +186,7 @@ export default function Admin() {
         <Panel title="Perícias" onSubmit={addSkill}>
           <Input placeholder="Nome" value={skill.name} onChange={(name) => setSkill({ ...skill, name })} />
           <Input placeholder="Chave opcional" value={skill.key} onChange={(key) => setSkill({ ...skill, key })} />
-          <select className="w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={skill.attribute} onChange={(event) => setSkill({ ...skill, attribute: event.target.value })}>
+          <select className="field !mt-0" value={skill.attribute} onChange={(event) => setSkill({ ...skill, attribute: event.target.value })}>
             {attributes.map((attr) => <option key={attr} value={attr}>{attr}</option>)}
           </select>
           <Button disabled={actionLoading}>{actionLoading ? 'Salvando...' : 'Adicionar perícia'}</Button>
@@ -196,12 +196,12 @@ export default function Admin() {
 
       {editor && (
         <div className="fixed inset-0 z-30 grid place-items-center bg-black/70 p-4">
-          <section className="gothic-panel max-h-[90vh] w-full max-w-2xl overflow-auto rounded-md p-4 sm:p-6">
-            <h2 className="font-display text-3xl text-ember">Editar {editor.item.name}</h2>
+          <section className="gothic-panel max-h-[90vh] w-full max-w-2xl overflow-auto p-4 sm:p-6">
+            <h2 className="font-display text-3xl text-bone">Editar {editor.item.name}</h2>
             <div className="mt-5 space-y-4">
               <Input placeholder="Nome" value={editor.item.name} onChange={(name) => setEditor({ ...editor, item: { ...editor.item, name } })} />
               {editor.type === 'races' && <Input placeholder="Imagem opcional" value={editor.item.image || ''} onChange={(image) => setEditor({ ...editor, item: { ...editor.item, image } })} />}
-              {editor.type === 'origins' && <textarea className="w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={editor.item.description || ''} onChange={(event) => setEditor({ ...editor, item: { ...editor.item, description: event.target.value } })} />}
+              {editor.type === 'origins' && <textarea className="field !mt-0" value={editor.item.description || ''} onChange={(event) => setEditor({ ...editor, item: { ...editor.item, description: event.target.value } })} />}
               {editor.type === 'classes' && (
                 <>
                   <Input placeholder="Descrição curta" value={editor.item.description || ''} onChange={(description) => setEditor({ ...editor, item: { ...editor.item, description } })} />
@@ -214,7 +214,7 @@ export default function Admin() {
               {editor.type === 'skills' && (
                 <>
                   <Input placeholder="Chave" value={editor.item.key} onChange={(key) => setEditor({ ...editor, item: { ...editor.item, key } })} />
-                  <select className="w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={editor.item.attribute || 'presenca'} onChange={(event) => setEditor({ ...editor, item: { ...editor.item, attribute: event.target.value } })}>
+                  <select className="field !mt-0" value={editor.item.attribute || 'presenca'} onChange={(event) => setEditor({ ...editor, item: { ...editor.item, attribute: event.target.value } })}>
                     {attributes.map((attr) => <option key={attr} value={attr}>{attr}</option>)}
                   </select>
                 </>
@@ -242,11 +242,11 @@ export default function Admin() {
 }
 
 function Panel({ title, onSubmit, children }) {
-  return <form onSubmit={onSubmit} className="gothic-panel rounded-md p-4 space-y-3 sm:p-5"><h2 className="font-display text-2xl">{title}</h2>{children}</form>;
+  return <form onSubmit={onSubmit} className="gothic-panel space-y-3 p-4 sm:p-5"><h2 className="font-display text-2xl text-bone">{title}</h2>{children}</form>;
 }
 
 function Input({ value, onChange, placeholder }) {
-  return <input className="w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} />;
+  return <input className="field !mt-0" placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} />;
 }
 
 function ClassProgressionEditor({ progression, onChange }) {
@@ -268,16 +268,16 @@ function ClassProgressionEditor({ progression, onChange }) {
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs uppercase tracking-[.22em] text-ember">Progressão</p>
+        <p className="text-sm text-mist">Progressão</p>
         <Button type="button" variant="ghost" className="px-3 py-1.5 text-xs" onClick={addRow}>Adicionar nível</Button>
       </div>
       <div className="mt-2 space-y-2">
         {rows.map((row, index) => (
-          <div key={`${row.level}-${index}`} className="grid gap-2 rounded-md border border-ember/15 bg-black/20 p-2 sm:grid-cols-[90px_90px_1fr_auto]">
-            <input type="number" min="1" max="20" className="rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={row.level ?? 1} onChange={(event) => update(index, { level: Number(event.target.value) || 1 })} />
-            <input type="number" min="0" className="rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={row.mana ?? 0} onChange={(event) => update(index, { mana: Number(event.target.value) || 0 })} />
-            <input className="rounded-md border border-ember/20 bg-black/30 px-3 py-2" placeholder="Habilidade" value={row.feature || ''} onChange={(event) => update(index, { feature: event.target.value })} />
-            <Button type="button" variant="ghost" className="px-3 text-red-200" onClick={() => removeRow(index)}>Remover</Button>
+          <div key={`${row.level}-${index}`} className="grid gap-2 pane p-2 sm:grid-cols-[90px_90px_1fr_auto]">
+            <input type="number" min="1" max="20" className="field !mt-0" value={row.level ?? 1} onChange={(event) => update(index, { level: Number(event.target.value) || 1 })} />
+            <input type="number" min="0" className="field !mt-0" value={row.mana ?? 0} onChange={(event) => update(index, { mana: Number(event.target.value) || 0 })} />
+            <input className="field !mt-0" placeholder="Habilidade" value={row.feature || ''} onChange={(event) => update(index, { feature: event.target.value })} />
+            <Button type="button" variant="ghost" className="px-3 text-bone" onClick={() => removeRow(index)}>Remover</Button>
           </div>
         ))}
       </div>
@@ -288,14 +288,14 @@ function ClassProgressionEditor({ progression, onChange }) {
 function ModifierGrid({ title, keysList, labels = [], values, onChange }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-[.22em] text-ember">{title}</p>
+      <p className="text-sm text-mist">{title}</p>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         {keysList.map((key) => {
           const label = labels.find((item) => item.key === key)?.name || key;
           return (
             <label key={key} className="text-sm capitalize text-mist">
               {label}
-              <input type="number" className="mt-1 w-full rounded-md border border-ember/20 bg-black/30 px-3 py-2" value={values?.[key] ?? 0} onChange={(event) => onChange({ ...values, [key]: Number(event.target.value) })} />
+              <input type="number" className="field !mt-0" value={values?.[key] ?? 0} onChange={(event) => onChange({ ...values, [key]: Number(event.target.value) })} />
             </label>
           );
         })}
@@ -308,14 +308,14 @@ function List({ items, endpoint, onEdit, onRemove }) {
   return (
     <ul className="space-y-2 pt-3">
       {items.map((item) => (
-        <li className="rounded-md border border-white/10 bg-black/20 p-2 text-sm text-mist" key={item.id}>
+        <li className="pane p-2 text-sm text-mist" key={item.id}>
           <div className="grid gap-2 sm:flex sm:items-center sm:justify-between">
             <span className="break-words">{item.name}</span>
             <span className="grid gap-2 sm:flex sm:shrink-0 sm:flex-wrap">
               <Button type="button" variant="ghost" className="w-full px-3 py-1.5 text-xs sm:w-auto" onClick={() => onEdit(item)}>
                 <span className="inline-flex items-center gap-1"><Edit size={13} /> Editar</span>
               </Button>
-              <Button type="button" variant="ghost" data-admin-delete-id={item.id} data-admin-delete-endpoint={endpoint} className="w-full px-3 py-1.5 text-xs text-red-200 sm:w-auto" onClick={() => onRemove(endpoint, item)}>
+              <Button type="button" variant="ghost" data-admin-delete-id={item.id} data-admin-delete-endpoint={endpoint} className="w-full px-3 py-1.5 text-xs text-bone sm:w-auto" onClick={() => onRemove(endpoint, item)}>
                 <span className="inline-flex items-center gap-1"><Trash2 size={13} /> Deletar</span>
               </Button>
             </span>
@@ -329,12 +329,12 @@ function List({ items, endpoint, onEdit, onRemove }) {
 function ConfirmDialog({ title, onCancel, onConfirm, loading = false }) {
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-black/75 p-4">
-      <section className="gothic-panel max-h-[90vh] w-full max-w-md overflow-auto rounded-md p-4 sm:p-6">
-        <h2 className="font-display text-3xl text-ember">{title}</h2>
+      <section className="gothic-panel max-h-[90vh] w-full max-w-md overflow-auto p-4 sm:p-6">
+        <h2 className="font-display text-3xl text-bone">{title}</h2>
         <p className="mt-3 text-sm leading-relaxed text-mist">Tem certeza que deseja deletar este item? Essa ação não poderá ser desfeita.</p>
         <div className="mt-6 grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
           <Button type="button" variant="ghost" disabled={loading} onClick={onCancel}>Cancelar</Button>
-          <Button type="button" disabled={loading} className="border-red-500/70 bg-red-900/70 hover:bg-red-800" onClick={onConfirm}>{loading ? 'Deletando...' : 'Deletar'}</Button>
+          <Button variant="danger" type="button" disabled={loading} className="" onClick={onConfirm}>{loading ? 'Deletando...' : 'Deletar'}</Button>
         </div>
       </section>
     </div>

@@ -11,13 +11,13 @@ export default function Avatar({ user, size = 'md' }) {
       <img
         src={user.profile_image_url}
         alt={`Foto de perfil de ${user?.name || 'usuário'}`}
-        className={`${sizes[size]} rounded-full border border-ember/40 object-cover shadow-glow`}
+        className={`${sizes[size]} border-[3px] border-lead object-cover`}
       />
     );
   }
 
   return (
-    <div className={`${sizes[size]} grid place-items-center rounded-full border border-ember/40 bg-ember/15 font-display text-ember shadow-glow`}>
+    <div className={`${sizes[size]} grid place-items-center border-[3px] border-lead lit font-display text-ember`}>
       {initial}
     </div>
   );

@@ -2,14 +2,14 @@ import { Trash2 } from 'lucide-react';
 
 function MemberAvatar({ member }) {
   if (member.display_avatar) {
-    return <img src={member.display_avatar} alt={`Avatar de ${member.display_name || member.name || 'participante'}`} className="h-10 w-10 rounded-full border border-white/15 object-cover" />;
+    return <img src={member.display_avatar} alt={`Avatar de ${member.display_name || member.name || 'participante'}`} className="h-10 w-10 rounded-full border-[3px] border-lead object-cover" />;
   }
 
   const initial = member.display_name?.trim()?.[0]?.toUpperCase() || '?';
   return (
     <div
-      className="grid h-10 w-10 place-items-center rounded-full border border-white/15 text-sm font-bold text-black"
-      style={{ backgroundColor: member.color || '#d6a65f' }}
+      className="grid h-10 w-10 place-items-center rounded-full border-[3px] border-lead text-sm font-bold text-black"
+      style={{ backgroundColor: member.color || 'var(--color-ember)' }}
     >
       {initial}
     </div>
@@ -22,13 +22,13 @@ export default function CampaignMembersList({ members, currentUserId, isMaster, 
       {members.map((member) => {
         const isSelf = member.user_id === currentUserId || member.id === currentUserId;
         return (
-          <div key={member.user_id || member.id} className="rounded-md border border-white/10 bg-black/25 p-3">
+          <div key={member.user_id || member.id} className="rounded-md border-[3px] border-lead bg-black/25 p-3">
             <div className="flex items-center gap-3">
               <MemberAvatar member={member} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: member.color || '#d6a65f' }} />
-                  <p className="truncate font-semibold text-white">{member.display_name || member.name}</p>
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: member.color || 'var(--color-ember)' }} />
+                  <p className="truncate font-semibold text-bone">{member.display_name || member.name}</p>
                 </div>
                 <p className="text-xs text-mist">{member.role === 'master' ? 'GM' : 'Jogador'}</p>
                 <p className="truncate text-xs text-ember/80">{member.character_name ? `Ficha: ${member.character_name}` : 'Sem personagem compartilhado'}</p>
@@ -49,9 +49,9 @@ export default function CampaignMembersList({ members, currentUserId, isMaster, 
                 Cor do jogador
                 <input
                   type="color"
-                  value={member.color || '#d6a65f'}
+                  value={member.color || 'var(--color-ember)'}
                   onChange={(event) => onColorChange(member, event.target.value)}
-                  className="h-8 w-12 rounded border border-white/10 bg-black"
+                  className="h-8 w-12 rounded border-[3px] border-lead bg-black"
                 />
               </label>
             ) : null}

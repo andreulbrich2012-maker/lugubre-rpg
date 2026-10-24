@@ -10,6 +10,8 @@ import { getTile } from '../../lib/tiles/catalog';
 import AvatarSprite from '../avatar/AvatarSprite';
 import FxLayer from '../fx/FxLayer';
 import ItemIcon from '../icons/ItemIcon';
+import MonsterSprite from '../monsters/MonsterSprite';
+import { monsterLook } from '../../lib/monsters/classify';
 
 // Telhado de uma construcao: canvas no tamanho nativo (16 px/celula), o CSS escala nitido.
 function Roof({ building, open, cell, onToggle }) {
@@ -501,6 +503,8 @@ export default function Board({
             const down = t.conditions?.includes('caído') || fx?.down;
             const active = t.id === activeTokenId;
             const sprite = isTiles && t.kind === 'character' ? t.appearance || appearanceCache.current[t.character_id || t.id] : null;
+            // monstro/NPC sem imagem enviada vira o bicho em pixel art (gerado pelo nome)
+            const mlook = isTiles && !sprite && !t.image_url && (t.kind === 'monster' || t.kind === 'npc') ? monsterLook({ name: t.name }) : null;
             return (
               <button
                 key={t.id}
@@ -510,10 +514,14 @@ export default function Board({
                 onKeyDown={(e) => { if (e.key === 'Enter' && targeting) onTarget?.(t); }}
                 aria-label={`${t.name}${t.hidden ? ' (oculto dos jogadores)' : ''}${active ? ', turno atual' : ''}`}
                 aria-pressed={t.id === selectedId}
-                className={`vtt-token absolute ${sprite ? 'is-sprite' : ''} ${t.id === selectedId ? 'is-selected' : ''} ${active ? 'is-active' : ''} ${t.hidden ? 'is-hidden' : ''} ${down ? 'is-down' : ''} ${targeting ? 'is-targetable' : ''}`}
+                className={`vtt-token absolute ${sprite || mlook ? 'is-sprite' : ''} ${t.id === selectedId ? 'is-selected' : ''} ${active ? 'is-active' : ''} ${t.hidden ? 'is-hidden' : ''} ${down ? 'is-down' : ''} ${targeting ? 'is-targetable' : ''}`}
                 style={{ left: pos.x, top: pos.y, width: size, height: size, '--tc': t.color || '#a4781a', transition: local[t.id] ? 'none' : 'left .25s cubic-bezier(.16,1,.3,1), top .25s cubic-bezier(.16,1,.3,1)' }}
               >
-                {sprite ? (
+                {mlook ? (
+                  <span key={fx?.n} className={`vtt-sprite ${fx?.n && fx?.hit ? 'hit-shake' : ''}`} style={{ width: size * (mlook.size / 16) * 0.9, height: size * (mlook.size / 16) * 0.9 }}>
+                    <MonsterSprite look={mlook} direction={motion[t.id]?.dir || 'down'} moving={Boolean(motion[t.id]?.moving)} scale={4} style={{ width: '100%', height: '100%' }} title={t.name} />
+                  </span>
+                ) : sprite ? (
                   <span key={fx?.n} className={`vtt-sprite ${fx?.n && fx?.hit ? 'hit-shake' : ''}`} style={{ width: size * 1.05, height: size * 1.4 }}>
                     <AvatarSprite appearance={sprite} direction={motion[t.id]?.dir || 'down'} moving={Boolean(motion[t.id]?.moving)} scale={4} style={{ width: '100%', height: '100%' }} title={t.name} />
                   </span>

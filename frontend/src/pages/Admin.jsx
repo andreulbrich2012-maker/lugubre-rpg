@@ -7,6 +7,7 @@ import AdminDeveloperDiaryPage from '../components/admin/AdminDeveloperDiaryPage
 import AdminFeedbackPage from '../components/feedback/AdminFeedbackPage';
 import AdminMonstersPage from '../components/monsters/AdminMonstersPage';
 import AdminSystemPage from '../components/admin/AdminSystemPage';
+import AdminAnimationsPage from '../components/admin/AdminAnimationsPage';
 import { api } from '../lib/api';
 
 const attributes = ['forca', 'agilidade', 'intelecto', 'vigor', 'presenca'];
@@ -145,6 +146,7 @@ export default function Admin() {
           <button type="button" className={`min-h-11 px-3 py-2 text-sm ${adminSection === 'monsters' ? 'lit text-bone' : 'text-mist hover:text-bone'}`} onClick={() => setAdminSection('monsters')}>Monstros</button>
           <button type="button" className={`min-h-11 px-3 py-2 text-sm ${adminSection === 'powers' ? 'lit text-bone' : 'text-mist hover:text-bone'}`} onClick={() => setAdminSection('powers')}>Biblioteca</button>
           <button type="button" className={`min-h-11 px-3 py-2 text-sm ${adminSection === 'developer' ? 'lit text-bone' : 'text-mist hover:text-bone'}`} onClick={() => setAdminSection('developer')}>Diário</button>
+          <button type="button" className={`min-h-11 px-3 py-2 text-sm ${adminSection === 'animations' ? 'lit text-bone' : 'text-mist hover:text-bone'}`} onClick={() => setAdminSection('animations')}>Animações</button>
           <button type="button" className={`min-h-11 px-3 py-2 text-sm ${adminSection === 'feedbacks' ? 'lit text-bone' : 'text-mist hover:text-bone'}`} onClick={() => setAdminSection('feedbacks')}>Feedback</button>
           <button type="button" className={`min-h-11 px-3 py-2 text-sm ${adminSection === 'system' ? 'lit text-bone' : 'text-mist hover:text-bone'}`} onClick={() => setAdminSection('system')}>Sistema</button>
         </div>
@@ -156,6 +158,8 @@ export default function Admin() {
         <div className="mt-8"><AdminPowerLibraryPage /></div>
       ) : adminSection === 'developer' ? (
         <div className="mt-8"><AdminDeveloperDiaryPage /></div>
+      ) : adminSection === 'animations' ? (
+        <div className="mt-8"><AdminAnimationsPage /></div>
       ) : adminSection === 'feedbacks' ? (
         <div className="mt-8"><AdminFeedbackPage /></div>
       ) : adminSection === 'system' ? (

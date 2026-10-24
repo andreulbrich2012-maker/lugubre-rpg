@@ -123,6 +123,21 @@ describe('formato da aparencia', () => {
     expect(stable(randomAppearance(r1))).toBe(stable(randomAppearance(r2)));
   });
 
+  it('cor livre (#hex) vale em cabelo, pele, olhos, tracos e canais das pecas', () => {
+    const app = defaultAppearance('humano');
+    const custom = repairAppearance({ ...app, skin: '#7FD0A0', hair: { ...app.hair, color: '#ff00aa' }, eyes: { ...app.eyes, color: '#00ccff' }, traits: { ...app.traits, hornColor: '#123456' }, layers: { ...app.layers, torso: { id: app.layers.torso.id, colors: ['#abcdef'] } } });
+    expect(custom.skin).toBe('#7fd0a0');
+    expect(custom.hair.color).toBe('#ff00aa');
+    expect(custom.eyes.color).toBe('#00ccff');
+    expect(custom.traits.hornColor).toBe('#123456');
+    expect(custom.layers.torso.colors[0]).toBe('#abcdef');
+    expect(isValidAppearance(custom)).toBe(true);
+    expect(repairAppearance({ ...app, hair: { ...app.hair, color: '#zzz' } }).hair.color).toBe('castanho-escuro');
+    const a = renderPixels(app, 'down', 'idle', 0);
+    const b = renderPixels({ ...app, hair: { ...app.hair, color: '#ff00aa' } }, 'down', 'idle', 0);
+    expect(Buffer.from(a).equals(Buffer.from(b))).toBe(false);
+  });
+
   it('valida mesmo com as chaves reordenadas (jsonb)', () => {
     const app = applyRace(defaultAppearance(), 'kenku');
     const reordered = JSON.parse(stable(app));

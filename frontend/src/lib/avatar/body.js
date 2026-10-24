@@ -16,7 +16,16 @@ export function drawBody(L, P, app = {}) {
   L.fill(P.headPart, 'skin');
   // orelha humana (as orelhas de raca sao tracos)
   if (!app.hideHumanEars) drawEars(L, P, 'skin');
-  for (const a of P.arms) if (!a.back) { L.fill(a, 'skin'); L.fill(a.handPart, 'skin'); }
+  for (const a of P.arms) {
+    if (a.back) continue;
+    if (P.view === 'side') {
+      // de perfil o braco passa na frente da roupa: tom medio chapado + brilho na frente,
+      // sem a coluna escura (que virava uma faixa avermelhada sobre a camisa)
+      L.fill(a, 'skin', { flat: true, s: 2 });
+      for (const [y, [x0]] of a.rows) L.withTag(a.tag, () => L.px(x0, y, 'skin', 3));
+      L.fill(a.handPart, 'skin', { flat: true, s: 2 });
+    } else { L.fill(a, 'skin'); L.fill(a.handPart, 'skin'); }
+  }
   // separa o braco do tronco com um vinco de sombra no ombro
   if (P.view !== 'side') for (const a of P.arms) {
     const ox = a.side === 'l' ? a.rows.get(a.top)[1] : a.rows.get(a.top)[0];

@@ -6,7 +6,7 @@
 
 function legEnd(P, l, len) {
   const f = l.foot.y;
-  return { short: P.hip + 1, knee: P.hip + 2, capri: f - 2, full: f - 1, long: f }[len] ?? f - 1;
+  return { short: P.hip + 2, knee: P.hip + 3, capri: f - 2, full: f - 1, long: f }[len] ?? f - 1;
 }
 
 function legSpan(P, y) {
@@ -51,7 +51,7 @@ function pants(L, P, o) {
 }
 
 function skirt(L, P, o) {
-  const len = { mini: 2, skirt: 3, midi: 4, long: 99 }[o.skirt] ?? 3;
+  const len = { mini: 2, skirt: 3, midi: 5, long: 99 }[o.skirt] ?? 3;
   const foot = Math.min(...P.legs.map((l) => l.foot.y));
   const y1 = Math.min(P.hip + len, foot);
   const out = [];

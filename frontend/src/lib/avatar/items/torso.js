@@ -196,10 +196,13 @@ function pattern(L, P, o, cells) {
       case 'checks': if ((Math.floor(tx / 2) + Math.floor(ty / 2)) % 2 === 0) L.px(x, y, 'b', s); break;
       case 'plaid': if (tx % 4 === 1 || ty % 4 === 1) L.px(x, y, 'b', (tx % 4 === 1 && ty % 4 === 1) ? Math.max(0, s - 1) : s); break;
       case 'quilt': if ((tx + ty) % 4 === 0 || (tx - ty + 40) % 4 === 0) L.px(x, y, 'a', Math.max(0, s - 1)); break;
-      case 'chain': L.px(x, y, 'c', (x + y) % 2 === 0 ? Math.min(4, s + 1) : Math.max(0, s - 1)); break;
-      case 'scale': if (ty % 2 === 0 ? tx % 2 === 0 : tx % 2 === 1) L.px(x, y, 'a', Math.min(4, s + 1)); else if (ty % 2 === 1) L.px(x, y, 'a', Math.max(0, s - 1)); break;
+      // malha: anel 2x2 (brilho em cima-esquerda, furo escuro embaixo-direita), fileiras desencontradas
+      case 'chain': { const u = (tx + (Math.floor(ty / 2) % 2)) % 2; const v = ty % 2; L.px(x, y, 'c', u === 0 && v === 0 ? Math.min(4, s + 1) : u === 1 && v === 1 ? Math.max(0, s - 2) : s); break; }
+      // escamas: meia-lua 4x2 com brilho no topo e vao escuro nas pontas, fileiras desencontradas
+      case 'scale': { const u = (tx + (Math.floor(ty / 2) % 2) * 2) % 4; const v = ty % 2; if (v === 0 && (u === 1 || u === 2)) L.px(x, y, 'a', Math.min(4, s + 1)); else if (v === 1 && (u === 0 || u === 3)) L.px(x, y, 'a', Math.max(0, s - 2)); break; }
       case 'plates': if (zone === 'torso' && ty % 3 === 2) L.px(x, y, 'c', 1); else if (ty % 3 === 0) L.px(x, y, 'c', Math.min(4, s + 1)); else L.px(x, y, 'c', s); break;
-      case 'dots': if ((tx * 3 + ty * 2) % 5 === 0) L.px(x, y, 'b', 3); break;
+      // poa: bolinhas numa grade desencontrada (a formula antiga virava listras diagonais)
+      case 'dots': if (ty % 3 === 1 && (tx + (Math.floor(ty / 3) % 2) * 2) % 4 === 1) L.px(x, y, 'b', 3); break;
       case 'fur': if ((x * 7 + y * 3) % 4 === 0) L.px(x, y, 'a', Math.min(4, s + 1)); else if ((x * 5 + y) % 6 === 0) L.px(x, y, 'a', Math.max(0, s - 1)); break;
       case 'patches': if (((tx >> 1) * 5 + (ty >> 1) * 3) % 7 === 0) L.px(x, y, 'b', s); break;
       case 'diamond': if (Math.abs(((tx + 2) % 4) - 2) + Math.abs(((ty + 2) % 4) - 2) === 2) L.px(x, y, 'b', s); break;

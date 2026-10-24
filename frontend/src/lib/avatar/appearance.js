@@ -131,7 +131,10 @@ export function applyRace(app, raceId) {
   return repairAppearance(next);
 }
 
-function pick(set, v, fallback) { return set.has(v) ? v : fallback; }
+// Cor livre (pedido do Andre, 24/10): alem das cores prontas, qualquer #rrggbb vale. A rampa
+// de 5 tons sai da propria cor, entao cabelo/roupa continuam com luz e sombra certas.
+export const isHex = (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
+function pick(set, v, fallback) { return set.has(v) ? v : isHex(v) ? v.toLowerCase() : fallback; }
 function obj(v) { return v && typeof v === 'object' && !Array.isArray(v) ? v : {}; }
 
 // Devolve SEMPRE uma aparencia valida (nunca lanca).
@@ -158,13 +161,13 @@ export function repairAppearance(input) {
     const item = getItem(slot, sel.id);
     if (!item) continue;
     const given = Array.isArray(sel.colors) ? sel.colors : [];
-    out.layers[slot] = { id: item.id, colors: item.channels.map((c, k) => (COLOR_IDS.has(given[k]) ? given[k] : c.def)) };
+    out.layers[slot] = { id: item.id, colors: item.channels.map((c, k) => (COLOR_IDS.has(given[k]) ? given[k] : isHex(given[k]) ? given[k].toLowerCase() : c.def)) };
   }
   const tr = obj(src.traits);
   const def = defaultTraits(raceId);
   for (const g of TRAIT_GROUPS) out.traits[g.id] = g.options.some((o) => o.id === tr[g.id]) ? tr[g.id] : def[g.id];
-  for (const k of ['hornColor', 'markColor']) out.traits[k] = COLOR_IDS.has(tr[k]) ? tr[k] : def[k];
-  out.traits.coat = HAIRC_IDS.has(tr.coat) || COLOR_IDS.has(tr.coat) ? tr.coat : def.coat;
+  for (const k of ['hornColor', 'markColor']) out.traits[k] = COLOR_IDS.has(tr[k]) ? tr[k] : isHex(tr[k]) ? tr[k].toLowerCase() : def[k];
+  out.traits.coat = HAIRC_IDS.has(tr.coat) || COLOR_IDS.has(tr.coat) ? tr.coat : isHex(tr.coat) ? tr.coat.toLowerCase() : def.coat;
   return out;
 }
 

@@ -81,12 +81,25 @@ export function skinShadeHex(hex, level) {
   return rgbToHex(hslToRgb(steps[level] ?? steps[2]));
 }
 
+// Rampa da pele: tons "de carne" (laranja/rosado, saturados) ganham a sombra rosada; pele
+// fantasiosa (azul, verde, pedra, penas) fica com a rampa comum, que puxa para azul/roxo.
+const skinCache = new Map();
+export function skinRamp(hex) {
+  let r = skinCache.get(hex);
+  if (!r) {
+    const [h, s] = rgbToHsl(hexToRgb(hex));
+    const flesh = (h <= 45 || h >= 340) && s >= 0.2;
+    r = [0, 1, 2, 3, 4].map((lv) => (flesh ? skinShadeHex(hex, lv) : shadeHex(hex, lv)));
+    skinCache.set(hex, r);
+  }
+  return r;
+}
+
 const rampCache = new Map();
 export function ramp(hex) {
   let r = rampCache.get(hex);
   if (!r) {
-    const skin = SKIN_HEXES.has(hex);
-    r = [0, 1, 2, 3, 4].map((lv) => (skin ? skinShadeHex(hex, lv) : shadeHex(hex, lv)));
+    r = [0, 1, 2, 3, 4].map((lv) => shadeHex(hex, lv));
     rampCache.set(hex, r);
   }
   return r;
@@ -207,8 +220,6 @@ export const COLORS = [
   ['madeira-escura', 'Madeira escura', '#4f3424']
 ].map(([id, name, hex]) => ({ id, name, hex }));
 
-// so as peles "de carne" ganham a rampa quente; pedra, penas e escamas ficam com a comum
-const SKIN_HEXES = new Set(SKINS.filter((c) => !['cinza-cinza', 'pedra', 'pena-negra', 'pena-parda', 'azul-palido', 'azul-profundo', 'marinha', 'lilas-noite', 'verde-gorak', 'musgo'].includes(c.id)).map((c) => c.hex));
 
 const byId = (list) => Object.fromEntries(list.map((c) => [c.id, c]));
 export const SKIN_BY_ID = byId(SKINS);

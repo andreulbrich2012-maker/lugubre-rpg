@@ -32,7 +32,10 @@ const SLOT_CROP = {
 };
 const norm = (s) => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
+// Paleta pronta + cor livre: o "+" abre o seletor do sistema; a rampa de luz e sombra sai da cor escolhida.
 function Swatches({ list, value, onPick, label }) {
+  const custom = typeof value === 'string' && value.startsWith('#');
+  const current = custom ? value : list.find((c) => c.id === value)?.hex || '#888888';
   return (
     <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-1">
       {list.map((c) => (
@@ -48,6 +51,20 @@ function Swatches({ list, value, onPick, label }) {
           style={{ background: c.hex }}
         />
       ))}
+      <label
+        title="Cor livre"
+        className={`relative grid h-6 w-6 cursor-pointer place-items-center border-2 text-sm font-bold leading-none text-bone ${custom ? 'border-ember outline outline-2 outline-ember' : 'border-lead'}`}
+        style={{ background: custom ? value : 'conic-gradient(#e0524c, #ffd04a, #5fa53f, #3a92cc, #9c6cd4, #e0524c)' }}
+      >
+        <span aria-hidden="true" style={{ textShadow: '0 0 2px #000' }}>{custom ? '' : '+'}</span>
+        <input
+          type="color"
+          aria-label={`${label}: cor livre`}
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          value={current}
+          onChange={(e) => onPick(e.target.value)}
+        />
+      </label>
     </div>
   );
 }

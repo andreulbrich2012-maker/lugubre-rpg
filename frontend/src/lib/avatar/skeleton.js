@@ -88,7 +88,9 @@ export function pose(dir = 'down', anim = 'idle', f = 0, build = 'medio', height
   const breath = !walk && f === 1 ? 1 : 0;
   const torsoY = 16 + short + bob;
   const headY = 5 + short + bob + breath;
-  const hipY = torsoY + 8;
+  // tronco de 7 linhas (auditoria 24/10): a perna ganha espaco para calca/saia/joelheira se lerem
+  const TORSO_ROWS = 7;
+  const hipY = torsoY + TORSO_ROWS;
 
   const P = { view, dir, anim, f, build, height, walk, ground, bob, hip: hipY };
   P.head = { x: 6, y: headY, w: 12, h: 11 };
@@ -110,9 +112,9 @@ export function pose(dir = 'down', anim = 'idle', f = 0, build = 'medio', height
   if (view === 'side') { tx0 = Math.round(12 - hw) - (build === 'forte' ? 0 : 0); tx1 = Math.round(11 + hw); }
   else { tx0 = 12 - hw; tx1 = 11 + hw; }
   const tspans = [];
-  for (let r = 0; r < 8; r++) {
-    const inset = view === 'side' ? (r === 0 ? 1 : 0) : (r === 0 || r >= 6 ? 1 : 0);
-    tspans.push([torsoY + r, tx0 + inset, tx1 - (view === 'side' && r >= 6 ? 1 : inset)]);
+  for (let r = 0; r < TORSO_ROWS; r++) {
+    const inset = view === 'side' ? (r === 0 ? 1 : 0) : (r === 0 || r >= TORSO_ROWS - 2 ? 1 : 0);
+    tspans.push([torsoY + r, tx0 + inset, tx1 - (view === 'side' && r >= TORSO_ROWS - 2 ? 1 : inset)]);
   }
   P.torso = makePart('torso', tspans, 'main', { x0: tx0, x1: tx1 });
   P.neck = { x: view === 'side' ? 10 : 11, y: torsoY - 1 };
@@ -146,12 +148,12 @@ export function pose(dir = 'down', anim = 'idle', f = 0, build = 'medio', height
       const swing = -phase * (front ? 1 : -1);
       const ax = 11;
       const spans = [];
-      for (let i = 0; i < 7; i++) {
-        const dx = -Math.round(swing * 2 * (i / 6));
+      for (let i = 0; i < 6; i++) {
+        const dx = -Math.round(swing * 2 * (i / 5));
         spans.push([torsoY + 1 + i, ax + dx, ax + dx + 1]);
       }
       const last = spans[spans.length - 1];
-      const hand = { x: last[1], y: torsoY + 8, w: 2, h: 2 };
+      const hand = { x: last[1], y: torsoY + 7, w: 2, h: 2 };
       P.arms.push(makePart(front ? 'armF' : 'armB', spans, front ? 'arm' : 'main', { front, back: !front, hand, side: front ? 'f' : 'b' }));
     }
   } else {
@@ -172,7 +174,7 @@ export function pose(dir = 'down', anim = 'idle', f = 0, build = 'medio', height
     }
     const ax = [tx0 - 2, tx1 + 1];
     for (const k of [0, 1]) {
-      let len = 7;
+      let len = 6;
       if (walk && phase !== 0) {
         const forward = (k === 1) === (phase > 0); // braco oposto a perna
         len += (forward ? 1 : -1) * (view === 'up' ? -1 : 1);

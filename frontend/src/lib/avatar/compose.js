@@ -21,10 +21,10 @@ const EQUIP = new Set(['torso', 'legs', 'feet', 'head', 'face', 'ears', 'neck', 
 const EDGE = { torso: 'all', legs: 'all', feet: 'all', head: 'all', back: 'all', hairFront: 'down', hairBack: 'all', neck: 'down', waist: 'down', held: 'all', arms: 'down', hands: false, knees: 'down', beard: 'down', horns: 'all', crest: 'all', earsTrait: false, face: false, ears: false, over: 'down' };
 
 function baseColors(app) {
-  const skin = SKIN_BY_ID[app.skin]?.hex || '#e8b996';
+  const skin = SKIN_BY_ID[app.skin]?.hex || colorHex(app.skin, '#e8b996');
   const hair = HAIR_BY_ID[app.hair?.color]?.hex || colorHex(app.hair?.color, '#4a2f22');
-  const beard = HAIR_BY_ID[app.beard?.color]?.hex || hair;
-  const eye = EYE_COLOR_BY_ID[app.eyes?.color]?.hex || '#5a3a26';
+  const beard = HAIR_BY_ID[app.beard?.color]?.hex || colorHex(app.beard?.color, hair);
+  const eye = EYE_COLOR_BY_ID[app.eyes?.color]?.hex || colorHex(app.eyes?.color, '#5a3a26');
   return { skin, hair, beard, eye, w: '#f4ecdc' };
 }
 

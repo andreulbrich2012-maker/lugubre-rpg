@@ -170,11 +170,13 @@ function buildMasks(P, o, ctx) {
   }
   if (has('bun') || has('topknot')) {
     const small = has('topknot');
-    const pts = view === 'side'
-      ? (small ? [[7, -2], [8, -2], [7, -1], [8, -1]] : [[7, -3], [8, -3], [6, -2], [7, -2], [8, -2], [9, -2], [7, -1], [8, -1], [9, -1]])
-      : (small ? [[5, -2], [6, -2], [5, -3], [6, -3]] : [[5, -4], [6, -4], [4, -3], [5, -3], [6, -3], [7, -3], [4, -2], [5, -2], [6, -2], [7, -2]]);
-    pts.forEach(([dx, dy]) => add(front, dx, dy, { tex: 'bun' }));
-    if (view === 'side') add(front, small ? 7 : 8, 0, tie); else { add(front, 5, -1, tie); add(front, 6, -1, tie); }
+    // bola redonda separada da cabeca por uma amarracao (antes virava um cone de costas)
+    const ball = small
+      ? [[0, -3], [1, -3], [0, -2], [1, -2]]
+      : [[0, -5], [1, -5], [-1, -4], [0, -4], [1, -4], [2, -4], [-1, -3], [0, -3], [1, -3], [2, -3], [0, -2], [1, -2]];
+    const cx = view === 'side' ? 8 : 5;
+    ball.forEach(([dx, dy]) => add(front, cx + dx, dy, { tex: 'bun' }));
+    add(front, cx, -1, tie); add(front, cx + 1, -1, tie);
   }
   if (has('lowbun')) {
     if (view === 'up') [[4, 8], [5, 8], [6, 8], [7, 8], [4, 9], [5, 9], [6, 9], [7, 9], [5, 10], [6, 10], [5, 11], [6, 11]].forEach(([dx, dy]) => add(front, dx, dy, { tex: 'bun' }));
@@ -218,7 +220,7 @@ function buildMasks(P, o, ctx) {
     }
     if (view === 'up') for (let dy = 8; dy <= 12; dy++) add(front, -1, dy, { lock: true, tex: 'braid' });
   }
-  if (has('quiff')) {
+  if (has('quiff') && view !== 'up') {
     // topete: volume puxado para cima e para a frente
     const pts = view === 'side' ? [[0, -1], [1, -1], [2, -1], [3, -1], [1, -2], [2, -2], [3, -2], [2, -3], [-1, 0], [0, 0]] : [[2, -2], [3, -2], [4, -2], [5, -2], [6, -2], [3, -3], [4, -3], [5, -3], [4, -4]];
     pts.forEach(([dx, dy]) => add(front, dx, dy));
@@ -236,7 +238,10 @@ function buildMasks(P, o, ctx) {
     if (view === 'side') {
       for (const [i, info] of [...front]) if (info.dy > 2 && info.dx < 9) front.delete(i);
       for (let dx = 1; dx <= 11; dx++) { add(front, dx, -1); if (dx >= 3 && dx <= 10) add(front, dx, -2); if (dx >= 5 && dx <= 8) add(front, dx, -3); }
-    } else for (let dy = -3; dy <= (view === 'up' ? 10 : 1); dy++) for (let dx = 4; dx <= 7; dx++) if (dy >= -1 || (dx >= 5 && dx <= 6)) add(front, dx, dy);
+    } else if (view === 'up') {
+      // de costas: faixa de largura constante da testa ate a nuca (nada de cone)
+      for (let dy = -2; dy <= 10; dy++) for (let dx = 4; dx <= 7; dx++) add(front, dx, dy);
+    } else for (let dy = -3; dy <= 1; dy++) for (let dx = 4; dx <= 7; dx++) if (dy >= -1 || (dx >= 5 && dx <= 6)) add(front, dx, dy);
   }
   if (has('tonsure')) {
     // coroa raspada no alto: so o anel em volta
@@ -260,6 +265,13 @@ function buildMasks(P, o, ctx) {
       }
     }
     extraCells.forEach(([dx, dy]) => add(front, dx, dy, { lock: dy > 10 }));
+  }
+  // de costas, a borda de baixo do cabelo curto ganha pontas de mecha (sem borda de cuia)
+  if (view === 'up' && len <= 1 && !has('mohawk')) {
+    for (const [i, info] of [...front]) {
+      if (info.lock || info.tex || front.has(i + W)) continue;
+      if (((i % W) - hx) % 3 === 1) front.delete(i);
+    }
   }
   return { front, back, hx, hy };
 }
@@ -323,13 +335,15 @@ function shadeAndPaint(L, P, m, o, opts = {}) {
   }
 }
 
-// Raspado/barba por fazer na cabeca: pontilhado escuro sobre a pele.
+// Raspado: area solida no tom escuro do cabelo, com 2-3 pixels de brilho no alto (como no
+// Stardew). O pontilhado alternado de antes parecia tela de arame.
 function stubble(L, P, region) {
   const tpl = P.view === 'side' ? HEAD_SIDE : HEAD_FRONT;
   for (let dy = 0; dy <= 8; dy++) {
     for (let dx = tpl[dy][0]; dx <= tpl[dy][1]; dx++) {
       if (!region(dx, dy)) continue;
-      if ((dx + dy) % 2 === 0) L.px(P.head.x + dx, P.head.y + dy, 'hair', dy < 2 ? 2 : 1);
+      const shine = dy === 1 && dx >= 3 && dx <= 5;
+      L.px(P.head.x + dx, P.head.y + dy, 'hair', shine ? 2 : dy >= 7 ? 0 : 1);
     }
   }
 }

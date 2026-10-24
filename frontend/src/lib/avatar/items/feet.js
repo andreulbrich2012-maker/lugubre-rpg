@@ -91,8 +91,10 @@ function boot(o) {
       }
       if (o.rivets) for (const r of rowsAt(o.rivets)) { const [a, b] = span(r); L.px(a, r, 'c', 4); L.px(b, r, 'c', 3); }
       if (o.seam) for (let r = yt + 1; r < y; r++) if ((r - yt) % 2) L.px(side ? span(r)[1] - 1 : mid(r), r, 'b', 3);
-      if (o.plates) for (const r of rowsAt(o.plates)) { const [a, b] = span(r); L.hline(a, b, r, 'a', 0); }
-      if (o.shine) for (let r = yt; r < y; r++) L.over(span(r)[0], r, 'c', 4);
+      // juntas de placa: sombra na emenda + brilho logo acima (antes a linha preta formava um "E")
+      if (o.plates) for (const r of rowsAt(o.plates)) { const [a, b] = span(r); L.hline(a, b, r, 'a', 1); if (r - 1 > yt) L.hline(a, b, r - 1, 'a', 3); }
+      // reflexo curto de metal (2 px) na canela; a coluna inteira clara formava um "L"
+      if (o.shine) for (let r = yt + 1; r < Math.min(y, yt + 3); r++) L.over(span(r)[0] + (side ? 0 : 1), r, 'c', 4);
       if (o.stripes) for (let r = yt; r < y; r++) if ((r - yt) % 2 === 0) L.hline(span(r)[0], span(r)[1], r, 'b', 2);
       if (o.wrap) for (let r = yt; r < y; r++) {
         const [a, b] = span(r);

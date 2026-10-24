@@ -3,7 +3,7 @@
 // 'skin','hair','eye','w' ou um '#hex' fixo) e um TOM 0..4 da rampa. A cor real
 // so e resolvida na composicao: trocar a cor nao muda o desenho.
 import { W, H, idx } from './skeleton.js';
-import { ramp, hexToRgb, outlineOf } from './palette.js';
+import { ramp, skinRamp, hexToRgb, outlineOf } from './palette.js';
 
 const NB4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
@@ -87,7 +87,7 @@ function resolve(c, s, colors) {
   if (c[0] === '#') return hexToRgb(ramp(c)[s]);
   const hex = colors[c];
   if (!hex) return null;
-  return hexToRgb(ramp(hex)[s]);
+  return hexToRgb((c === 'skin' ? skinRamp(hex) : ramp(hex))[s]);
 }
 
 // layers: [{ L, colors, outline }] na ordem de desenho.

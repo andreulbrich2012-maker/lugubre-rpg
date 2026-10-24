@@ -87,3 +87,22 @@ describe('itens e construcoes no prompt', () => {
     expect(r.warnings.join(' ')).toMatch(/descartad/);
   });
 });
+
+describe('itens e monstros sim/nao', () => {
+  it('o prompt pede monstros so quando o mestre quer, e avisa quando nao quer itens', () => {
+    const base = buildMapPrompt({ description: 'cripta', cols: 12, rows: 8 });
+    expect(base).not.toContain('MONSTROS');
+    const com = buildMapPrompt({ description: 'cripta', cols: 12, rows: 8, monsters: true, items: false });
+    expect(com).toContain('MONSTROS ("monsters"');
+    expect(com).toContain('NÃO quer itens');
+  });
+
+  it('monstros da resposta: so em celula livre, sem repetir, hp limitado', () => {
+    const ground = Array.from({ length: 8 }, (_, y) => (y === 0 ? '#'.repeat(12) : '.'.repeat(12)));
+    const text = JSON.stringify({ layers: { ground, objects: Array(8).fill(' '.repeat(12)) }, monsters: [
+      { name: 'Esqueleto', x: 3, y: 3, hp: 9999 }, { name: 'Na parede', x: 2, y: 0 }, { name: 'Repetido', x: 3, y: 3 }, { name: '', x: 4, y: 4 }, { name: 'Fora', x: 40, y: 2 }
+    ] });
+    const r = parseMapResponse(text, 12, 8);
+    expect(r.monsters).toEqual([{ name: 'Esqueleto', x: 3, y: 3, hp: 500 }]);
+  });
+});

@@ -686,8 +686,13 @@ export default function CampaignRoom() {
                 const cell = tileEditor.grid_size || 70;
                 try {
                   await api.patch(`/campaigns/${id}/scenes/${tileEditor.id}`, { map_kind: 'tiles', tiles: map, width: map.cols * cell, height: map.rows * cell, ...(meta?.name && /^Cena \d+$/.test(tileEditor.name) ? { name: meta.name } : {}) });
+                  // monstros que a IA sugeriu viram tokens (o mestre pode esconder ou apagar depois)
+                  const list = meta?.monsters || [];
+                  await Promise.all(list.map((m) => api.post(`/campaigns/${id}/scenes/${tileEditor.id}/tokens`, {
+                    kind: 'monster', name: m.name, x: m.x * cell, y: m.y * cell, size: 1, hp_current: m.hp, hp_max: m.hp
+                  }).catch(() => null)));
                   setTileEditor(null);
-                  notify('Mapa salvo.');
+                  notify(list.length ? `Mapa salvo com ${list.length} monstro(s).` : 'Mapa salvo.');
                   loadScene(stateRef.current.viewSceneId).catch(() => null);
                 } catch (err) { notify(err.response?.data?.message || 'Não deu para salvar o mapa.', 'error'); }
               }}

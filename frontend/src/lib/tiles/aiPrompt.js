@@ -1,7 +1,7 @@
 // Prompt para qualquer IA (servidor ou copiar/colar no ChatGPT/Claude/Gemini) gerar
 // um mapa no nosso formato, e o leitor tolerante da resposta.
 import { TILES, CATEGORIES, DEFAULT_GROUND } from './catalog.js';
-import { repairMap, ITEM_CATEGORIES, MAX_ITEMS, MAX_BUILDINGS } from './format.js';
+import { repairMap, isSolid, ITEM_CATEGORIES, MAX_ITEMS, MAX_BUILDINGS } from './format.js';
 
 export function catalogText() {
   return CATEGORIES.map((cat) => {
@@ -46,7 +46,15 @@ const EXAMPLE = {
   notes: 'Taverna fechada por paredes de pedra, porta ao sul ligada à estrada; o baú guarda moedas e uma poção.'
 };
 
-export function buildMapPrompt({ description, cols, rows }) {
+export const MAX_MONSTERS = 12;
+const MONSTER_TEXT = `MONSTROS ("monsters", até ${MAX_MONSTERS})
+- Criaturas hostis do mundo sombrio que fazem sentido no lugar (ex.: "Lobo Sombrio", "Esqueleto", "Rato gigante", "Bandido", "Aranha da cripta", "Carniçal").
+- Cada um numa célula onde dá para andar (nunca em parede, água funda ou objeto que bloqueia), longe da entrada.
+- Formato: {"name": "Esqueleto", "x": 5, "y": 3, "hp": 12}. hp entre 4 e 60.
+
+`;
+
+export function buildMapPrompt({ description, cols, rows, items = true, monsters = false }) {
   return `Você é um cartógrafo de RPG de fantasia sombria (mesa virtual "Lúgubre RPG": mundo medieval, gótico, perigoso; moeda = dracmas).
 Crie um mapa visto de cima, em grade, para: ${String(description || '').trim() || 'um mapa livre e interessante'}
 
@@ -82,7 +90,7 @@ CONSTRUÇÕES COM TELHADO ("buildings", até ${MAX_BUILDINGS})
   {"id": "b1", "x": coluna do canto esquerdo, "y": linha de cima, "w": largura, "h": altura, "name": "nome curto", "roof": "telha" | "telha-azul" | "palha" | "palha-escura" | "ardosia" | "ardosia-verde" | "madeira" | "madeira-escura"}
 - O retângulo bate exatamente com as paredes da grade (w e h ≥ 3). Masmorras, cavernas e ruínas sem teto NÃO entram em "buildings".
 
-ITENS PEGÁVEIS ("items", até ${MAX_ITEMS})
+${items ? '' : 'ITENS: o mestre NÃO quer itens neste mapa. Responda "items": [] (lista vazia) e ignore a seção abaixo.\n\n'}ITENS PEGÁVEIS ("items", até ${MAX_ITEMS})
 - Coloque itens só onde faz sentido saquear: objetos marcados "pode guardar itens" (baú, tesouro, prateleira de poções, livros, caixote, barril, ossos, corpo caído, altar, sarcófago...) ou no chão de um lugar plausível.
 - Nem todo objeto tem item. Um baú guarda de 1 a 3 itens (vários itens podem ter o mesmo x,y).
 - O x,y do item é a célula do objeto que o guarda.
@@ -92,9 +100,9 @@ ITENS PEGÁVEIS ("items", até ${MAX_ITEMS})
 - Dinheiro: um item com "dracmas" (número inteiro, normalmente 5 a 60) vai para a bolsa do personagem.
 - Formato: {"id": "i1", "x": 0, "y": 0, "name": "...", "description": "até 1 frase", "quantity": 1, "weight": 0.5, "category": "Poções"}
 
-RESPOSTA
+${monsters ? MONSTER_TEXT : ''}RESPOSTA
 Responda SOMENTE com o JSON abaixo, sem texto antes ou depois, sem \`\`\` e sem comentários:
-{"name": "...", "layers": {"ground": [...], "objects": [...]}, "buildings": [...], "items": [...], "notes": "uma frase sobre o mapa para o mestre"}
+{"name": "...", "layers": {"ground": [...], "objects": [...]}, "buildings": [...], "items": [...]${monsters ? ', "monsters": [...]' : ''}, "notes": "uma frase sobre o mapa para o mestre"}
 
 EXEMPLO (12×8, só para mostrar o formato; o seu mapa tem ${cols}×${rows}):
 ${JSON.stringify(EXAMPLE, null, 1)}`;
@@ -154,6 +162,20 @@ function rawGrid(text) {
 }
 
 // Devolve {ok, map, name, notes, warnings}. map ja vem consertado no tamanho pedido.
+// Monstros sugeridos pela IA: so em celula livre do mapa, nome curto, hp sensato.
+export function repairMonsters(list, map) {
+  const out = [];
+  for (const m of Array.isArray(list) ? list : []) {
+    const x = Math.floor(Number(m?.x)); const y = Math.floor(Number(m?.y));
+    const name = String(m?.name ?? '').trim().slice(0, 40);
+    if (!name || !(x >= 0 && y >= 0 && x < map.cols && y < map.rows) || isSolid(map, x, y)) continue;
+    if (out.some((o) => o.x === x && o.y === y)) continue;
+    out.push({ name, x, y, hp: Math.max(1, Math.min(500, Math.round(Number(m?.hp) || 10))) });
+    if (out.length >= MAX_MONSTERS) break;
+  }
+  return out;
+}
+
 export function parseMapResponse(text, cols, rows) {
   const src = String(text || '');
   const fenced = [...src.matchAll(/```[a-zA-Z]*\s*\n?([\s\S]*?)```/g)].map((m) => m[1]);
@@ -162,7 +184,7 @@ export function parseMapResponse(text, cols, rows) {
     const layers = obj && layersFrom(obj);
     if (layers) {
       const { map, warnings } = repairMap({ layers, items: extra(obj, 'items'), buildings: extra(obj, 'buildings') }, { cols, rows });
-      return { ok: true, map, name: obj.name || '', notes: obj.notes || '', warnings };
+      return { ok: true, map, name: obj.name || '', notes: obj.notes || '', warnings, monsters: repairMonsters(extra(obj, 'monsters'), map) };
     }
   }
   const grid = rawGrid(fenced[0] || src);

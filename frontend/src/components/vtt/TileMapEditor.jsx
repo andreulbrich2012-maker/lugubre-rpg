@@ -31,6 +31,27 @@ const TOOLS = [
   { id: 'item', label: 'Colocar item', icon: Gem },
   { id: 'pan', label: 'Mover a vista', icon: Hand }
 ];
+const TABS = [['pintar', 'Pintar'], ['construcoes', 'Construções'], ['itens', 'Itens'], ['ambiente', 'Ambiente']];
+const TAB_TOOLS = {
+  pintar: ['brush', 'bucket', 'rect', 'eraser', 'picker', 'pan'],
+  construcoes: ['design', 'building', 'pan'],
+  itens: ['item', 'pan'],
+  ambiente: ['pan']
+};
+
+// Pergunta de sim/nao com dois botoes grandes.
+function YesNo({ label, value, onChange }) {
+  return (
+    <div className="flex items-center gap-2" role="radiogroup" aria-label={label}>
+      <span className="text-sm text-mist">{label}</span>
+      {[[true, 'Sim'], [false, 'Não']].map(([v, l]) => (
+        <button key={l} type="button" role="radio" aria-checked={value === v} onClick={() => onChange(v)}
+          className={`rounded-md border-[3px] border-lead px-3 py-1 text-sm font-bold ${value === v ? 'lit' : 'bg-glass text-mist hover:text-bone'}`}>{l}</button>
+      ))}
+    </div>
+  );
+}
+
 const SIZES = [
   { id: 'p', label: 'Pequeno', cols: 16, rows: 12 },
   { id: 'm', label: 'Médio', cols: 24, rows: 16 },
@@ -111,10 +132,16 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
   const [result, setResult] = useState(null);
   const [build, setBuild] = useState({ wall: '#', floor: '=', roof: 'telha' });
   const [design, setDesign] = useState('casa-frente-media');
+  const [tab, setTab] = useState('pintar');
+  const [aiItems, setAiItems] = useState(true);
+  const [aiMonsters, setAiMonsters] = useState(false);
+  const [monsters, setMonsters] = useState([]);
+  // cada aba liga a ferramenta certa: menos botoes na tela
+  const goTab = (t) => { setTab(t); setTool(t === 'construcoes' ? 'design' : t === 'itens' ? 'item' : 'brush'); };
 
   const code = selected[layer];
   const aiDims = SIZES.find((x) => x.id === aiSize);
-  const prompt = useMemo(() => buildMapPrompt({ description, cols: aiDims.cols, rows: aiDims.rows }), [description, aiDims]);
+  const prompt = useMemo(() => buildMapPrompt({ description, cols: aiDims.cols, rows: aiDims.rows, items: aiItems, monsters: aiMonsters }), [description, aiDims, aiItems, aiMonsters]);
   const groups = useMemo(() => CATEGORIES
     .map((cat) => [cat, TILES.filter((t) => t.category === cat && t.layer === layer)])
     .filter(([, list]) => list.length), [layer]);
@@ -265,7 +292,9 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
     loadMap(result.map);
     const info = { name: result.name, notes: result.notes, warnings: result.warnings };
     setAiInfo(info);
-    if (andSave) onSave?.(result.map, { name: result.name, notes: result.notes });
+    const found = aiMonsters ? result.monsters || [] : [];
+    setMonsters(found);
+    if (andSave) onSave?.(result.map, { name: result.name, notes: result.notes, monsters: found });
     else setMode('manual');
   };
 
@@ -307,6 +336,11 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
               </button>
             ))}
           </div>
+
+          <div className="flex flex-wrap gap-4">
+            <YesNo label="Itens para pegar?" value={aiItems} onChange={(v) => { setAiItems(v); setResult(null); setPasted(''); }} />
+            <YesNo label="Monstros no mapa?" value={aiMonsters} onChange={(v) => { setAiMonsters(v); setResult(null); setPasted(''); }} />
+          </div>
         </section>
 
         <section className="gothic-panel flex flex-col gap-3 rounded-md p-4">
@@ -332,7 +366,7 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
               <div>
                 <p className="font-display text-2xl">{result.name || 'Mapa importado'}</p>
                 {result.notes && <p className="text-mist">{result.notes}</p>}
-                <p className="text-sm text-mist">{result.map.items.length} item(ns) pegável(is) · {result.map.buildings.length} construção(ões) com telhado</p>
+                <p className="text-sm text-mist">{result.map.items.length} item(ns) pegável(is) · {result.map.buildings.length} construção(ões) com telhado{aiMonsters ? ` · ${(result.monsters || []).length} monstro(s)` : ''}</p>
                 {result.warnings.map((w) => <p key={w} className="text-sm text-ember">{w}</p>)}
               </div>
               <div className="max-h-[55vh] overflow-auto rounded-md border-[3px] border-lead bg-abyss">
@@ -363,16 +397,22 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
         {/* Area do mapa */}
         <section className="gothic-panel flex min-w-0 flex-col gap-3 rounded-md p-3">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex overflow-hidden rounded-md border-[3px] border-lead" role="group" aria-label="Camada">
+            <div className="flex overflow-hidden rounded-md border-[3px] border-lead" role="tablist" aria-label="O que editar">
+              {TABS.map(([t, label]) => (
+                <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => goTab(t)}
+                  className={`px-3 py-1.5 text-sm font-bold ${tab === t ? 'lit' : 'bg-glass text-mist hover:text-bone'}`}>{label}</button>
+              ))}
+            </div>
+            {tab === 'pintar' && <div className="flex overflow-hidden rounded-md border-[3px] border-lead" role="group" aria-label="Camada">
               {['ground', 'objects'].map((l) => (
                 <button key={l} type="button" onClick={() => setLayer(l)} aria-pressed={layer === l}
                   className={`px-3 py-1.5 text-sm font-bold ${layer === l ? 'lit' : 'bg-glass text-mist hover:text-bone'}`}>
                   {LAYER_LABEL[l]}
                 </button>
               ))}
-            </div>
+            </div>}
             <div className="flex flex-wrap gap-1" role="group" aria-label="Ferramentas">
-              {TOOLS.map(({ id, label, icon: Icon }) => (
+              {TOOLS.filter((t) => TAB_TOOLS[tab].includes(t.id)).map(({ id, label, icon: Icon }) => (
                 <button key={id} type="button" onClick={() => setTool(id)} title={label} aria-label={label} aria-pressed={tool === id}
                   className={`grid h-10 w-10 place-items-center rounded-md border-2 border-lead ${tool === id ? 'lit' : 'bg-glass text-mist hover:text-bone'}`}>
                   <Icon size={18} />
@@ -404,7 +444,7 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
                 <BuildingSprite key={`s-${b.id}`} building={b} tiles={map} scale={zoom / 16} placed className="pointer-events-none" />
               ))}
               {buildings.map((b) => (
-                <div key={b.id} className="pointer-events-none absolute border-2 border-dashed border-ember/70" style={{ left: b.x * zoom, top: b.y * zoom, width: b.w * zoom, height: b.h * zoom }}>
+                <div key={b.id} className={`pointer-events-none absolute ${b.design ? '' : 'border-2 border-dashed border-ember/70'}`} style={{ left: b.x * zoom, top: b.y * zoom, width: b.w * zoom, height: b.h * zoom }}>
                   <span className="absolute left-0 top-0 bg-abyss/85 px-1 text-[10px] font-bold text-ember">{b.name}</span>
                 </div>
               ))}
@@ -434,7 +474,7 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
 
         {/* Lateral: paleta e IA */}
         <aside className="flex min-w-0 flex-col gap-4">
-          <section className="gothic-panel rounded-md p-3">
+          {tab === 'pintar' && <section className="gothic-panel rounded-md p-3">
             <h3 className="font-display text-xl">Blocos de {LAYER_LABEL[layer].toLowerCase()}</h3>
             <div className="mt-2 max-h-[22rem] overflow-y-auto pr-1">
               {groups.map(([cat, list]) => (
@@ -449,9 +489,9 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
                 </div>
               ))}
             </div>
-          </section>
+          </section>}
 
-          <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
+          {tab === 'ambiente' && <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
             <h3 className="font-display text-xl">Ambiente</h3>
             <div className="grid grid-cols-2 gap-2">
               <label className="text-sm text-mist">Luz da cena
@@ -472,9 +512,9 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
               </label>
             </div>
             <p className="text-xs text-mist">À noite, tochas, fogueiras, janelas e cristais brilham. A decoração (grama, flores, pedrinhas) é espalhada sozinha, sem cobrir caminhos, portas ou objetos. O estilo muda as cores do mapa inteiro (ex.: Outono, Inverno, Sépia).</p>
-          </section>
+          </section>}
 
-          {tool === 'design' && (
+          {tab === 'construcoes' && (
             <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
               <h3 className="font-display text-xl">Construção pronta</h3>
               <p className="text-sm text-mist">Escolha e clique no mapa (canto de cima-esquerda). Casas já vêm com interior pronto quando o mestre abrir a porta.</p>
@@ -482,9 +522,9 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
             </section>
           )}
 
-          {tool === 'building' && (
-            <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
-              <h3 className="font-display text-xl">Nova construção</h3>
+          {tab === 'construcoes' && (
+            <details className="gothic-panel flex flex-col gap-2 rounded-md p-3" open={tool === 'building'} onToggle={(e) => setTool(e.currentTarget.open ? 'building' : 'design')}>
+              <summary className="cursor-pointer font-display text-xl">Desenhar com paredes (avançado)</summary>
               <p className="text-sm text-mist">Arraste um retângulo no mapa: paredes em volta, piso dentro, porta embaixo e telhado.</p>
               <label className="text-sm text-mist">Parede
                 <select className="field py-1.5" value={build.wall} onChange={(e) => setBuild((b) => ({ ...b, wall: e.target.value }))}>
@@ -501,10 +541,10 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
                   {ROOFS.map((r) => <option key={r} value={r}>{ROOF_LABEL[r]}</option>)}
                 </select>
               </label>
-            </section>
+            </details>
           )}
 
-          <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
+          {tab === 'itens' && <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
             <h3 className="font-display text-xl">Itens pegáveis <span className="text-sm text-mist">({items.length}/{MAX_ITEMS})</span></h3>
             {!items.length && <p className="text-sm text-mist">Use a ferramenta “Colocar item” e clique numa célula (de preferência num baú, prateleira ou corpo caído).</p>}
             <ul className="flex max-h-[20rem] flex-col gap-2 overflow-y-auto pr-1">
@@ -529,10 +569,10 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
                 </li>
               ))}
             </ul>
-          </section>
+          </section>}
 
-          <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
-            <h3 className="font-display text-xl">Construções <span className="text-sm text-mist">({buildings.length})</span></h3>
+          {tab === 'construcoes' && <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
+            <h3 className="font-display text-xl">Construções no mapa <span className="text-sm text-mist">({buildings.length})</span></h3>
             {!buildings.length && <p className="text-sm text-mist">Use a ferramenta “Construção” e arraste um retângulo.</p>}
             <ul className="flex max-h-[16rem] flex-col gap-2 overflow-y-auto pr-1">
               {buildings.map((b) => (
@@ -546,7 +586,7 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
                 </li>
               ))}
             </ul>
-          </section>
+          </section>}
 
           <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
             <button type="button" className="btn btn-glass" onClick={() => setMode('ai')}><Sparkles size={18} /> Criar com IA</button>
@@ -577,7 +617,7 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
       <div className="lead-rule" />
       <div className="flex flex-wrap justify-end gap-2">
         {onCancel && <button type="button" className="btn btn-glass" onClick={onCancel}><X size={18} /> Cancelar</button>}
-        <button type="button" className="btn btn-lit" onClick={() => onSave?.(map, aiInfo ? { name: aiInfo.name, notes: aiInfo.notes } : {})}>
+        <button type="button" className="btn btn-lit" onClick={() => onSave?.(map, { ...(aiInfo ? { name: aiInfo.name, notes: aiInfo.notes } : {}), monsters })}>
           <Save size={18} /> Salvar mapa
         </button>
       </div>

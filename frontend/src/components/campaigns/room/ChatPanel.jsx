@@ -42,7 +42,9 @@ export default function ChatPanel({ messages, currentUserId, isMaster, content, 
       >
         {messages.map((message) => (message.message_type === 'roll'
           ? <RollLine key={message.id} message={message} />
-          : (
+          : message.message_type === 'event'
+            ? <p key={message.id} className="border-l-[3px] border-ember px-3 py-1 text-sm italic text-mist">{message.content}</p>
+            : (
             <CampaignMessageBubble
               key={message.id}
               message={message}

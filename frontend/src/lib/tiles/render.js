@@ -1,6 +1,8 @@
 // Desenho dos mapas em <canvas>. Os sprites viram um atlas uma vez so (por quadro
 // nos animados) e cada celula e um drawImage: rapido ate 80x80 a 4 fps.
-import { SIZE, TILES, DEFAULT_GROUND, getTile, tileImages } from './catalog.js';
+import { SIZE, TILES, getTile, tileImages } from './catalog.js';
+import { roofPixels } from './roofs.js';
+import { renderTerrain, renderObjects, terrainFrames, isAnimatedObject, lightSources, LIGHT_TINT } from './compose.js';
 
 export const FRAME_MS = 250; // ~4 fps: pixel art animada mais rapido que isso parece tremida
 
@@ -70,72 +72,99 @@ function getAtlas() {
   return atlas;
 }
 
-function imageCol(entry, x, y, time) {
-  if (entry.count < 2) return 0;
-  // objetos animados ficam fora de fase entre si (duas tochas nao piscam juntas);
-  // agua anda em sincronia para as ondas continuarem de uma celula para outra
-  if (entry.animated) return frameIndex(time, entry.count, entry.objects ? cellHash(x, y) % 4 : 0);
-  return cellHash(x, y) % entry.count;
+const roofCache = new Map();
+
+// Telhado de uma construcao num canvas do tamanho nativo (16 px por celula); escalar e com o CSS/drawImage.
+export function roofCanvas(b, canvas = document.createElement('canvas')) {
+  const { width, height, data } = roofPixels(b);
+  canvas.width = width;
+  canvas.height = height;
+  canvas.getContext('2d').putImageData(new ImageData(data, width, height), 0, 0);
+  return canvas;
 }
 
-export function drawMap(ctx, map, { cellSize = 48, time = 0, showGrid = false } = {}) {
+function toCanvas(img) {
+  const c = document.createElement('canvas');
+  c.width = img.w;
+  c.height = img.h;
+  c.getContext('2d').putImageData(new ImageData(img.data, img.w, img.h), 0, 0);
+  return c;
+}
+
+// Camadas pre-renderizadas por mapa (chave = o objeto layers: pegar item troca so "items" e
+// nao refaz o chao). Terreno: um canvas por quadro de agua/lava, feito na primeira vez que precisa.
+const layerCache = new WeakMap();
+function sceneLayers(map, beautify) {
+  const decor = map.decor || 'normal';
+  let c = layerCache.get(map.layers);
+  if (!c || c.beautify !== beautify || c.decor !== decor || c.cols !== map.cols) {
+    const animated = [];
+    map.layers.objects.forEach((row, y) => [...row].forEach((ch, x) => {
+      const t = getTile(ch);
+      if (t && isAnimatedObject(t)) animated.push([x, y, t]);
+    }));
+    c = { beautify, decor, cols: map.cols, frames: terrainFrames(map), terrain: [], objects: null, animated, lights: lightSources(map) };
+    layerCache.set(map.layers, c);
+  }
+  return c;
+}
+
+// light: 'dia' | 'entardecer' | 'noite' (map.light). roofs: desenha todos os telhados (previa do editor).
+export function drawMap(ctx, map, { cellSize = 48, time = 0, showGrid = false, roofs = false, beautify = true } = {}) {
   const { canvas: img, index } = getAtlas();
   const { cols, rows } = map;
-  const ground = map.layers?.ground || [];
-  const objects = map.layers?.objects || [];
-  ctx.imageSmoothingEnabled = false;
-  ctx.clearRect(0, 0, cols * cellSize, rows * cellSize);
   const s = cellSize;
-  const lights = [];
-
-  for (let y = 0; y < rows; y++) {
-    const row = ground[y] || '';
-    for (let x = 0; x < cols; x++) {
-      const e = index[row[x]] || index[DEFAULT_GROUND];
-      ctx.drawImage(img, imageCol(e, x, y, time) * SIZE, e.y, SIZE, SIZE, x * s, y * s, s, s);
-      const t = getTile(row[x]);
-      if (t?.light) lights.push([x, y, t.light, 0.35]);
-    }
+  const L = sceneLayers(map, beautify);
+  const f = L.frames > 1 ? frameIndex(time, L.frames) : 0;
+  if (!L.terrain[f]) L.terrain[f] = toCanvas(renderTerrain(map, { frame: f, beautify, decor: L.decor }));
+  if (!L.objects) L.objects = toCanvas(renderObjects(map, { beautify }));
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, cols * s, rows * s);
+  ctx.drawImage(L.terrain[f], 0, 0, cols * s, rows * s);
+  ctx.drawImage(L.objects, 0, 0, cols * s, rows * s);
+  // so os objetos animados sao redesenhados a cada quadro (fora de fase entre si)
+  for (const [x, y, t] of L.animated) {
+    const e = index[t.code];
+    ctx.drawImage(img, frameIndex(time, e.count, cellHash(x, y) % 4) * SIZE, e.y, SIZE, SIZE, x * s, y * s, s, s);
   }
 
-  // sombra projetada para baixo-direita (luz do alto-esquerda), 1 pixel do sprite
-  const px = s / SIZE;
-  for (let pass = 0; pass < 2; pass++) {
-    if (pass === 0) ctx.globalAlpha = 0.45;
-    for (let y = 0; y < rows; y++) {
-      const row = objects[y] || '';
-      for (let x = 0; x < cols; x++) {
-        const t = getTile(row[x]);
-        if (!t || t.layer !== 'objects') continue;
-        const e = { ...index[t.code], objects: true };
-        const col = imageCol(e, x, y, time) * SIZE;
-        if (pass === 0) ctx.drawImage(img, col, e.y + SIZE, SIZE, SIZE, x * s + px, y * s + px, s, s);
-        else {
-          ctx.drawImage(img, col, e.y, SIZE, SIZE, x * s, y * s, s, s);
-          if (t.light) lights.push([x, y, t.light, 0.55]);
-        }
-      }
-    }
-    ctx.globalAlpha = 1;
+  // ciclo de luz: o ceu multiplica a cor; as fontes de luz somam brilho (mais forte a noite)
+  const light = map.light || 'dia';
+  const tintHex = LIGHT_TINT[light];
+  if (tintHex) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = tintHex;
+    ctx.fillRect(0, 0, cols * s, rows * s);
+    ctx.restore();
   }
-
-  // brilho das fontes de luz (fogo, tocha, portal): soma de cor, oscila um pouco
-  if (lights.length) {
+  const sources = tintHex ? L.lights : L.lights.filter(([x, y]) => map.layers.ground[y][x] !== 'J');
+  if (sources.length) {
+    const strength = light === 'noite' ? 1.4 : light === 'entardecer' ? 0.9 : 0.5;
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    for (const [x, y, color, base] of lights) {
+    for (const [x, y, color] of sources) {
       const flick = 0.85 + 0.15 * Math.sin(time / 180 + cellHash(x, y));
       const cx = (x + 0.5) * s;
       const cy = (y + 0.5) * s;
-      const r = s * 1.8;
+      const r = s * (light === 'noite' ? 2.6 : 1.8);
       const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
       const [cr, cg, cb] = hexToRgb(color);
-      g.addColorStop(0, `rgba(${cr},${cg},${cb},${(base * flick * 0.5).toFixed(3)})`);
+      g.addColorStop(0, `rgba(${cr},${cg},${cb},${Math.min(0.9, 0.3 * strength * flick).toFixed(3)})`);
       g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
       ctx.fillStyle = g;
       ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
     }
     ctx.restore();
+  }
+
+  if (roofs) {
+    for (const b of map.buildings || []) {
+      const key = `${b.w}x${b.h}:${b.roof}`;
+      if (!roofCache.has(key)) roofCache.set(key, roofCanvas(b));
+      const rc = roofCache.get(key);
+      ctx.drawImage(rc, b.x * s, b.y * s, b.w * s, (rc.height / SIZE) * s);
+    }
   }
 
   if (showGrid) {

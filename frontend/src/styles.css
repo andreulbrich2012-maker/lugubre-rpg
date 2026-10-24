@@ -379,6 +379,24 @@ button.d20:not(:disabled):hover { filter: drop-shadow(0 0 22px rgb(var(--light) 
 @keyframes ping { from { transform: scale(.1); opacity: 1; } to { transform: scale(1.4); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .vtt-float, .vtt-ping::before, .vtt-ping::after { animation-duration: .01s; } }
 
+/* Itens pegaveis: losango de luz ambar preso no chumbo, respira devagar. */
+.vtt-loot { position: absolute; display: grid; place-items: center; padding: 0; background: none; border: 0; cursor: pointer; }
+.vtt-loot::before {
+  content: ''; width: 34%; height: 34%; transform: rotate(45deg);
+  background: radial-gradient(circle at 35% 35%, #fff3c4, #f0b04a 55%, #9a5a16);
+  border: 2px solid var(--color-lead);
+  box-shadow: 0 0 10px 3px rgba(240,176,74,.55);
+  animation: lootGlint 2.4s ease-in-out infinite;
+}
+.vtt-loot:focus-visible { outline: 3px double var(--color-ember); outline-offset: -4px; }
+@keyframes lootGlint { 0%, 100% { opacity: .7; box-shadow: 0 0 6px 1px rgba(240,176,74,.35); } 50% { opacity: 1; box-shadow: 0 0 14px 5px rgba(240,176,74,.7); } }
+/* Telhados: some/volta em 250 ms quando o interior abre. */
+.vtt-roof { position: absolute; pointer-events: none; }
+.vtt-roof canvas { width: 100%; height: 100%; image-rendering: pixelated; transition: opacity .25s cubic-bezier(.16,1,.3,1); filter: drop-shadow(0 5px 6px rgba(20,10,30,.55)); }
+.vtt-roof.is-open canvas { opacity: 0; }
+.vtt-roof:focus-visible { outline: 3px double var(--color-ember); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .vtt-loot::before { animation: none; } .vtt-roof canvas { transition: none; } }
+
 /* Rolagem em cena. */
 .dice-card { animation: diceCardIn .45s cubic-bezier(.16, 1, .3, 1) both; }
 .dice-total { animation: d20Land .45s cubic-bezier(.16, 1, .3, 1) both; }

@@ -1,12 +1,12 @@
 // Prompt para qualquer IA (servidor ou copiar/colar no ChatGPT/Claude/Gemini) gerar
 // um mapa no nosso formato, e o leitor tolerante da resposta.
 import { TILES, CATEGORIES, DEFAULT_GROUND } from './catalog.js';
-import { repairMap } from './format.js';
+import { repairMap, ITEM_CATEGORIES, MAX_ITEMS, MAX_BUILDINGS } from './format.js';
 
 export function catalogText() {
   return CATEGORIES.map((cat) => {
     const items = TILES.filter((t) => t.category === cat)
-      .map((t) => `"${t.code}" ${t.name} (${t.layer === 'ground' ? 'chão' : 'objeto'}${t.solid ? ', bloqueia' : ''})`);
+      .map((t) => `"${t.code}" ${t.name} (${t.layer === 'ground' ? 'chão' : 'objeto'}${t.solid ? ', bloqueia' : ''}${t.loot ? ', pode guardar itens' : ''})`);
     return items.length ? `${cat}: ${items.join('; ')}` : '';
   }).filter(Boolean).join('\n');
 }
@@ -35,36 +35,65 @@ const EXAMPLE = {
       'T    m     T'
     ]
   },
-  notes: 'Taverna fechada por paredes de pedra, porta ao sul ligada à estrada.'
+  items: [
+    { id: 'i1', x: 9, y: 2, name: 'Poção de cura menor', description: 'Frasco turvo que fecha cortes leves.', quantity: 1, weight: 0.5, category: 'Poções' },
+    { id: 'i2', x: 9, y: 2, name: 'Bolsa de moedas', description: 'Couro gasto, cheira a cerveja.', quantity: 1, weight: 0.2, category: 'Tesouro', dracmas: 25 },
+    { id: 'i3', x: 9, y: 4, name: 'Corda de cânhamo', description: '10 metros, um pouco úmida.', quantity: 1, weight: 1, category: 'Achados' }
+  ],
+  buildings: [
+    { id: 'b1', x: 1, y: 1, w: 10, h: 5, name: 'Taverna do Corvo', roof: 'palha' }
+  ],
+  notes: 'Taverna fechada por paredes de pedra, porta ao sul ligada à estrada; o baú guarda moedas e uma poção.'
 };
 
 export function buildMapPrompt({ description, cols, rows }) {
-  return `Você é um cartógrafo de RPG de fantasia sombria (mesa virtual "Lúgubre RPG").
+  return `Você é um cartógrafo de RPG de fantasia sombria (mesa virtual "Lúgubre RPG": mundo medieval, gótico, perigoso; moeda = dracmas).
 Crie um mapa visto de cima, em grade, para: ${String(description || '').trim() || 'um mapa livre e interessante'}
 
-FORMATO
-- A grade tem ${cols} colunas e ${rows} linhas.
-- Há duas camadas, cada uma com EXATAMENTE ${rows} textos de EXATAMENTE ${cols} caracteres.
+TAMANHO (obrigatório)
+- EXATAMENTE ${cols} colunas e ${rows} linhas.
+- "ground" e "objects": cada uma é uma lista de EXATAMENTE ${rows} textos, cada texto com EXATAMENTE ${cols} caracteres.
+- Coordenadas: x = coluna (0 a ${cols - 1}, da esquerda para a direita), y = linha (0 a ${rows - 1}, de cima para baixo).
+
+CAMADAS
 - "ground" (chão): todo caractere é um código de chão. Vazio = "${DEFAULT_GROUND}" (grama).
-- "objects" (objetos por cima do chão): use espaço " " para célula vazia; só códigos de objeto.
+- "objects" (por cima do chão): espaço " " = célula vazia; só códigos de objeto.
 
 CÓDIGOS (cada caractere é um bloco; "bloqueia" = não dá para andar por cima)
 ${catalogText()}
 
-REGRAS
-- Paredes ("#", "B", "M") fecham os cômodos; portas ("D" ou "X") e janelas ("J") ficam DENTRO da linha da parede.
-- Todo cômodo tem pelo menos uma porta; caminhos/estradas ligam as entradas.
-- Água, pântano e lava formam áreas contínuas, não pontos soltos; use ponte ("-") para atravessar rio.
-- Paredes, portas, escadas, água e pisos só na camada "ground"; móveis, árvores e decoração só em "objects".
-- Objeto que bloqueia não pode tapar porta nem fechar a única passagem.
-- Bordas coerentes: floresta, água ou paredes nas margens; nada cortado pela metade.
-- Não invente códigos e não use aspas nem barra invertida na grade.
+COMO FAZER UM MAPA BOM
+- Pense primeiro na planta: onde ficam as construções, os caminhos, a água e a natureza.
+- Construções e salas são retângulos FECHADOS por paredes ("#", "B", "M" ou "H" em caverna) com piso dentro ("_", "=", "Q"...).
+- Toda sala tem pelo menos uma porta ("D") DENTRO da linha da parede; janelas ("J") também ficam na parede.
+- Caminhos/estradas (";", ",", "c") ligam as portas entre si e às bordas do mapa.
+- Água, pântano e lava formam áreas contínuas (lagos, rios), nunca pontos soltos; ponte ("-") atravessa rio.
+- Fora das construções: grama, terra, árvores e arbustos em grupos, bordas naturais (floresta, água, rocha).
+- Interior mobiliado com sentido (taverna: mesas, cadeiras, barris; cripta: sarcófagos, ossos, altar).
+- Objeto que bloqueia nunca tapa porta nem fecha a única passagem.
+- Paredes, portas, escadas, água e pisos só em "ground"; móveis, árvores e decoração só em "objects".
+- Não invente códigos e não use aspas nem barra invertida dentro da grade.
+
+CONSTRUÇÕES COM TELHADO ("buildings", até ${MAX_BUILDINGS})
+- Para cada casa/taverna/capela com paredes, registre o retângulo INTEIRO incluindo as paredes:
+  {"id": "b1", "x": coluna do canto esquerdo, "y": linha de cima, "w": largura, "h": altura, "name": "nome curto", "roof": "telha" | "palha" | "ardosia" | "madeira"}
+- O retângulo bate exatamente com as paredes da grade (w e h ≥ 3). Masmorras, cavernas e ruínas sem teto NÃO entram em "buildings".
+
+ITENS PEGÁVEIS ("items", até ${MAX_ITEMS})
+- Coloque itens só onde faz sentido saquear: objetos marcados "pode guardar itens" (baú, tesouro, prateleira de poções, livros, caixote, barril, ossos, corpo caído, altar, sarcófago...) ou no chão de um lugar plausível.
+- Nem todo objeto tem item. Um baú guarda de 1 a 3 itens (vários itens podem ter o mesmo x,y).
+- O x,y do item é a célula do objeto que o guarda.
+- Nomes em português, no clima sombrio do mundo: "Poção de cura menor", "Chave de ferro torta", "Pergaminho de luz", "Erva-de-sangue", "Adaga enferrujada", "Bolsa de moedas".
+- Valores pequenos e sensatos, nada poderoso demais: quantity de 1 a 5, weight em kg (0.1 a 5).
+- category: ${ITEM_CATEGORIES.map((c) => `"${c}"`).join(', ')}.
+- Dinheiro: um item com "dracmas" (número inteiro, normalmente 5 a 60) vai para a bolsa do personagem.
+- Formato: {"id": "i1", "x": 0, "y": 0, "name": "...", "description": "até 1 frase", "quantity": 1, "weight": 0.5, "category": "Poções"}
 
 RESPOSTA
-Responda SOMENTE com este JSON, sem texto antes ou depois e sem comentários:
-{"name": "...", "layers": {"ground": [...], "objects": [...]}, "notes": "uma frase sobre o mapa"}
+Responda SOMENTE com o JSON abaixo, sem texto antes ou depois, sem \`\`\` e sem comentários:
+{"name": "...", "layers": {"ground": [...], "objects": [...]}, "buildings": [...], "items": [...], "notes": "uma frase sobre o mapa para o mestre"}
 
-EXEMPLO (12×8, só para mostrar o formato):
+EXEMPLO (12×8, só para mostrar o formato; o seu mapa tem ${cols}×${rows}):
 ${JSON.stringify(EXAMPLE, null, 1)}`;
 }
 
@@ -97,6 +126,9 @@ function layersFrom(obj) {
   return null;
 }
 
+// items/buildings podem vir na raiz, em "tiles" ou em "map" (cada IA embrulha de um jeito).
+const extra = (obj, key) => obj?.[key] ?? obj?.tiles?.[key] ?? obj?.map?.[key];
+
 // Ultimo recurso: linhas que parecem grade crua (so codigos de chao/objeto).
 function rawGrid(text) {
   const codes = new Set(TILES.map((t) => t.code));
@@ -126,7 +158,7 @@ export function parseMapResponse(text, cols, rows) {
     const obj = findJsonObjects(chunk)[0];
     const layers = obj && layersFrom(obj);
     if (layers) {
-      const { map, warnings } = repairMap({ layers }, { cols, rows });
+      const { map, warnings } = repairMap({ layers, items: extra(obj, 'items'), buildings: extra(obj, 'buildings') }, { cols, rows });
       return { ok: true, map, name: obj.name || '', notes: obj.notes || '', warnings };
     }
   }

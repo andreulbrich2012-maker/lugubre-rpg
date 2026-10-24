@@ -16,6 +16,7 @@ import NotesPanel from '../components/campaigns/room/NotesPanel';
 import SheetsPanel from '../components/campaigns/room/SheetsPanel';
 import { useCampaignFeed } from '../hooks/useCampaignFeed';
 import { api } from '../lib/api';
+import { PICKUP_RANGE, tokenItemDistance } from '../lib/tiles/format';
 import { useAuth } from '../store/authStore';
 
 const TileMapEditor = lazy(() => import('../components/vtt/TileMapEditor'));
@@ -177,6 +178,9 @@ export default function CampaignRoom() {
           }
           setScenes((cur) => cur.map((s) => (s.id === p.scene?.id ? { ...s, ...p.scene } : s)));
           break;
+        case 'scene:items':
+          if (p.sceneId === sid) setScene((cur) => (cur?.tiles ? { ...cur, tiles: { ...cur.tiles, items: p.items } } : cur));
+          break;
         case 'initiative': case 'combat':
           if (p.sceneId === sid) setScene((cur) => (cur ? { ...cur, ...p } : cur));
           break;
@@ -248,6 +252,31 @@ export default function CampaignRoom() {
     const dist = Math.hypot(pos.x - t.x, pos.y - t.y) / cell;
     return (scene.turn_state?.moved || 0) + dist <= (scene.movement_per_turn || 6) + 0.25;
   }, [isMaster, scene]);
+
+  // Mesmas regras do servidor, so para explicar no botao por que nao da para pegar.
+  const pickupBlock = useCallback((item) => {
+    if (!scene || scene.mode === 'prep') return 'A mesa está em preparação.';
+    if (!myToken) return 'Coloque seu personagem no mapa primeiro.';
+    if (scene.mode === 'combat') {
+      if (!isMyTurn) return 'Não é o seu turno.';
+      if (scene.turn_state?.action_used) return 'Você já usou sua ação neste turno.';
+    }
+    if (tokenItemDistance(myToken, item, scene.grid_size || 70) > PICKUP_RANGE) return 'Chegue mais perto para pegar.';
+    return null;
+  }, [scene, myToken, isMyTurn]);
+
+  const pickup = useCallback(async (item, characterId) => {
+    try {
+      const { data } = await api.post(`/campaigns/${id}/scenes/${scene.id}/pickup`, { itemId: item.id, ...(characterId ? { characterId } : {}) });
+      // some na hora para quem pegou; o evento scene:items confirma para todos
+      setScene((cur) => (cur?.tiles ? { ...cur, tiles: { ...cur.tiles, items: (cur.tiles.items || []).filter((it) => it.id !== item.id) } } : cur));
+      notify(data.received?.kind === 'dracmas' ? `+${data.received.dracmas} dracmas na bolsa.` : `${item.name} foi para o inventário.`);
+      setSheetReload((n) => n + 1);
+    } catch (err) {
+      notify(err.response?.data?.message || 'Não deu para pegar.', 'error');
+      loadScene(stateRef.current.viewSceneId).catch(() => null);
+    }
+  }, [id, scene?.id, notify, loadScene]);
 
   const moveToken = useCallback(async (t, x, y) => {
     try {
@@ -446,6 +475,9 @@ export default function CampaignRoom() {
                 pings={pings}
                 onPing={ping}
                 budget={budget}
+                myTokenId={myToken?.id}
+                onPickup={pickup}
+                pickupBlock={pickupBlock}
               />
             ) : (
               <div className="grid h-full min-h-[50svh] place-items-center bg-[#050407] p-6 text-center">
@@ -572,7 +604,6 @@ export default function CampaignRoom() {
             <TileMapEditor
               initialMap={tileEditor.map_kind === 'tiles' ? tileEditor.tiles : null}
               onCancel={() => setTileEditor(null)}
-              generate={async (body) => (await api.post(`/campaigns/${id}/maps/generate`, body)).data}
               onSave={async (map, meta) => {
                 const cell = tileEditor.grid_size || 70;
                 try {

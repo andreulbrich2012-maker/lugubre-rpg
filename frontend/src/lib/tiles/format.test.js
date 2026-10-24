@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  emptyMap, validateMap, repairMap, resizeMap, setCell, floodFill, rectFill, isSolid, canMoveTo, serializeMap, cloneMap
+  emptyMap, validateMap, repairMap, resizeMap, setCell, floodFill, rectFill, isSolid, canMoveTo, serializeMap, cloneMap,
+  placeBuilding, addItem, updateItem, removeItem
 } from './format.js';
 
 describe('formato do mapa', () => {
@@ -74,5 +75,59 @@ describe('formato do mapa', () => {
     const c = cloneMap(m);
     c.layers.ground[0] = '####';
     expect(m.layers.ground[0]).toBe('....');
+  });
+});
+
+describe('itens pegaveis e construcoes', () => {
+  it('repairMap descarta itens fora do mapa, limita valores e corta textos', () => {
+    const { map, warnings } = repairMap({
+      layers: { ground: ['....', '....', '....', '....'] },
+      items: [
+        { id: 'a', x: 1, y: 2, name: 'Poção de cura', quantity: 0, weight: -3, category: 'poções', description: 'x'.repeat(300) },
+        { id: 'a', x: 2, y: 2, name: 'N'.repeat(90), quantity: 5000, weight: 2.345, category: 'Inventada', dracmas: 12.6 },
+        { x: 9, y: 0, name: 'Fora' },
+        { x: 0, y: 0, name: '   ' }
+      ]
+    });
+    expect(map.items).toHaveLength(2);
+    const [a, b] = map.items;
+    expect(a).toMatchObject({ id: 'a', quantity: 1, weight: 0, category: 'Poções' });
+    expect(a.description).toHaveLength(200);
+    expect(b.id).not.toBe('a');
+    expect(b.name).toHaveLength(60);
+    expect(b).toMatchObject({ quantity: 999, weight: 2.35, category: 'Achados', dracmas: 13 });
+    expect(warnings.join(' ')).toMatch(/2 item/);
+    expect(validateMap(map).ok).toBe(true);
+  });
+
+  it('construcoes: dentro do mapa e no minimo 3x3; telhado desconhecido vira telha', () => {
+    const { map } = repairMap({
+      layers: { ground: Array(6).fill('......') },
+      buildings: [
+        { x: 0, y: 0, w: 4, h: 3, name: 'Casa', roof: 'Ardósia' },
+        { x: 3, y: 3, w: 4, h: 3 },
+        { x: 0, y: 3, w: 2, h: 3 },
+        { x: 1, y: 3, w: 3, h: 3, roof: 'ouro' }
+      ]
+    });
+    expect(map.buildings.map((b) => [b.name, b.roof])).toEqual([['Casa', 'ardosia'], ['Construção', 'telha']]);
+    expect(validateMap({ ...map, buildings: [{ id: 'x', x: 5, y: 5, w: 3, h: 3, name: 'a', roof: 'telha' }] }).ok).toBe(false);
+  });
+
+  it('placeBuilding cerca de parede, poe piso, porta embaixo e registra o telhado', () => {
+    const m = placeBuilding(emptyMap(8, 6), 1, 1, 5, 4, { wall: 'B', floor: '_', roof: 'palha', name: 'Casa' });
+    expect(m.layers.ground.slice(1, 5)).toEqual(['.BBBBB..', '.B___B..', '.B___B..', '.BBDBB..']);
+    expect(m.buildings[0]).toMatchObject({ x: 1, y: 1, w: 5, h: 4, roof: 'palha', name: 'Casa' });
+    expect(placeBuilding(m, 0, 0, 1, 1)).toBe(m); // menor que 3x3
+  });
+
+  it('itens: adicionar, editar, remover e cortar no redimensionar', () => {
+    let m = addItem(emptyMap(6, 6), 5, 5, { name: 'Chave' });
+    const id = m.items[0].id;
+    m = updateItem(m, id, { quantity: 3 });
+    expect(m.items[0]).toMatchObject({ name: 'Chave', quantity: 3, x: 5, y: 5 });
+    expect(resizeMap(m, 5, 5).items).toEqual([]);
+    expect(removeItem(m, id).items).toEqual([]);
+    expect(JSON.parse(serializeMap(m)).items).toHaveLength(1);
   });
 });

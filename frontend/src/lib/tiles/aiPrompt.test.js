@@ -66,3 +66,24 @@ describe('parseMapResponse', () => {
     expect(r.warnings[0]).toMatch(/Não encontrei/);
   });
 });
+
+describe('itens e construcoes no prompt', () => {
+  it('pede items e buildings e o exemplo traz os dois', () => {
+    const p = buildMapPrompt({ description: 'cripta', cols: 16, rows: 12 });
+    expect(p).toMatch(/"items"/);
+    expect(p).toMatch(/"buildings"/);
+    expect(p).toContain('pode guardar itens');
+    expect(p).toContain('x = coluna (0 a 15');
+    const r = parseMapResponse(p.slice(p.indexOf('EXEMPLO')), 12, 8);
+    expect(r.map.items.length).toBe(3);
+    expect(r.map.buildings[0]).toMatchObject({ x: 1, y: 1, w: 10, h: 5, roof: 'palha' });
+    expect(r.map.items.find((it) => it.dracmas)?.dracmas).toBe(25);
+  });
+
+  it('le items dentro de "map" e conserta os invalidos', () => {
+    const r = parseMapResponse(JSON.stringify({ map: { ...payload, items: [{ x: 1, y: 1, name: 'Ossos de rato' }, { x: 40, y: 1, name: 'Fora' }] } }), 6, 4);
+    expect(r.ok).toBe(true);
+    expect(r.map.items.map((it) => it.name)).toEqual(['Ossos de rato']);
+    expect(r.warnings.join(' ')).toMatch(/descartad/);
+  });
+});

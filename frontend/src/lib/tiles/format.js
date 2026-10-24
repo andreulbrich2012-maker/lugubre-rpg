@@ -1,5 +1,7 @@
 // Formato do mapa (o backend valida igual):
-// {cols, rows, layers: {ground: [rows de cols chars], objects: [idem]}}
+// {cols, rows, layers: {ground: [rows de cols chars], objects: [idem]},
+//  items: [{id, x, y, name, description, quantity, weight, category, dracmas?}],   (pegaveis, max 60)
+//  buildings: [{id, x, y, w, h, name, roof}]}                                      (telhados, max 30)
 // Funcoes puras: sempre devolvem um mapa novo (o desfazer guarda as versoes antigas).
 import { DEFAULT_GROUND, EMPTY_OBJECT, getTile } from './catalog.js';
 
@@ -11,6 +13,67 @@ const emptyCode = (layer) => (layer === 'ground' ? DEFAULT_GROUND : EMPTY_OBJECT
 const clampSize = (n) => Math.min(MAX_SIZE, Math.max(MIN_SIZE, Math.round(Number(n)) || MIN_SIZE));
 const PRINTABLE = /^[\x20-\x7e]*$/;
 
+export const MAX_ITEMS = 60;
+export const MAX_BUILDINGS = 30;
+export const ITEM_CATEGORIES = ['Achados', 'Armas', 'Armaduras', 'Poções', 'Tesouro', 'Livros', 'Ingredientes', 'Outros'];
+export const ROOF_TYPES = ['telha', 'palha', 'ardosia', 'madeira'];
+const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
+const num = (v, min, max, dflt) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : dflt;
+};
+const text = (v, max) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+export const shortId = () => Math.random().toString(36).slice(2, 10);
+
+// Itens pegaveis vindos da IA/colagem/editor: descarta o que esta fora do mapa ou sem nome,
+// limita quantidade/peso/textos e garante id unico. Devolve {items, dropped}.
+export function repairItems(list, cols, rows) {
+  const items = [];
+  const ids = new Set();
+  let dropped = 0;
+  for (const raw of Array.isArray(list) ? list : []) {
+    const x = Math.floor(Number(raw?.x));
+    const y = Math.floor(Number(raw?.y));
+    const name = text(raw?.name, 60);
+    if (!name || !(x >= 0 && y >= 0 && x < cols && y < rows) || items.length >= MAX_ITEMS) { dropped++; continue; }
+    let id = ID_RE.test(String(raw.id ?? '')) ? String(raw.id) : shortId();
+    while (ids.has(id)) id = shortId();
+    ids.add(id);
+    const item = {
+      id, x, y, name,
+      description: text(raw.description, 200),
+      quantity: Math.round(num(raw.quantity, 1, 999, 1)),
+      weight: Math.round(num(raw.weight, 0, 1000, 0) * 100) / 100,
+      category: ITEM_CATEGORIES.find((c) => c.toLowerCase() === String(raw.category ?? '').toLowerCase()) || 'Achados'
+    };
+    const dracmas = Math.round(num(raw.dracmas, 0, 100000, 0));
+    if (dracmas > 0) item.dracmas = dracmas;
+    items.push(item);
+  }
+  return { items, dropped };
+}
+
+// Construcoes (telhados): retangulo inteiro dentro do mapa, minimo 3x3. Devolve {buildings, dropped}.
+export function repairBuildings(list, cols, rows) {
+  const buildings = [];
+  const ids = new Set();
+  let dropped = 0;
+  for (const raw of Array.isArray(list) ? list : []) {
+    const [x, y, w, h] = ['x', 'y', 'w', 'h'].map((k) => Math.floor(Number(raw?.[k])));
+    const ok = x >= 0 && y >= 0 && w >= 3 && h >= 3 && x + w <= cols && y + h <= rows;
+    if (!ok || buildings.length >= MAX_BUILDINGS) { dropped++; continue; }
+    let id = ID_RE.test(String(raw.id ?? '')) ? String(raw.id) : shortId();
+    while (ids.has(id)) id = shortId();
+    ids.add(id);
+    const roof = String(raw.roof ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    buildings.push({ id, x, y, w, h, name: text(raw.name, 60) || 'Construção', roof: ROOF_TYPES.includes(roof) ? roof : 'telha' });
+  }
+  return { buildings, dropped };
+}
+
+export const itemAt = (map, x, y) => (map.items || []).find((it) => it.x === x && it.y === y) || null;
+export const buildingAt = (map, x, y) => (map.buildings || []).find((b) => x >= b.x && y >= b.y && x < b.x + b.w && y < b.y + b.h) || null;
+
 export function emptyMap(cols = 16, rows = 12) {
   const c = clampSize(cols);
   const r = clampSize(rows);
@@ -20,16 +83,21 @@ export function emptyMap(cols = 16, rows = 12) {
     layers: {
       ground: Array.from({ length: r }, () => DEFAULT_GROUND.repeat(c)),
       objects: Array.from({ length: r }, () => EMPTY_OBJECT.repeat(c))
-    }
+    },
+    items: [],
+    buildings: []
   };
 }
 
 export function cloneMap(map) {
-  return { cols: map.cols, rows: map.rows, layers: { ground: [...map.layers.ground], objects: [...map.layers.objects] } };
+  return {
+    cols: map.cols, rows: map.rows, layers: { ground: [...map.layers.ground], objects: [...map.layers.objects] },
+    items: (map.items || []).map((it) => ({ ...it })), buildings: (map.buildings || []).map((b) => ({ ...b }))
+  };
 }
 
 export function serializeMap(map) {
-  return JSON.stringify({ cols: map.cols, rows: map.rows, layers: map.layers });
+  return JSON.stringify({ cols: map.cols, rows: map.rows, layers: map.layers, items: map.items || [], buildings: map.buildings || [] });
 }
 
 export function validateMap(map) {
@@ -51,6 +119,14 @@ export function validateMap(map) {
         if (!t || t.layer !== layer) { errors.push(`Camada "${layer}", linha ${y + 1}: código "${ch}" não vale aqui.`); break; }
       }
     });
+  }
+  if (map.items !== undefined) {
+    if (!Array.isArray(map.items) || map.items.length > MAX_ITEMS) errors.push(`Itens: no máximo ${MAX_ITEMS}.`);
+    else if (repairItems(map.items, cols, rows).dropped) errors.push('Há item fora do mapa ou sem nome.');
+  }
+  if (map.buildings !== undefined) {
+    if (!Array.isArray(map.buildings) || map.buildings.length > MAX_BUILDINGS) errors.push(`Construções: no máximo ${MAX_BUILDINGS}.`);
+    else if (repairBuildings(map.buildings, cols, rows).dropped) errors.push('Há construção fora do mapa ou menor que 3×3.');
   }
   return { ok: errors.length === 0, errors };
 }
@@ -96,6 +172,12 @@ export function repairMap(input, { cols, rows } = {}) {
   if (moved) warnings.push(`${moved} bloco(s) estavam na camada errada e foram movidos.`);
   map.layers.ground = g.map((row) => row.join(''));
   map.layers.objects = o.map((row) => row.join(''));
+  const it = repairItems(input?.items, c, r);
+  const bd = repairBuildings(input?.buildings, c, r);
+  map.items = it.items;
+  map.buildings = bd.buildings;
+  if (it.dropped) warnings.push(`${it.dropped} item(ns) fora do mapa ou sem nome foram descartados.`);
+  if (bd.dropped) warnings.push(`${bd.dropped} construção(ões) fora do mapa ou pequenas demais foram descartadas.`);
   return { map, warnings };
 }
 
@@ -105,7 +187,53 @@ export function resizeMap(map, cols, rows) {
   const r = clampSize(rows);
   const fit = (data, layer) => Array.from({ length: r }, (_, y) =>
     (data[y] ?? '').slice(0, c).padEnd(c, emptyCode(layer)));
-  return { cols: c, rows: r, layers: { ground: fit(map.layers.ground, 'ground'), objects: fit(map.layers.objects, 'objects') } };
+  return {
+    cols: c, rows: r, layers: { ground: fit(map.layers.ground, 'ground'), objects: fit(map.layers.objects, 'objects') },
+    items: (map.items || []).filter((it) => it.x < c && it.y < r),
+    buildings: (map.buildings || []).filter((b) => b.x + b.w <= c && b.y + b.h <= r)
+  };
+}
+
+// ---- itens e construcoes (editor) ----
+export function addItem(map, x, y, fields = {}) {
+  if (!inside(map, x, y) || (map.items || []).length >= MAX_ITEMS) return map;
+  const [item] = repairItems([{ name: 'Item achado', ...fields, x, y }], map.cols, map.rows).items;
+  return { ...map, items: [...(map.items || []), item] };
+}
+export function updateItem(map, id, patch) {
+  return { ...map, items: (map.items || []).map((it) => (it.id === id ? repairItems([{ ...it, ...patch }], map.cols, map.rows).items[0] || it : it)) };
+}
+export const removeItem = (map, id) => ({ ...map, items: (map.items || []).filter((it) => it.id !== id) });
+export function updateBuilding(map, id, patch) {
+  return { ...map, buildings: (map.buildings || []).map((b) => (b.id === id ? repairBuildings([{ ...b, ...patch }], map.cols, map.rows).buildings[0] || b : b)) };
+}
+export const removeBuilding = (map, id) => ({ ...map, buildings: (map.buildings || []).filter((b) => b.id !== id) });
+
+// Ferramenta "Construcao": paredes no perimetro, piso dentro, porta no meio da parede de baixo
+// e o registro do telhado. Objetos em cima das paredes saem (nao da para ter arvore na parede).
+export function placeBuilding(map, x0, y0, x1, y1, { wall = '#', floor = '=', roof = 'telha', name = 'Construção' } = {}) {
+  const x = Math.max(0, Math.min(x0, x1));
+  const y = Math.max(0, Math.min(y0, y1));
+  const w = Math.min(map.cols - 1, Math.max(x0, x1)) - x + 1;
+  const h = Math.min(map.rows - 1, Math.max(y0, y1)) - y + 1;
+  if (w < 3 || h < 3 || (map.buildings || []).length >= MAX_BUILDINGS) return map;
+  const g = map.layers.ground.map((row) => [...row]);
+  const o = map.layers.objects.map((row) => [...row]);
+  for (let cy = y; cy < y + h; cy++) {
+    for (let cx = x; cx < x + w; cx++) {
+      const edge = cx === x || cy === y || cx === x + w - 1 || cy === y + h - 1;
+      g[cy][cx] = edge ? wall : floor;
+      if (edge) o[cy][cx] = EMPTY_OBJECT;
+    }
+  }
+  const door = x + Math.floor(w / 2);
+  g[y + h - 1][door] = 'D';
+  const [b] = repairBuildings([{ x, y, w, h, name, roof }], map.cols, map.rows).buildings;
+  return {
+    ...map,
+    layers: { ground: g.map((r) => r.join('')), objects: o.map((r) => r.join('')) },
+    buildings: [...(map.buildings || []), b]
+  };
 }
 
 export function getCell(map, layer, x, y) {
@@ -170,4 +298,17 @@ export function canMoveTo(map, tokens, x, y, selfId) {
   const cx = Math.floor(x);
   const cy = Math.floor(y);
   return !(tokens || []).some((t) => t.id !== selfId && Math.floor(t.x) === cx && Math.floor(t.y) === cy);
+}
+
+// Distancia (em passos) do centro do token ao centro da celula do item; o servidor usa a mesma conta.
+export const PICKUP_RANGE = 1.5;
+export function tokenItemDistance(token, item, cell) {
+  const half = ((token.size || 1) * cell) / 2;
+  return Math.hypot((token.x + half) / cell - (item.x + 0.5), (token.y + half) / cell - (item.y + 0.5));
+}
+
+// Construcao onde o centro do token esta (token x,y em px, canto de cima-esquerda).
+export function tokenBuilding(map, token, cell) {
+  const half = ((token.size || 1) * cell) / 2;
+  return buildingAt(map, Math.floor((token.x + half) / cell), Math.floor((token.y + half) / cell));
 }

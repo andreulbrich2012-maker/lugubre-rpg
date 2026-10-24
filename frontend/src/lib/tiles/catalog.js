@@ -7,23 +7,25 @@ export const SIZE = 16;
 export const DEFAULT_GROUND = '.';
 export const EMPTY_OBJECT = ' ';
 
-// Paleta mestre: noite, tons apagados (nada de neon), rampas de 4 a 6 tons.
+// Paleta mestre (24/10, direcao de arte "beleza de Stardew"): quente e saturada, rampas com
+// hue shifting (sombra puxa para azul/roxo, luz para amarelo/creme), contorno colorido escuro
+// (nada de preto puro). O clima sombrio do Lugubre vem do ciclo de luz da cena (noite/entardecer).
 const PAL = {
-  k: '#0d0c12', K: '#1a1822', // contorno
-  1: '#26242e', 2: '#36333f', 3: '#4a4654', 4: '#615c6a', 5: '#7d7885', 6: '#a19ca6', // pedra
-  g: '#1a2a1e', h: '#223826', i: '#2c4a2f', j: '#3a5e38', l: '#4f7444', m: '#6d8f55', // grama
-  n: '#241913', o: '#36251b', p: '#4d3324', q: '#684631', r: '#87603f', s: '#a67d55', // madeira/terra
-  t: '#5e5040', u: '#7d6c50', v: '#9f8c66', w: '#c0ad82', // areia
-  x: '#0c1624', y: '#13243a', z: '#1b3651', A: '#264c69', B: '#3b6c85', C: '#7fa6b4', // agua
-  D: '#7d879a', E: '#a6b0c0', G: '#d4dce6', // neve / teia
-  H: '#2e0c0a', I: '#5e1810', J: '#9a2e18', L: '#cc5a24', M: '#eb9a3c', N: '#f6d27e', // fogo/lava
-  O: '#1e2419', Q: '#2d3523', R: '#424a2f', S: '#5b6338', // pantano
-  T: '#24152f', U: '#3f2552', V: '#613a7e', X: '#8c62aa', Y: '#bb94d6', // arcano
-  Z: '#5a4217', 7: '#8f6a24', 8: '#c49a3e', 9: '#e6c56a', // ouro
-  a: '#33101a', b: '#52192a', c: '#7a2632', d: '#a2423f', // tecido vermelho
-  e: '#183844', f: '#2a6470', 0: '#4f9fa2', P: '#a8e2d4', // cristal
-  F: '#b9ae94', W: '#e2d8c0', // osso
-  '+': '#5d7a2e', '*': '#8fae48', '^': '#c6d67a' // acido (verde apagado, nada de neon)
+  k: '#2a1c2e', K: '#3c2a3e', // contorno (ameixa escura)
+  1: '#3b3452', 2: '#524866', 3: '#6d627c', 4: '#8a7f8e', 5: '#ab9f9c', 6: '#d2c4ae', // pedra
+  g: '#1d4a3e', h: '#2b6a40', i: '#468c3a', j: '#5fa53f', l: '#88c04a', m: '#bcd96c', // grama
+  n: '#3d2230', o: '#5c3328', p: '#7d4a2e', q: '#9e6635', r: '#c08746', s: '#e0ad66', // madeira/terra
+  t: '#a07246', u: '#c69a5c', v: '#e2bf7c', w: '#f4dda2', // areia
+  x: '#1c2860', y: '#22468c', z: '#2c6cb0', A: '#3a92cc', B: '#5cb8e0', C: '#c4eef2', // agua
+  D: '#9fb0d8', E: '#cfdcf2', G: '#f6f9ff', // neve / teia
+  H: '#5a1a30', I: '#9c2a26', J: '#d4482c', L: '#f07c2e', M: '#ffb64a', N: '#ffe48a', // fogo/lava
+  O: '#263a32', Q: '#3a5034', R: '#56683a', S: '#7a8a4c', // pantano
+  T: '#2e1e4c', U: '#4a2e7a', V: '#7048ac', X: '#9c6cd4', Y: '#caa4f2', // arcano
+  Z: '#7c4a1c', 7: '#b47c28', 8: '#e4ae3c', 9: '#ffe27c', // ouro
+  a: '#4a1a32', b: '#7c2238', c: '#ac3440', d: '#d8584c', // tecido vermelho
+  e: '#1e4a62', f: '#2c8098', 0: '#4cbcc6', P: '#bcf6ea', // cristal
+  F: '#d8c6a2', W: '#faefd6', // osso
+  '+': '#5a8c2c', '*': '#90c642', '^': '#d2ee7c' // acido
 };
 
 // Desloca as linhas na horizontal (com volta): usado para a agua/lava "correr".
@@ -2049,6 +2051,18 @@ const EXTRA_TILES = [
 ];
 
 export const TILES = [...BASE_TILES, ...EXTRA_TILES];
+
+// loot: objeto onde faz sentido achar item pegavel (so dica para a IA e o editor; quem decide e a IA/mestre).
+const LOOT_CODES = 'C$78&9qukmNfx4' + "52a3'E";
+// wall: parede que escolhe o desenho pelo vizinho (topo x face). face: sempre de frente
+// (porta, janela, portao, tocha na parede: so fazem sentido vistos de frente).
+const WALL_CODES = '#BMHZ?';
+const FACE_CODES = 'DXJ()/]';
+for (const t of TILES) {
+  if (LOOT_CODES.includes(t.code)) t.loot = true;
+  if (WALL_CODES.includes(t.code)) t.wall = true;
+  if (FACE_CODES.includes(t.code)) { t.wall = true; t.face = true; }
+}
 
 export const TILE_BY_CODE = Object.fromEntries(TILES.map((t) => [t.code, t]));
 

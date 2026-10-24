@@ -1,8 +1,29 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Crosshair, LocateFixed, Minus, Plus } from 'lucide-react';
+import { Crosshair, Eye, EyeOff, Hand, LocateFixed, Minus, Plus, X } from 'lucide-react';
 import TileMapCanvas from './TileMapCanvas';
 import Crack from '../glass/Crack';
-import { isSolid } from '../../lib/tiles/format';
+import { buildingAt, isSolid, PICKUP_RANGE, tokenBuilding, tokenItemDistance } from '../../lib/tiles/format';
+import { roofCanvas } from '../../lib/tiles/render';
+import { EAVE_SHADOW, roofRows } from '../../lib/tiles/roofs';
+
+// Telhado de uma construcao: canvas no tamanho nativo (16 px/celula), o CSS escala nitido.
+function Roof({ building, open, cell, onToggle }) {
+  const ref = useRef(null);
+  useEffect(() => { if (ref.current) roofCanvas(building, ref.current); }, [building.w, building.h, building.roof]);
+  return (
+    <div
+      className={`vtt-roof ${open ? 'is-open' : ''}`}
+      style={{ left: building.x * cell, top: building.y * cell, width: building.w * cell, height: (roofRows(building.h) + EAVE_SHADOW / 16) * cell }}
+      role="button"
+      tabIndex={0}
+      aria-pressed={open}
+      aria-label={`${building.name || 'Construção'}: ${open ? 'interior à mostra' : 'telhado fechado'}. Enter alterna.`}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
+    >
+      <canvas ref={ref} aria-hidden="true" />
+    </div>
+  );
+}
 
 // Mesa virtual: mapa (imagem ou pixel art), grade, tokens, neblina, pings e efeitos de acerto.
 // Movimento: arrastar ou WASD/setas na velocidade que o mestre escolheu; em combate o servidor confere o limite.
@@ -23,7 +44,10 @@ export default function Board({
   effects = {},
   pings = [],
   onPing,
-  budget
+  budget,
+  myTokenId,
+  onPickup,
+  pickupBlock
 }) {
   const cell = scene?.grid_size || 70;
   const isTiles = scene?.map_kind === 'tiles' && scene?.tiles;
@@ -39,6 +63,64 @@ export default function Board({
   const sendTimer = useRef({});
 
   const tokenPos = useCallback((t) => localRef.current[t.id] || { x: t.x, y: t.y }, []);
+
+  // ---- itens pegaveis e telhados ----
+  const items = useMemo(() => (isTiles ? scene.tiles.items || [] : []), [isTiles, scene?.tiles]);
+  const buildings = useMemo(() => (isTiles ? scene.tiles.buildings || [] : []), [isTiles, scene?.tiles]);
+  const [roofToggle, setRoofToggle] = useState({}); // escolha local de cada pessoa (id -> aberto?)
+  const [interiors, setInteriors] = useState(false); // mestre: "ver interiores"
+  const [popover, setPopover] = useState(null); // celula {x, y} com itens
+  const [hover, setHover] = useState(null);
+  useEffect(() => { setRoofToggle({}); setPopover(null); setHover(null); }, [scene?.id]);
+
+  // Interior abre sozinho quando o token da pessoa esta dentro (posicao local, ja enquanto anda).
+  const myToken = tokens.find((t) => t.id === myTokenId);
+  const myPos = myToken && (local[myToken.id] || { x: myToken.x, y: myToken.y });
+  const myBuildingId = isTiles && myPos ? tokenBuilding(scene.tiles, { ...myToken, ...myPos }, cell)?.id : null;
+  const roofOpen = useCallback((b) => roofToggle[b.id] ?? (b.id === myBuildingId || (isMaster && interiors)), [roofToggle, myBuildingId, isMaster, interiors]);
+  const toggleRoof = useCallback((b) => setRoofToggle((cur) => ({ ...cur, [b.id]: !roofOpen(b) })), [roofOpen]);
+  const underRoof = useCallback((x, y) => {
+    const b = isTiles ? buildingAt(scene.tiles, x, y) : null;
+    return Boolean(b && !roofOpen(b));
+  }, [isTiles, scene?.tiles, roofOpen]);
+  const visibleItems = useMemo(() => items.filter((it) => !underRoof(it.x, it.y)), [items, underRoof]);
+  const itemsAt = useCallback((x, y) => visibleItems.filter((it) => it.x === x && it.y === y), [visibleItems]);
+  useEffect(() => { if (popover && !itemsAt(popover.x, popover.y).length) setPopover(null); }, [popover, itemsAt]);
+
+  // E: abre o item mais perto do seu token (se estiver ao alcance).
+  useEffect(() => {
+    if (!myToken || !visibleItems.length) return undefined;
+    const onKey = (e) => {
+      if (e.key.toLowerCase() !== 'e' || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (/input|textarea|select/i.test(e.target.tagName) || e.target.isContentEditable) return;
+      const pos = { ...myToken, ...(localRef.current[myToken.id] || {}) };
+      const near = visibleItems.map((it) => [tokenItemDistance(pos, it, cell), it]).filter(([d]) => d <= PICKUP_RANGE).sort((a, b) => a[0] - b[0])[0];
+      if (near) { e.preventDefault(); setPopover({ x: near[1].x, y: near[1].y }); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [myToken, visibleItems, cell]);
+
+  // Toque/clique sem arrastar: item abre o popover; construcao alterna o telhado.
+  function onTap(p) {
+    const x = Math.floor(p.x / cell);
+    const y = Math.floor(p.y / cell);
+    if (itemsAt(x, y).length) { setPopover({ x, y }); return; }
+    setPopover(null);
+    const b = isTiles ? buildingAt(scene.tiles, x, y) : null;
+    if (b) toggleRoof(b);
+  }
+
+  function onHover(event) {
+    if (!isTiles) return;
+    const p = toMap(event);
+    const x = Math.floor(p.x / cell);
+    const y = Math.floor(p.y / cell);
+    const here = itemsAt(x, y);
+    const b = buildingAt(scene.tiles, x, y);
+    const text = isMaster && here.length ? here.map((it) => it.name).join(', ') : b && !roofOpen(b) ? b.name : '';
+    setHover((cur) => (text ? (cur?.text === text && cur.x === x && cur.y === y ? cur : { text, x, y }) : null));
+  }
 
   // Centraliza o mapa ao trocar de cena.
   const fit = useCallback(() => {
@@ -207,7 +289,7 @@ export default function Board({
       onPing?.(p.x, p.y);
       return;
     }
-    drag.current = { kind: 'pan', sx: event.clientX, sy: event.clientY, vx: view.x, vy: view.y };
+    drag.current = { kind: 'pan', sx: event.clientX, sy: event.clientY, vx: view.x, vy: view.y, moved: 0 };
     event.currentTarget.setPointerCapture(event.pointerId);
   }
 
@@ -227,8 +309,9 @@ export default function Board({
 
   function onPointerMove(event) {
     const d = drag.current;
-    if (!d) return;
+    if (!d) { onHover(event); return; }
     if (d.kind === 'pan') {
+      d.moved = Math.max(d.moved, Math.hypot(event.clientX - d.sx, event.clientY - d.sy));
       setView((v) => ({ ...v, x: d.vx + event.clientX - d.sx, y: d.vy + event.clientY - d.sy }));
     } else {
       const p = toMap(event);
@@ -239,9 +322,10 @@ export default function Board({
     }
   }
 
-  function onPointerUp() {
+  function onPointerUp(event) {
     const d = drag.current;
     drag.current = null;
+    if (d?.kind === 'pan' && d.moved < 6 && event?.type === 'pointerup') onTap(toMap(event));
     if (d?.kind !== 'token' || !d.moved) return;
     const raw = localRef.current[d.token.id];
     if (!raw) return;
@@ -266,6 +350,7 @@ export default function Board({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onPointerLeave={() => setHover(null)}
         role="application"
         aria-label="Mesa virtual. Arraste para mover o mapa, roda do mouse para zoom, WASD para andar com o token selecionado, Alt+clique para marcar um ponto."
       >
@@ -288,8 +373,24 @@ export default function Board({
             />
           )}
 
+          {visibleItems.map((it) => (
+            <button
+              key={it.id}
+              type="button"
+              className="vtt-loot"
+              style={{ left: it.x * cell, top: it.y * cell, width: cell, height: cell }}
+              aria-label={`Item no mapa: ${it.name}`}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPopover({ x: it.x, y: it.y }); } }}
+            />
+          ))}
+
           {sortedTokens.map((t) => {
             const pos = local[t.id] || { x: t.x, y: t.y };
+            const hiddenInside = !isMaster && t.id !== myTokenId && isTiles && (() => {
+              const b = tokenBuilding(scene.tiles, { ...t, ...pos }, cell);
+              return b && !roofOpen(b);
+            })();
+            if (hiddenInside) return null;
             const size = (t.size || 1) * cell;
             const fx = effects[t.id];
             const down = t.conditions?.includes('caído') || fx?.down;
@@ -318,6 +419,10 @@ export default function Board({
             );
           })}
 
+          {buildings.map((b) => (
+            <Roof key={b.id} building={b} cell={cell} open={roofOpen(b)} onToggle={() => toggleRoof(b)} />
+          ))}
+
           {fogOn && (
             <svg className="pointer-events-none absolute inset-0" width={width} height={height} aria-hidden="true">
               <defs>
@@ -336,7 +441,64 @@ export default function Board({
         </div>
       </div>
 
+      {popover && (() => {
+        const here = itemsAt(popover.x, popover.y);
+        if (!here.length) return null;
+        const nearChars = isMaster ? tokens.filter((t) => t.kind === 'character' && t.character_id && here.some((it) => tokenItemDistance({ ...t, ...(local[t.id] || {}) }, it, cell) <= PICKUP_RANGE)) : [];
+        return (
+          <div
+            role="dialog"
+            aria-label="Itens nesta célula"
+            className="gothic-panel absolute z-20 w-64 max-w-[calc(100%-1rem)] rounded-md border-[3px] border-lead p-2 text-sm text-bone"
+            style={{ left: clamp(view.x + (popover.x + 0.5) * cell * view.z, 136, 10000), top: Math.max(8, view.y + popover.y * cell * view.z - 8), transform: 'translate(-50%, -100%)' }}
+            onKeyDown={(e) => { if (e.key === 'Escape') setPopover(null); }}
+          >
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <p className="font-display text-lg">Achados</p>
+              <button type="button" className="btn btn-glass !min-h-8 !w-8 !p-0" onClick={() => setPopover(null)} aria-label="Fechar"><X size={15} /></button>
+            </div>
+            <ul className="space-y-2">
+              {here.map((it) => {
+                const reason = isMaster ? null : pickupBlock?.(it);
+                return (
+                  <li key={it.id} className="border-t-2 border-lead pt-2 first:border-0 first:pt-0">
+                    <p className="font-bold">{it.name}{it.dracmas ? ` — ${it.dracmas} dracmas` : it.quantity > 1 ? ` ×${it.quantity}` : ''}</p>
+                    {it.description && <p className="text-xs text-mist">{it.description}</p>}
+                    {!isMaster && (
+                      <>
+                        <button type="button" autoFocus className="btn btn-lit mt-1 !min-h-9 w-full text-sm" disabled={Boolean(reason)} onClick={() => onPickup?.(it)}>
+                          <Hand size={15} /> Pegar
+                        </button>
+                        {reason && <p className="mt-1 text-xs text-ember">{reason}</p>}
+                      </>
+                    )}
+                    {isMaster && (nearChars.length ? (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {nearChars.map((t) => (
+                          <button key={t.id} type="button" className="btn btn-glass !min-h-8 text-xs" onClick={() => onPickup?.(it, t.character_id)}>Entregar a {t.name}</button>
+                        ))}
+                      </div>
+                    ) : <p className="mt-1 text-xs text-mist">Nenhum personagem perto para entregar.</p>)}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })()}
+      {hover && !popover && !drag.current && (
+        <p className="pointer-events-none absolute z-10 max-w-xs border-2 border-lead bg-abyss/95 px-2 py-1 text-xs font-bold text-bone"
+          style={{ left: view.x + (hover.x + 0.5) * cell * view.z, top: view.y + hover.y * cell * view.z - 6, transform: 'translate(-50%, -100%)' }}>
+          {hover.text}
+        </p>
+      )}
+
       <div className="absolute bottom-3 right-3 flex flex-col gap-1">
+        {isMaster && buildings.length > 0 && (
+          <button type="button" className={`btn btn-glass !min-h-10 !w-10 !p-0 ${interiors ? 'lit' : ''}`} onClick={() => { setInteriors((v) => !v); setRoofToggle({}); }} aria-pressed={interiors} aria-label="Ver interiores" title="Ver interiores">
+            {interiors ? <EyeOff size={18} /> : <Eye size={18} />}
+          </button>
+        )}
         <button type="button" className="btn btn-glass !min-h-10 !w-10 !p-0" onClick={() => zoomBy(1.25)} aria-label="Aproximar"><Plus size={18} /></button>
         <button type="button" className="btn btn-glass !min-h-10 !w-10 !p-0" onClick={() => zoomBy(0.8)} aria-label="Afastar"><Minus size={18} /></button>
         <button type="button" className="btn btn-glass !min-h-10 !w-10 !p-0" onClick={fit} aria-label="Centralizar mapa"><LocateFixed size={18} /></button>

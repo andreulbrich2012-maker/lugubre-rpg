@@ -1,12 +1,12 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from './app.js';
 import { pool } from './db/pool.js';
 import { parseRulebook, seedRules } from './db/seedRules.js';
-import { normalizeTiles, resetMapRateLimit } from './utils/mapgen.js';
+import { dracmasToCoins, validateTiles } from './utils/tiles.js';
 
 const app = createApp();
 const hasDb = Boolean(process.env.DATABASE_URL);
@@ -48,10 +48,16 @@ async function eventsAfter(api, cursor) {
 }
 
 describe('utilitarios v2 (sem banco)', () => {
-  it('normaliza tiles da IA cortando e completando linhas com o chao padrao', () => {
-    const tiles = normalizeTiles({ ground: ['##', '#########', 'ção'], objects: ['T'] }, 4, 4);
-    expect(tiles.layers.ground).toEqual(['##..', '####', '..o.', '....']);
-    expect(tiles.layers.objects).toEqual(['T...', '....', '....', '....']);
+  it('valida itens e construcoes do mapa e troca dracmas em moedas', () => {
+    const base4 = { cols: 4, rows: 4, layers: { ground: ['....', '....', '....', '....'] } };
+    const ok = validateTiles({ ...base4, items: [{ id: 'a', x: 3, y: 3, name: 'Chave' }], buildings: [{ id: 'b', x: 0, y: 0, w: 4, h: 4, roof: 'palha' }], light: 'noite' });
+    expect(ok.items[0]).toMatchObject({ quantity: 1, weight: 0, category: 'Achados' });
+    expect(ok.light).toBe('noite');
+    expect(() => validateTiles({ ...base4, items: [{ id: 'a', x: 4, y: 0, name: 'Fora' }] })).toThrow(/fora do mapa/);
+    expect(() => validateTiles({ ...base4, items: [{ id: 'a', x: 0, y: 0, name: 'A' }, { id: 'a', x: 1, y: 0, name: 'B' }] })).toThrow(/repetidos/);
+    expect(() => validateTiles({ ...base4, buildings: [{ id: 'b', x: 2, y: 0, w: 3, h: 3 }] })).toThrow(/fora do mapa/);
+    expect(() => validateTiles({ ...base4, items: [{ id: 'a', x: 0, y: 0, name: 'A', quantity: 0 }] })).toThrow(/quantity/);
+    expect(dracmasToCoins(623)).toEqual({ gold: 1, platinum: 1, silver: 2, bronze: 3 });
   });
 
   it('separa o livro em secoes com slugs sem acento e desambigua so os repetidos', async () => {
@@ -76,12 +82,6 @@ describe.skipIf(!hasDb)('API v2 com Postgres', () => {
     playerCharacter = await createCharacter(player.api, 'Heroína V2');
     await player.api.post('/api/campaigns/join', { inviteCode: campaign.invite_code, characterId: playerCharacter.id }).expect(200);
     await other.api.post('/api/campaigns/join', { inviteCode: campaign.invite_code }).expect(200);
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    delete process.env.ANTHROPIC_API_KEY;
-    delete process.env.GROQ_API_KEY;
   });
 
   it('feed: cursor, mensagens, rolagem secreta so para o mestre e ids invalidos', async () => {
@@ -239,26 +239,65 @@ describe.skipIf(!hasDb)('API v2 com Postgres', () => {
     await master.api.post(`${base()}/ping`, { x: 10, y: 20, sceneId: scene.id }).expect(201);
   });
 
-  it('mapa por IA: 503 sem chave, valida e corrige a resposta com fetch falso', async () => {
-    resetMapRateLimit();
-    const payload = { description: 'Uma cripta com colunas', cols: 6, rows: 4, catalog: '. chao\n# parede\nT tocha' };
-    const { body: off } = await master.api.post(`${base()}/maps/generate`, payload).expect(503);
-    expect(off.error).toContain('Geração por IA não configurada');
-    await player.api.post(`${base()}/maps/generate`, payload).expect(403);
+  it('itens do mapa: pegar, longe, duas pessoas ao mesmo tempo, preparacao e combate', async () => {
+    const { body: scene } = await master.api.post(`${base()}/scenes`, { name: 'Armazém', grid_size: 70 }).expect(201);
+    await master.api.post(`${base()}/scenes/${scene.id}/activate`).expect(200);
+    const ground = ['......', '......', '......', '......', '......', '......'];
+    const items = [
+      { id: 'pocao', x: 1, y: 1, name: 'Poção de cura', quantity: 2, weight: 0.5, category: 'Poções' },
+      { id: 'longe', x: 5, y: 5, name: 'Adaga enferrujada', category: 'Armas' },
+      { id: 'bolsa', x: 1, y: 0, name: 'Bolsa de moedas', dracmas: 523 },
+      { id: 'erva', x: 2, y: 1, name: 'Erva-de-sangue', category: 'Ingredientes' },
+      { id: 'osso', x: 0, y: 1, name: 'Osso entalhado' }
+    ];
+    await master.api.patch(`${base()}/scenes/${scene.id}`, { map_kind: 'tiles', tiles: { cols: 6, rows: 6, layers: { ground }, items: [{ id: 'x', x: 9, y: 0, name: 'Fora' }] } }).expect(400);
+    await master.api.patch(`${base()}/scenes/${scene.id}`, { map_kind: 'tiles', tiles: { cols: 6, rows: 6, layers: { ground }, items } }).expect(200);
+    const { body: token } = await player.api.post(`${base()}/scenes/${scene.id}/tokens`, { kind: 'character', x: 0, y: 0 }).expect(201);
+    const pickup = (api, itemId, extra = {}) => api.post(`${base()}/scenes/${scene.id}/pickup`, { itemId, ...extra });
 
-    process.env.ANTHROPIC_API_KEY = 'chave-falsa-de-teste';
-    const fetchMock = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ content: [{ type: 'text', text: 'Aqui: {"name":"Cripta","layers":{"ground":["######","#..#"],"objects":["..T"]},"notes":"Ok"}' }] })
-    }));
-    vi.stubGlobal('fetch', fetchMock);
-    const { body } = await master.api.post(`${base()}/maps/generate`, payload).expect(200);
-    expect(body.name).toBe('Cripta');
-    expect(body.tiles.layers.ground).toEqual(['######', '#..#..', '......', '......']);
-    expect(body.tiles.layers.objects[0]).toBe('..T...');
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe('https://api.anthropic.com/v1/messages');
-    expect(JSON.parse(init.body).model).toBe('claude-haiku-5-5');
+    expect((await pickup(player.api, 'pocao').expect(409)).body.message).toBe('A mesa está em preparação.');
+    await master.api.patch(`${base()}/scenes/${scene.id}`, { mode: 'exploration' }).expect(200);
+    expect((await pickup(player.api, 'longe').expect(409)).body.message).toBe('Chegue mais perto para pegar.');
+    await other.api.post(`${base()}/scenes/${scene.id}/pickup`, { itemId: 'pocao' }).expect(409); // sem personagem no mapa
+
+    const { body: cursor } = await player.api.get(`${base()}/events`).expect(200);
+    const both = await Promise.all([pickup(player.api, 'pocao'), pickup(player.api, 'pocao')]);
+    expect(both.map((r) => r.status).sort()).toEqual([201, 409]);
+    expect(both.find((r) => r.status === 409).body.message).toBe('Já pegaram esse item.');
+    const got = both.find((r) => r.status === 201).body;
+    expect(got.character.inventory.filter((entry) => entry.name === 'Poção de cura')).toHaveLength(1);
+    expect(got.character.inventory.at(-1)).toMatchObject({ quantity: 2, weight: 0.5, category: 'Poções', defenseBonus: 0 });
+
+    const { body: money } = await pickup(player.api, 'bolsa').expect(201);
+    expect(money.received).toMatchObject({ kind: 'dracmas', dracmas: 523 });
+    expect(money.character.wallet).toMatchObject({ gold: 1, silver: 2, bronze: 3 });
+    const sheet = (await player.api.get(`${base()}/characters/${playerCharacter.id}`).expect(200)).body;
+    expect(sheet.inventory.some((entry) => entry.name === 'Poção de cura')).toBe(true);
+    expect(sheet.wallet_total_dracmas).toBeGreaterThanOrEqual(523);
+
+    const sceneNow = (await player.api.get(`${base()}/scenes/${scene.id}`).expect(200)).body;
+    expect(sceneNow.tiles.items.map((entry) => entry.id)).toEqual(['longe', 'erva', 'osso']);
+    const events = await eventsAfter(other.api, cursor.cursor);
+    expect(events.filter((event) => event.type === 'scene:items').at(-1).payload.items).toHaveLength(3);
+    expect(events.some((event) => event.type === 'message:created' && event.payload.message.content === 'Heroína V2 pegou Poção de cura ×2')).toBe(true);
+    expect(events.some((event) => event.type === 'character:updated')).toBe(true);
+
+    // combate: so no proprio turno e gasta a acao
+    await player.api.patch(`${base()}/tokens/${token.id}`, { x: 70, y: 0 }).expect(200);
+    const { body: rat } = await master.api.post(`${base()}/npcs`, { name: 'Rato', kind: 'monster', hp_max: 3 }).expect(201);
+    const { body: ratToken } = await master.api.post(`${base()}/scenes/${scene.id}/tokens`, { kind: 'monster', npcId: rat.id, x: 280, y: 280 }).expect(201);
+    await master.api.post(`${base()}/scenes/${scene.id}/combat/start`, { initiative: [{ tokenId: ratToken.id, value: 20 }, { tokenId: token.id, value: 5 }] }).expect(200);
+    expect((await pickup(player.api, 'erva').expect(409)).body.message).toBe('Não é o seu turno.');
+    await master.api.post(`${base()}/scenes/${scene.id}/combat/next`).expect(200);
+    await pickup(player.api, 'erva').expect(201);
+    const combatScene = (await master.api.get(`${base()}/scenes/${scene.id}`).expect(200)).body;
+    expect(combatScene.turn_state.action_used).toBe(true);
+    expect((await pickup(player.api, 'osso').expect(409)).body.message).toBe('Você já usou sua ação neste turno.');
+
+    // mestre entrega em nome do personagem (sem conferir distancia)
+    await pickup(master.api, 'longe').expect(400);
+    await pickup(master.api, 'longe', { characterId: playerCharacter.id }).expect(201);
+    await master.api.post(`${base()}/scenes/${scene.id}/combat/end`).expect(200);
   });
 
   it('correcoes: compra sem personagem, booleanos, diario e erros sem vazar SQL', async () => {

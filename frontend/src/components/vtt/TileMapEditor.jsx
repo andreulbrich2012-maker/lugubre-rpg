@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Check, ClipboardPaste, Copy, Eraser, Grid3x3, Hand, Loader2, PaintBucket, Paintbrush,
-  Pipette, Redo2, Save, Sparkles, Square, Undo2, X, ZoomIn, ZoomOut
+  Check, Copy, Eraser, Gem, Grid3x3, Hand, Home, PaintBucket, Paintbrush,
+  Pipette, Redo2, RotateCcw, Save, Sparkles, Square, Trash2, Undo2, Wrench, X, ZoomIn, ZoomOut
 } from 'lucide-react';
 import TileMapCanvas from './TileMapCanvas';
 import { TILES, CATEGORIES, DEFAULT_GROUND, EMPTY_OBJECT, getTile } from '../../lib/tiles/catalog';
 import { renderTilePreview } from '../../lib/tiles/render';
 import {
-  emptyMap, repairMap, resizeMap, setCell, floodFill, rectFill, getCell, MIN_SIZE, MAX_SIZE
+  emptyMap, repairMap, resizeMap, setCell, floodFill, rectFill, getCell, MIN_SIZE, MAX_SIZE,
+  addItem, updateItem, removeItem, placeBuilding, updateBuilding, removeBuilding, itemAt, ITEM_CATEGORIES, MAX_ITEMS
 } from '../../lib/tiles/format';
-import { buildMapPrompt, catalogText, parseMapResponse } from '../../lib/tiles/aiPrompt';
+import { ROOFS, ROOF_LABEL } from '../../lib/tiles/roofs';
+import { buildMapPrompt, parseMapResponse } from '../../lib/tiles/aiPrompt';
 
 const HISTORY = 50;
 const ZOOMS = [16, 24, 32, 40, 48, 64];
@@ -19,8 +21,25 @@ const TOOLS = [
   { id: 'rect', label: 'Retângulo', icon: Square },
   { id: 'eraser', label: 'Borracha', icon: Eraser },
   { id: 'picker', label: 'Conta-gotas', icon: Pipette },
+  { id: 'building', label: 'Construção (arraste um retângulo)', icon: Home },
+  { id: 'item', label: 'Colocar item', icon: Gem },
   { id: 'pan', label: 'Mover a vista', icon: Hand }
 ];
+const SIZES = [
+  { id: 'p', label: 'Pequeno', cols: 16, rows: 12 },
+  { id: 'm', label: 'Médio', cols: 24, rows: 16 },
+  { id: 'g', label: 'Grande', cols: 32, rows: 22 }
+];
+const EXAMPLES = [
+  'Taverna à beira da estrada',
+  'Cripta com altar e armadilhas',
+  'Floresta com ruínas e um rio',
+  'Masmorra com três salas e um tesouro',
+  'Vila pequena com poço e mercado',
+  'Caverna de cristais com lago subterrâneo'
+];
+const WALLS = [['#', 'Pedra'], ['B', 'Tijolo'], ['M', 'Madeira']];
+const FLOORS = [['=', 'Assoalho'], ['_', 'Pedra'], ['Q', 'Templo']];
 const LAYER_LABEL = { ground: 'Chão', objects: 'Objetos' };
 const emptyFor = (layer) => (layer === 'ground' ? DEFAULT_GROUND : EMPTY_OBJECT);
 
@@ -41,11 +60,6 @@ function line(x0, y0, x1, y1) {
   }
 }
 
-function is503(err) {
-  const status = err?.response?.status ?? err?.status;
-  return status === 503 || status === 501 || status === 404;
-}
-
 function TileButton({ tile, active, onClick }) {
   return (
     <button
@@ -62,7 +76,9 @@ function TileButton({ tile, active, onClick }) {
   );
 }
 
-export default function TileMapEditor({ initialMap, onSave, onCancel, generate }) {
+export default function TileMapEditor({ initialMap, onSave, onCancel }) {
+  // 23/10: o site so monta o prompt; o mestre cola na IA que quiser e cola a resposta de volta.
+  const [mode, setMode] = useState(initialMap ? 'manual' : 'ai');
   const [map, setMap] = useState(() => (initialMap ? repairMap(initialMap).map : emptyMap(20, 14)));
   const mapRef = useRef(map);
   mapRef.current = map;
@@ -79,16 +95,17 @@ export default function TileMapEditor({ initialMap, onSave, onCancel, generate }
   const stroke = useRef(null);
 
   const [description, setDescription] = useState('');
-  const [aiBusy, setAiBusy] = useState(false);
+  const [aiSize, setAiSize] = useState('m');
   const [aiError, setAiError] = useState('');
   const [aiInfo, setAiInfo] = useState(null);
-  const [promptOpen, setPromptOpen] = useState(!generate);
   const [copied, setCopied] = useState(false);
   const [pasted, setPasted] = useState('');
-  const [importMsg, setImportMsg] = useState(null);
+  const [result, setResult] = useState(null);
+  const [build, setBuild] = useState({ wall: '#', floor: '=', roof: 'telha' });
 
   const code = selected[layer];
-  const prompt = useMemo(() => buildMapPrompt({ description, cols: size.cols, rows: size.rows }), [description, size]);
+  const aiDims = SIZES.find((x) => x.id === aiSize);
+  const prompt = useMemo(() => buildMapPrompt({ description, cols: aiDims.cols, rows: aiDims.rows }), [description, aiDims]);
   const groups = useMemo(() => CATEGORIES
     .map((cat) => [cat, TILES.filter((t) => t.category === cat && t.layer === layer)])
     .filter(([, list]) => list.length), [layer]);
@@ -168,16 +185,21 @@ export default function TileMapEditor({ initialMap, onSave, onCancel, generate }
       return;
     }
     if (tool === 'bucket') { commit(floodFill(map, layer, x, y, code)); return; }
+    if (tool === 'item') {
+      if (itemAt(map, x, y)) return;
+      commit(addItem(map, x, y, { name: 'Item achado' }));
+      return;
+    }
     e.currentTarget.setPointerCapture?.(e.pointerId);
     stroke.current = { before: map, last: [x, y] };
-    if (tool === 'rect') setRect({ x0: x, y0: y, x1: x, y1: y });
+    if (tool === 'rect' || tool === 'building') setRect({ x0: x, y0: y, x1: x, y1: y });
     else paintTo(x, y);
   };
 
   const onPointerMove = (e) => {
     if (!stroke.current) return;
     const [x, y] = cellAt(e);
-    if (tool === 'rect') setRect((r) => (r && (r.x1 !== x || r.y1 !== y) ? { ...r, x1: x, y1: y } : r));
+    if (tool === 'rect' || tool === 'building') setRect((r) => (r && (r.x1 !== x || r.y1 !== y) ? { ...r, x1: x, y1: y } : r));
     else paintTo(x, y);
   };
 
@@ -187,6 +209,10 @@ export default function TileMapEditor({ initialMap, onSave, onCancel, generate }
     stroke.current = null;
     if (tool === 'rect' && rect) {
       commit(rectFill(s.before, layer, rect.x0, rect.y0, rect.x1, rect.y1, code), s.before);
+      setRect(null);
+    } else if (tool === 'building' && rect) {
+      const n = (s.before.buildings || []).length + 1;
+      commit(placeBuilding(s.before, rect.x0, rect.y0, rect.x1, rect.y1, { ...build, name: `Construção ${n}` }), s.before);
       setRect(null);
     } else commit(mapRef.current, s.before);
   };
@@ -202,47 +228,31 @@ export default function TileMapEditor({ initialMap, onSave, onCancel, generate }
     setSize({ cols: next.cols, rows: next.rows });
   };
 
-  const runAi = async () => {
-    setAiError('');
-    setAiInfo(null);
-    if (!generate) { setPromptOpen(true); return; }
-    if (!description.trim()) { setAiError('Descreva o mapa antes de gerar.'); return; }
-    setAiBusy(true);
-    try {
-      const res = await generate({ description, cols: size.cols, rows: size.rows, catalog: catalogText() });
-      const src = res?.tiles ?? res;
-      const { map: next, warnings } = repairMap(src?.layers ? src : { layers: src }, { cols: size.cols, rows: size.rows });
-      loadMap(next);
-      setAiInfo({ name: res?.name || '', notes: res?.notes || '', warnings });
-    } catch (err) {
-      if (is503(err)) {
-        setAiError('A IA do servidor não está disponível agora. Use o caminho manual: copie o prompt abaixo.');
-        setPromptOpen(true);
-      } else {
-        setAiError(err?.response?.data?.error || err?.message || 'Não deu para gerar o mapa. Tente de novo.');
-      }
-    } finally {
-      setAiBusy(false);
-    }
-  };
-
   const copyPrompt = async () => {
-    setPromptOpen(true);
+    setAiError('');
     try {
       await navigator.clipboard.writeText(prompt);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
+      setTimeout(() => setCopied(false), 2200);
     } catch {
-      setAiError('O navegador bloqueou a cópia. Selecione o texto do prompt e copie à mão.');
+      setAiError('O navegador bloqueou a cópia. Abra "Ver o prompt", selecione o texto e copie à mão.');
     }
   };
 
-  const importPasted = () => {
-    const res = parseMapResponse(pasted, size.cols, size.rows);
-    if (res.ok) {
-      loadMap(res.map);
-      setImportMsg({ ok: true, text: [res.name && `"${res.name}" importado.`, res.notes, ...res.warnings].filter(Boolean) });
-    } else setImportMsg({ ok: false, text: res.warnings });
+  // Importa sozinho ao colar: nada de botao extra.
+  const readPasted = (text) => {
+    setPasted(text);
+    if (!text.trim()) { setResult(null); return; }
+    setResult(parseMapResponse(text, aiDims.cols, aiDims.rows));
+  };
+
+  const applyResult = (andSave) => {
+    if (!result?.ok) return;
+    loadMap(result.map);
+    const info = { name: result.name, notes: result.notes, warnings: result.warnings };
+    setAiInfo(info);
+    if (andSave) onSave?.(result.map, { name: result.name, notes: result.notes });
+    else setMode('manual');
   };
 
   const rectBox = rect && {
@@ -252,6 +262,86 @@ export default function TileMapEditor({ initialMap, onSave, onCancel, generate }
     height: (Math.abs(rect.y1 - rect.y0) + 1) * zoom
   };
   const h = history.current;
+
+  if (mode === 'ai') {
+    return (
+      <div className="mx-auto flex max-w-3xl flex-col gap-4 p-3 text-bone sm:p-6">
+        <header className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-3xl">Criar mapa com IA</h2>
+            <p className="text-mist">Três passos: descreva, copie o pedido para a sua IA e cole a resposta aqui.</p>
+          </div>
+          {onCancel && <button type="button" className="btn btn-glass" onClick={onCancel}><X size={18} /> Fechar</button>}
+        </header>
+
+        <section className="gothic-panel flex flex-col gap-3 rounded-md p-4">
+          <label className="font-display text-xl" htmlFor="map-desc">1. Descreva o mapa</label>
+          <textarea id="map-desc" className="field min-h-[7rem] text-base" value={description} onChange={(e) => setDescription(e.target.value)}
+            placeholder="Ex.: uma taverna com lareira ao norte, porta ao sul e uma estrada cortando a floresta" />
+          <div className="flex flex-wrap gap-2" aria-label="Exemplos">
+            {EXAMPLES.map((ex) => (
+              <button key={ex} type="button" onClick={() => setDescription(ex)} aria-pressed={description === ex}
+                className={`rounded-md border-2 border-lead px-3 py-1.5 text-sm ${description === ex ? 'lit' : 'bg-glass text-mist hover:text-bone'}`}>{ex}</button>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="Tamanho">
+            <span className="text-sm text-mist">Tamanho:</span>
+            {SIZES.map((x) => (
+              <button key={x.id} type="button" role="radio" aria-checked={aiSize === x.id} onClick={() => { setAiSize(x.id); setResult(null); setPasted(''); }}
+                className={`rounded-md border-[3px] border-lead px-3 py-1.5 text-sm font-bold ${aiSize === x.id ? 'lit' : 'bg-glass text-mist hover:text-bone'}`}>
+                {x.label} <span className="font-normal opacity-75">{x.cols}×{x.rows}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className="gothic-panel flex flex-col gap-3 rounded-md p-4">
+          <h3 className="font-display text-xl">2. Copie o pedido</h3>
+          <button type="button" className="btn btn-lit min-h-14 text-lg" onClick={copyPrompt}>
+            {copied ? <Check size={22} /> : <Copy size={22} />} {copied ? 'Copiado! Agora cole na IA' : 'Copiar prompt'}
+          </button>
+          <p className="text-mist">Cole no ChatGPT, Gemini ou Claude e copie a resposta inteira.</p>
+          {aiError && <p role="alert" className="text-sm text-ember">{aiError}</p>}
+          <details className="text-sm">
+            <summary className="cursor-pointer text-mist hover:text-bone">Ver o prompt</summary>
+            <textarea readOnly className="field mt-2 h-40 font-mono text-[11px]" value={prompt} onFocus={(e) => e.target.select()} />
+          </details>
+        </section>
+
+        <section className="gothic-panel flex flex-col gap-3 rounded-md p-4">
+          <label className="font-display text-xl" htmlFor="map-paste">3. Cole aqui a resposta da IA</label>
+          <textarea id="map-paste" className="field h-28 font-mono text-[11px]" value={pasted} onChange={(e) => readPasted(e.target.value)}
+            placeholder='{"name": "...", "layers": {...}, "buildings": [...], "items": [...]}' />
+          {result && !result.ok && <p role="alert" className="text-ember">{result.warnings[0]}</p>}
+          {result?.ok && (
+            <div className="flex flex-col gap-3" role="status">
+              <div>
+                <p className="font-display text-2xl">{result.name || 'Mapa importado'}</p>
+                {result.notes && <p className="text-mist">{result.notes}</p>}
+                <p className="text-sm text-mist">{result.map.items.length} item(ns) pegável(is) · {result.map.buildings.length} construção(ões) com telhado</p>
+                {result.warnings.map((w) => <p key={w} className="text-sm text-ember">{w}</p>)}
+              </div>
+              <div className="max-h-[55vh] overflow-auto rounded-md border-[3px] border-lead bg-abyss">
+                <TileMapCanvas map={result.map} cellSize={Math.max(12, Math.min(28, Math.floor(680 / result.map.cols)))} roofs />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="btn btn-lit" onClick={() => applyResult(true)}><Save size={18} /> Usar este mapa</button>
+                <button type="button" className="btn btn-glass" onClick={() => readPasted('')}><RotateCcw size={18} /> Tentar de novo</button>
+                <button type="button" className="btn btn-glass" onClick={() => applyResult(false)}><Wrench size={18} /> Ajustar à mão</button>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <button type="button" className="self-start text-sm text-mist underline hover:text-bone" onClick={() => setMode('manual')}>
+          Prefiro desenhar à mão
+        </button>
+      </div>
+    );
+  }
+
+  const items = map.items || [];
+  const buildings = map.buildings || [];
 
   return (
     <div className="flex flex-col gap-4 text-bone">
@@ -296,6 +386,14 @@ export default function TileMapEditor({ initialMap, onSave, onCancel, generate }
                 onPointerCancel={onPointerUp}
                 style={{ touchAction: tool === 'pan' ? 'auto' : 'none', cursor: tool === 'pan' ? 'grab' : 'crosshair' }}
               />
+              {buildings.map((b) => (
+                <div key={b.id} className="pointer-events-none absolute border-2 border-dashed border-ember/70" style={{ left: b.x * zoom, top: b.y * zoom, width: b.w * zoom, height: b.h * zoom }}>
+                  <span className="absolute left-0 top-0 bg-abyss/85 px-1 text-[10px] font-bold text-ember">{b.name}</span>
+                </div>
+              ))}
+              {items.map((it) => (
+                <span key={it.id} className="vtt-loot pointer-events-none" title={it.name} style={{ left: it.x * zoom, top: it.y * zoom, width: zoom, height: zoom }} />
+              ))}
               {rectBox && <div className="pointer-events-none absolute border-2 border-ember" style={{ ...rectBox, background: 'rgb(var(--light) / .2)' }} />}
             </div>
           </div>
@@ -336,52 +434,80 @@ export default function TileMapEditor({ initialMap, onSave, onCancel, generate }
             </div>
           </section>
 
+          {tool === 'building' && (
+            <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
+              <h3 className="font-display text-xl">Nova construção</h3>
+              <p className="text-sm text-mist">Arraste um retângulo no mapa: paredes em volta, piso dentro, porta embaixo e telhado.</p>
+              <label className="text-sm text-mist">Parede
+                <select className="field py-1.5" value={build.wall} onChange={(e) => setBuild((b) => ({ ...b, wall: e.target.value }))}>
+                  {WALLS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}
+                </select>
+              </label>
+              <label className="text-sm text-mist">Piso
+                <select className="field py-1.5" value={build.floor} onChange={(e) => setBuild((b) => ({ ...b, floor: e.target.value }))}>
+                  {FLOORS.map(([c, n]) => <option key={c} value={c}>{n}</option>)}
+                </select>
+              </label>
+              <label className="text-sm text-mist">Telhado
+                <select className="field py-1.5" value={build.roof} onChange={(e) => setBuild((b) => ({ ...b, roof: e.target.value }))}>
+                  {ROOFS.map((r) => <option key={r} value={r}>{ROOF_LABEL[r]}</option>)}
+                </select>
+              </label>
+            </section>
+          )}
+
           <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
-            <h3 className="font-display text-xl">Mapa com IA</h3>
-            <label className="text-sm text-mist">Descreva o mapa
-              <textarea className="field min-h-[5.5rem]" value={description} onChange={(e) => setDescription(e.target.value)}
-                placeholder="Uma taverna com dois andares de mesas, lareira ao norte e porta ao sul cercada por floresta" />
-            </label>
-            <p className="text-xs text-mist">Tamanho: {size.cols}×{size.rows}. O mapa atual será substituído (dá para desfazer).</p>
-            <div className="flex flex-wrap gap-2">
-              {generate && (
-                <button type="button" className="btn btn-lit" onClick={runAi} disabled={aiBusy}>
-                  {aiBusy ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
-                  {aiBusy ? 'Gerando…' : 'Gerar com IA'}
-                </button>
-              )}
-              <button type="button" className="btn btn-glass" onClick={copyPrompt}>
-                {copied ? <Check size={18} /> : <Copy size={18} />} {copied ? 'Copiado!' : 'Copiar prompt'}
-              </button>
-            </div>
-            {aiError && <p role="alert" className="text-sm text-ember">{aiError}</p>}
+            <h3 className="font-display text-xl">Itens pegáveis <span className="text-sm text-mist">({items.length}/{MAX_ITEMS})</span></h3>
+            {!items.length && <p className="text-sm text-mist">Use a ferramenta “Colocar item” e clique numa célula (de preferência num baú, prateleira ou corpo caído).</p>}
+            <ul className="flex max-h-[20rem] flex-col gap-2 overflow-y-auto pr-1">
+              {items.map((it) => (
+                <li key={it.id} className="rounded-md border-2 border-lead bg-glass p-2">
+                  <div className="flex items-center gap-1">
+                    <input className="field py-1 text-sm" aria-label="Nome do item" value={it.name} maxLength={60}
+                      onChange={(e) => commit(updateItem(map, it.id, { name: e.target.value || ' ' }))} />
+                    <button type="button" className="btn btn-glass !min-h-9 !w-9 !p-0" onClick={() => commit(removeItem(map, it.id))} aria-label={`Apagar ${it.name}`}><Trash2 size={15} /></button>
+                  </div>
+                  <div className="mt-1 grid grid-cols-3 gap-1 text-xs text-mist">
+                    <label>Qtd.<input type="number" min={1} max={999} className="field py-1" value={it.quantity} onChange={(e) => commit(updateItem(map, it.id, { quantity: e.target.value }))} /></label>
+                    <label>Peso<input type="number" min={0} step={0.1} className="field py-1" value={it.weight} onChange={(e) => commit(updateItem(map, it.id, { weight: e.target.value }))} /></label>
+                    <label>Dracmas<input type="number" min={0} className="field py-1" value={it.dracmas || 0} onChange={(e) => commit(updateItem(map, it.id, { dracmas: e.target.value }))} /></label>
+                  </div>
+                  <label className="mt-1 block text-xs text-mist">Categoria
+                    <select className="field py-1 text-sm" value={it.category} onChange={(e) => commit(updateItem(map, it.id, { category: e.target.value }))}>
+                      {ITEM_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                    </select>
+                  </label>
+                  <p className="mt-1 text-[11px] text-mist">Célula {it.x},{it.y}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
+            <h3 className="font-display text-xl">Construções <span className="text-sm text-mist">({buildings.length})</span></h3>
+            {!buildings.length && <p className="text-sm text-mist">Use a ferramenta “Construção” e arraste um retângulo.</p>}
+            <ul className="flex max-h-[16rem] flex-col gap-2 overflow-y-auto pr-1">
+              {buildings.map((b) => (
+                <li key={b.id} className="flex items-center gap-1 rounded-md border-2 border-lead bg-glass p-2">
+                  <input className="field min-w-0 py-1 text-sm" aria-label="Nome da construção" value={b.name} maxLength={60}
+                    onChange={(e) => commit(updateBuilding(map, b.id, { name: e.target.value || ' ' }))} />
+                  <select className="field w-28 py-1 text-sm" aria-label="Telhado" value={b.roof} onChange={(e) => commit(updateBuilding(map, b.id, { roof: e.target.value }))}>
+                    {ROOFS.map((r) => <option key={r} value={r}>{ROOF_LABEL[r]}</option>)}
+                  </select>
+                  <button type="button" className="btn btn-glass !min-h-9 !w-9 shrink-0 !p-0" onClick={() => commit(removeBuilding(map, b.id))} aria-label={`Apagar ${b.name}`}><Trash2 size={15} /></button>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
+            <button type="button" className="btn btn-glass" onClick={() => setMode('ai')}><Sparkles size={18} /> Criar com IA</button>
             {aiInfo && (
               <div className="text-sm text-mist">
                 {aiInfo.name && <p className="text-bone">{aiInfo.name}</p>}
                 {aiInfo.notes && <p>{aiInfo.notes}</p>}
-                {aiInfo.warnings.map((w) => <p key={w} className="text-ember">{w}</p>)}
               </div>
             )}
-
-            <details open={promptOpen} onToggle={(e) => setPromptOpen(e.currentTarget.open)} className="rounded-md border-2 border-lead bg-glass p-2">
-              <summary className="cursor-pointer text-sm font-bold text-bone">Usar outra IA (copiar e colar)</summary>
-              <p className="mt-2 text-sm text-mist">
-                Como funciona: cole este texto no ChatGPT/Claude/Gemini, copie a resposta e cole abaixo.
-              </p>
-              <textarea readOnly className="field mt-2 h-40 font-mono text-[11px]" value={prompt} onFocus={(e) => e.target.select()} />
-              <label className="mt-2 block text-sm text-mist">Colar resultado da IA
-                <textarea className="field h-28 font-mono text-[11px]" value={pasted} onChange={(e) => setPasted(e.target.value)}
-                  placeholder='{"name": "...", "layers": {"ground": [...], "objects": [...]}}' />
-              </label>
-              <button type="button" className="btn btn-glass mt-2" onClick={importPasted} disabled={!pasted.trim()}>
-                <ClipboardPaste size={18} /> Importar
-              </button>
-              {importMsg && (
-                <div role="status" className={`mt-2 text-sm ${importMsg.ok ? 'text-mist' : 'text-ember'}`}>
-                  {importMsg.text.map((t) => <p key={t}>{t}</p>)}
-                </div>
-              )}
-            </details>
           </section>
         </aside>
       </div>

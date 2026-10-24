@@ -76,6 +76,7 @@ Limites: o polling do feed e o movimento de tokens têm limite próprio (900 req
 | `character:updated` | all | `{ characterId }` (sem números; quem pode ver recarrega a ficha) |
 | `notes:changed` | author / master / all | `{ noteId, action: 'created'\|'updated'\|'deleted', scope }` → recarregue `GET /notes` |
 | `scene:updated` | all (cena ativa) ou master | `{ scene, changed?: [campos], map_changed?: bool }` — `scene` sem `map_url` (tem `has_map_url`); se `map_changed`, busque `GET /scenes/:sid` |
+| `scene:items` | all (cena ativa) ou master | `{ sceneId, items }` — lista nova de itens pegáveis do mapa (troque `scene.tiles.items`; não precisa recarregar o mapa) |
 | `scene:activated` | all | `{ sceneId }` → recarregue cenas e tokens |
 | `scene:deleted` | all/master | `{ sceneId }` |
 | `token:moved` | all (master se oculto) | `{ tokenId, sceneId, x, y }` — coalescido: só a última posição recente fica no feed; anime até ela |
@@ -254,22 +255,45 @@ Campos de cena:
   "layers": {
     "ground":  ["....................", "...(12 linhas)"],
     "objects": ["......T.............", "..."]
-  }
+  },
+  "items": [
+    { "id": "i1", "x": 3, "y": 4, "name": "Poção de cura", "description": "", "quantity": 1, "weight": 0.5, "category": "Poções" },
+    { "id": "i2", "x": 3, "y": 4, "name": "Bolsa de moedas", "quantity": 1, "weight": 0.2, "category": "Tesouro", "dracmas": 25 }
+  ],
+  "buildings": [
+    { "id": "b1", "x": 1, "y": 1, "w": 8, "h": 6, "name": "Taverna", "roof": "palha" }
+  ],
+  "light": "noite"
 }
 ```
 
 Regras do servidor: `cols`/`rows` entre 4 e 80; 1 ou 2 camadas (nome `a-z_`); cada camada com exatamente `rows` linhas; cada linha com exatamente `cols` caracteres ASCII imprimíveis (1 caractere = 1 célula). O significado dos códigos é do frontend (`frontend/src/lib/tiles/catalog.js`); `.` é o chão padrão/vazio. Células sólidas são bloqueadas pelo cliente (o servidor só confere distância).
 
-### 6.3 Mapa por IA — `POST /api/campaigns/:id/maps/generate` (mestre)
+Campos opcionais (validados em `backend/src/utils/tiles.js`; nada de tabela nova, tudo dentro do jsonb `tiles`):
+- `items` (até 60) — itens pegáveis: `id` (`[A-Za-z0-9_-]{1,40}`, único), `x`/`y` (célula dentro do mapa), `name` (1–60), `description` (≤200), `quantity` (inteiro 1–999, padrão 1), `weight` (0–1000, padrão 0), `category` (`Achados` padrão, `Armas`, `Armaduras`, `Poções`, `Tesouro`, `Livros`, `Ingredientes`, `Outros`), `dracmas` (inteiro; se > 0 o item é dinheiro e vai para a bolsa). Vários itens podem estar na mesma célula (um baú).
+- `buildings` (até 30) — construções com telhado: `id`, `x`, `y`, `w`, `h` (≥3, retângulo inteiro dentro do mapa, incluindo as paredes), `name` (≤60), `roof` (`telha` padrão, `palha`, `ardosia`, `madeira`). O telhado esconde o interior; cada cliente decide quando mostrar (clique, token dentro, mestre com "ver interiores").
+- `light` — ciclo de luz da cena: `dia`, `entardecer` ou `noite` (sem o campo = dia).
+
+### 6.3 Pegar item do mapa — `POST /api/campaigns/:id/scenes/:sid/pickup`
 
 ```json
-// pedido
-{ "description": "Cripta com colunas e um altar ao norte (até 1500)", "cols": 24, "rows": 16, "catalog": ". chão\n# parede\nT tocha\n... (até 6000)" }
-// resposta 200
-{ "tiles": { "cols": 24, "rows": 16, "layers": { "ground": ["..."], "objects": ["..."] } }, "name": "Cripta do Altar", "notes": "Dica para o mestre." }
+// jogador
+{ "itemId": "i1" }                       // opcional: "characterId" se tiver mais de um personagem na cena
+// mestre (entrega em nome de um personagem da campanha, sem conferir distância/turno)
+{ "itemId": "i1", "characterId": "<uuid>" }
+// resposta 201
+{ "item": { "id": "i1", ... }, "received": { "kind": "item", "id": "<uuid novo>", "name": "Poção de cura", "quantity": 1, ... } | { "kind": "dracmas", "dracmas": 25, "name": "Bolsa de moedas" },
+  "character": { "id": "...", "inventory": [...], "wallet": { "bronze": 0, "silver": 0, "platinum": 0, "gold": 0 } } }
 ```
 
-O servidor corta/completa linhas com `.`. Provedor: `ANTHROPIC_API_KEY` (modelo `claude-haiku-5-5`, opcionalmente `ANTHROPIC_MAP_MODEL`) ou `GROQ_API_KEY` (`llama-3.3-70b-versatile`, opcionalmente `GROQ_MAP_MODEL`). Sem chave → `503 { "error": "Geração por IA não configurada no servidor. Use o prompt pronto e cole o resultado.", "message": "(o mesmo)" }`. Limite: 10 por hora por usuário (`429`). Tempo máximo 25 s (`502` se o provedor falhar). Grave o resultado com `PATCH scenes/:sid { "map_kind": "tiles", "tiles": ... }`.
+- Cena em `exploration` ou `combat` (senão `409 "A mesa está em preparação."`).
+- Jogador: o token do personagem dele na cena precisa estar a até **1,5 passo** do item (centro do token × centro da célula, em `grid_size`) → senão `409 "Chegue mais perto para pegar."`. Sem token → `409 "Coloque seu personagem no mapa para pegar itens."`.
+- Combate: só no próprio turno (`409 "Não é o seu turno."`) e **gasta a ação** (`turn_state.action_used`; se já usou → `409 "Você já usou sua ação neste turno."`).
+- Atômico (cena travada com `SELECT … FOR UPDATE`): dois cliques ao mesmo tempo → um leva, o outro recebe `409 "Já pegaram esse item."`.
+- O item vira um item da ficha (mesmo formato do inventário, `id` novo, `defenseBonus: 0`). `dracmas` vão para a bolsa já trocadas nas moedas maiores (ouro 500, platina 100, prata 10, bronze 1).
+- Eventos: `scene:items`, `message:created` (mensagem `message_type: "event"`, ex.: "Kael pegou Poção de cura") e `character:updated`; em combate também `combat`.
+
+Mapas por IA: o site não chama IA nenhuma. O editor monta o prompt (`frontend/src/lib/tiles/aiPrompt.js`), o mestre cola no ChatGPT/Gemini/Claude e cola a resposta de volta (o parser conserta tamanho, códigos, itens e construções).
 
 ### 6.4 NPCs e monstros da campanha (só mestre)
 

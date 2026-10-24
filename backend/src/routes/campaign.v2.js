@@ -1,5 +1,5 @@
 // Rotas v2 da sala de campanha: feed de eventos, notas, ficha para o mestre,
-// mesa virtual (cenas, NPCs, tokens), rolagens, acertos, ping e mapas por IA.
+// mesa virtual (cenas, NPCs, tokens, itens pegaveis), rolagens, acertos e ping.
 // Registradas no mesmo router de campaign.routes.js (uma autenticacao por requisicao).
 import crypto from 'crypto';
 import { z } from 'zod';
@@ -7,7 +7,7 @@ import { pool, query } from '../db/pool.js';
 import { assertCampaignMaster, requireCampaignMember } from '../utils/campaignAccess.js';
 import { emitEvent, emitSplit, latestEventId, listEvents } from '../utils/events.js';
 import { boolish, httpError, parseJson, requireDatabase } from '../utils/http.js';
-import { checkMapRateLimit, generateMap, validateTiles } from '../utils/mapgen.js';
+import { dracmasToCoins, validateTiles } from '../utils/tiles.js';
 import { parseDiceFormula, rollDiceFormula, SKILL_DEFINITIONS } from '../utils/rules.js';
 import { enrich } from './character.routes.js';
 
@@ -116,12 +116,11 @@ const vitalsSchema = z.object({
   sanity_current: z.coerce.number().int().optional(),
   mana_current: z.coerce.number().int().optional()
 });
-const mapGenerateSchema = z.object({
-  description: z.string().trim().min(3).max(1500),
-  cols: int(4, 80),
-  rows: int(4, 80),
-  catalog: z.string().trim().min(1).max(6000)
+const pickupSchema = z.object({
+  itemId: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/),
+  characterId: z.string().uuid().optional()
 });
+const PICKUP_RANGE = 1.5; // passos (centro do token ate o centro da celula do item)
 
 const MOVE_TOLERANCE = 0.25;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -861,15 +860,103 @@ export function registerCampaignV2Routes(router) {
     res.json({ ...common, amount: body.amount, hp_current: hpCurrent, hp_max: hpMax });
   });
 
-  // ===== mapa em tiles gerado por IA =====
-  router.post('/:id/maps/generate', async (req, res) => {
-    await assertCampaignMaster(req.params.id, req.user);
-    const body = mapGenerateSchema.parse(req.body);
-    if (!process.env.ANTHROPIC_API_KEY && !process.env.GROQ_API_KEY) {
-      const message = 'Geração por IA não configurada no servidor. Use o prompt pronto e cole o resultado.';
-      return res.status(503).json({ error: message, message });
+  // ===== pegar item do mapa =====
+  // Tudo numa transacao com a cena travada (FOR UPDATE): dois jogadores clicando juntos,
+  // so o primeiro leva; o segundo ve "Ja pegaram esse item.".
+  router.post('/:id/scenes/:sceneId/pickup', async (req, res) => {
+    const { master } = await requireCampaignMember(req.params.id, req.user);
+    const body = pickupSchema.parse(req.body);
+    if (master && !body.characterId) throw httpError('Escolha para qual personagem entregar o item.');
+    const client = await pool.connect();
+    let result;
+    try {
+      await client.query('begin');
+      const scene = (await client.query('select * from campaign_scenes where id = $1 and campaign_id = $2 for update', [req.params.sceneId, req.params.id])).rows[0];
+      if (!scene || (!master && !scene.is_active)) throw httpError('Cena não encontrada.', 404);
+      if (scene.mode === 'prep') throw httpError('A mesa está em preparação.', 409);
+      const tiles = parseJson(scene.tiles, null);
+      const items = Array.isArray(tiles?.items) ? tiles.items : [];
+      const item = items.find((entry) => entry.id === body.itemId);
+      if (!item) throw httpError('Já pegaram esse item.', 409);
+
+      let characterId = body.characterId;
+      let combatState = null;
+      if (!master) {
+        const mine = (await client.query(
+          `${TOKEN_SELECT} where t.scene_id = $1 and t.kind = 'character' and (ch.owner_id = $2 or t.controlled_by = $2)`,
+          [scene.id, req.user.id]
+        )).rows.filter((token) => !body.characterId || token.character_id === body.characterId);
+        if (!mine.length) throw httpError('Coloque seu personagem no mapa para pegar itens.', 409);
+        const grid = scene.grid_size || 70;
+        const distance = (token) => Math.hypot(
+          (Number(token.x) + (Number(token.size || 1) * grid) / 2) / grid - (item.x + 0.5),
+          (Number(token.y) + (Number(token.size || 1) * grid) / 2) / grid - (item.y + 0.5)
+        );
+        const token = mine.sort((a, b) => distance(a) - distance(b))[0];
+        if (scene.mode === 'combat') {
+          const state = parseJson(scene.turn_state, {});
+          if (state.tokenId !== token.id) throw httpError('Não é o seu turno.', 409);
+          if (state.action_used) throw httpError('Você já usou sua ação neste turno.', 409);
+          combatState = { ...state, action_used: true };
+        }
+        if (distance(token) > PICKUP_RANGE + 1e-6) throw httpError('Chegue mais perto para pegar.', 409);
+        characterId = token.character_id;
+      } else if (!(await sharedInCampaign(req.params.id, characterId))) {
+        throw httpError('Esse personagem não está nesta campanha.', 404);
+      }
+
+      const character = (await client.query('select id, character_name, inventory, wallet from characters where id = $1 for update', [characterId])).rows[0];
+      if (!character) throw httpError('Ficha não encontrada.', 404);
+      let inventory = parseJson(character.inventory, []);
+      const wallet = { bronze: 0, silver: 0, platinum: 0, gold: 0, ...parseJson(character.wallet, {}) };
+      let received;
+      if (item.dracmas > 0) {
+        // dinheiro vai para a bolsa, ja trocado nas moedas maiores
+        const coins = dracmasToCoins(item.dracmas);
+        for (const [coin, amount] of Object.entries(coins)) wallet[coin] = Number(wallet[coin] || 0) + amount;
+        received = { kind: 'dracmas', dracmas: item.dracmas, name: item.name };
+      } else {
+        // mesmo formato de item da ficha (character.routes.js normalizeItem)
+        const entry = {
+          id: crypto.randomUUID(), name: item.name, quantity: item.quantity || 1, weight: Number(item.weight || 0),
+          category: item.category || 'Achados', description: item.description || '', defenseBonus: 0
+        };
+        inventory = [...inventory, entry];
+        received = { kind: 'item', ...entry };
+      }
+      await client.query('update characters set inventory = $1, wallet = $2, updated_at = now() where id = $3', [JSON.stringify(inventory), JSON.stringify(wallet), character.id]);
+      const nextItems = items.filter((entry) => entry.id !== item.id);
+      const sceneFieldsUpdate = combatState ? ', turn_state = $3' : '';
+      const updatedScene = (await client.query(
+        `update campaign_scenes set tiles = $1${sceneFieldsUpdate}, updated_at = now() where id = $2 returning *`,
+        combatState ? [JSON.stringify({ ...tiles, items: nextItems }), scene.id, JSON.stringify(combatState)] : [JSON.stringify({ ...tiles, items: nextItems }), scene.id]
+      )).rows[0];
+      const what = item.dracmas > 0 ? `${item.dracmas} dracmas (${item.name})` : `${item.name}${item.quantity > 1 ? ` ×${item.quantity}` : ''}`;
+      const content = `${character.character_name} pegou ${what}`;
+      const message = (await client.query(
+        `insert into messages (campaign_id, user_id, character_id, content, message_type, meta)
+         values ($1,$2,$3,$4,'event',$5) returning id, message_type, meta, campaign_id, user_id, character_id, content, created_at, updated_at`,
+        [req.params.id, req.user.id, character.id, content, JSON.stringify({ event: 'pickup', sceneId: scene.id, itemId: item.id })]
+      )).rows[0];
+      await client.query('commit');
+      result = { item, received, character, inventory, wallet, updatedScene, combatState, message };
+    } catch (error) {
+      await client.query('rollback');
+      throw error;
+    } finally {
+      client.release();
     }
-    checkMapRateLimit(req.user.id);
-    res.json(await generateMap(body));
+
+    const { updatedScene } = result;
+    // 'scene:items': evento leve so com a lista nova (nao recarrega o mapa inteiro)
+    await emitEvent(req.params.id, 'scene:items', { sceneId: updatedScene.id, items: parseJson(updatedScene.tiles, {}).items || [] }, updatedScene.is_active ? 'all' : 'master', req.user.id);
+    await emitEvent(req.params.id, 'message:created', { message: { ...result.message, account_name: req.user.name, character_name: result.character.character_name } }, 'all', req.user.id);
+    await emitEvent(req.params.id, 'character:updated', { characterId: result.character.id }, 'all', req.user.id);
+    if (result.combatState) await emitCombat(req.params.id, updatedScene, req.user.id);
+    res.status(201).json({
+      item: result.item,
+      received: result.received,
+      character: { id: result.character.id, inventory: result.inventory, wallet: result.wallet }
+    });
   });
 }

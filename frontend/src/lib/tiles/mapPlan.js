@@ -289,10 +289,10 @@ function planToMapOnce(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
         case 'pantano': {
           // manchas de agua parada e lama no meio do capim (ruido), mais ralas na borda da area
           const n = wob(x, y, 5) * 0.7 + wob(x * 2, y * 2, 6) * 0.3 - Math.max(0, d - 0.6) * 0.6;
-          G[y][x] = n > 0.54 ? '%' : n > 0.46 ? 'j' : 'g';
+          G[y][x] = n > 0.54 ? '%' : n > 0.51 ? 'j' : 'g'; // lama so como beirada fina da agua parada
           forest[y * C + x] = 0;
           const r = rnd();
-          if (n <= 0.46 && r < 0.06) setO(x, y, r < 0.03 ? 'T' : r < 0.05 ? 'd' : 'm');
+          if (n <= 0.51 && r < 0.06) setO(x, y, r < 0.03 ? 'T' : r < 0.05 ? 'd' : 'm');
           break;
         }
         case 'lago': G[y][x] = d < 0.55 ? 'W' : '~'; O[y][x] = ' '; forest[y * C + x] = 0; lock[y * C + x] = 1; lake[y * C + x] = 1; break;
@@ -932,7 +932,10 @@ function planToMapOnce(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
       // vila do modo texto: pelo menos ~40 casas se o lugar comporta (cada casa ~20 celulas de chao)
       const target = Math.max(camp ? 6 : Math.min(40, Math.round(cells.length / 20)), Math.round((cells.length / 24) * (camp ? 0.22 : 0.45)));
       if (have >= Math.min(6, target) && have >= target * (camp ? 0.5 : 0.75)) continue;
-      (camp ? fillDistrict : fillStreets)({ cells, small: 0.7, density: 1, type: camp ? 'tenda' : 'casa', want: target - have, avoidRoad: true, scatter: camp });
+      const spec = { cells, small: 0.7, density: camp ? 1 : 1.5, type: camp ? 'tenda' : 'casa', want: target - have, avoidRoad: true, scatter: camp };
+      const got = (camp ? fillDistrict : fillStreets)(spec);
+      // ruas de menos dentro da cerca: completa em fileiras (sem pisar em rua)
+      if (!camp && got < spec.want * 0.6) fillDistrict({ ...spec, want: spec.want - got });
     }
   }
 

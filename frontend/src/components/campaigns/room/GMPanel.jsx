@@ -4,6 +4,8 @@ import Button from '../../Button';
 import { api } from '../../../lib/api';
 import { normalizeRules } from '../../../lib/tableRules';
 import QuickPoints from './QuickPoints';
+import { clockLabel, phaseAt } from '../../../lib/tiles/daylight';
+import { VISION_LABELS, VISION_RADII } from '../../../lib/tableRules';
 
 // Painel do mestre: tudo que so ele controla. O mestre decide acerto e dano; os jogadores so veem o efeito.
 const CONDITIONS = ['caído', 'envenenado', 'atordoado', 'imobilizado', 'sangrando', 'amedrontado', 'invisível', 'inconsciente'];
@@ -102,6 +104,26 @@ function TableRules({ campaignId, rules, members, onRulesChange, notify }) {
             </select>
           </label>
         ))}
+      </div>
+      <p className="mt-4 font-bold text-bone">Hora do mundo e visão</p>
+      <p className="text-xs text-mist">Com o relógio ligado, a luz das cenas de fora segue a hora (amanhecer, dia, entardecer, noite). Na mesa, ‹ e › mudam 15 minutos.</p>
+      <div className="mt-2 grid grid-cols-2 gap-2 text-sm">
+        <label className="text-mist">Relógio
+          <select className="field" disabled={saving} value={rules.clock?.on ? 'on' : 'off'} onChange={(e) => save({ ...rules, clock: { ...rules.clock, on: e.target.value === 'on' } }, e.target.value === 'on' ? 'Relógio ligado: a luz segue a hora.' : 'Relógio desligado: cada cena usa a própria luz.')}>
+            <option value="off">Desligado</option>
+            <option value="on">Ligado</option>
+          </select>
+        </label>
+        <label className="text-mist">Hora
+          <select className="field" disabled={saving} value={rules.clock?.minutes ?? 720} onChange={(e) => save({ ...rules, clock: { on: true, minutes: Number(e.target.value) } }, `Agora são ${clockLabel(Number(e.target.value))}.`)}>
+            {Array.from({ length: 96 }, (_, i) => i * 15).map((m) => <option key={m} value={m}>{clockLabel(m)} · {phaseAt(m)}</option>)}
+          </select>
+        </label>
+        <label className="col-span-2 text-mist">Visão dos jogadores
+          <select className="field" disabled={saving} value={rules.vision ?? 9} onChange={(e) => save({ ...rules, vision: Number(e.target.value) }, `Visão: ${VISION_LABELS[Number(e.target.value)]}.`)}>
+            {VISION_LABELS.map((l, i) => <option key={l} value={i}>{l}{VISION_RADII[i] ? ` (${VISION_RADII[i]} passos)` : ''}</option>)}
+          </select>
+        </label>
       </div>
       <p className="mt-4 font-bold text-bone">Inventário dos jogadores</p>
       <p className="text-xs text-mist">Padrão: 30 kg e 9 itens. Vazio = sem limite. Mochilas guardam itens dentro: pesam, mas contam como 1 item.</p>

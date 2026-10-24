@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fxFromRoll, fxFromHit } from '../lib/fx/sync';
-import { normalizeRules, playerRights } from '../lib/tableRules';
+import { normalizeRules, playerRights, VISION_RADII } from '../lib/tableRules';
+import { loadSummary } from '../lib/load';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Copy, Crown, Map as MapIcon, Maximize2, Swords, X } from 'lucide-react';
 import WorldMapOverlay from '../components/vtt/WorldMapOverlay';
@@ -576,7 +577,7 @@ export default function CampaignRoom() {
             setMapsOpen(false);
             try {
               const { data } = await api.get(`/campaigns/${id}/scenes/${m.mapSceneId}/worldmap`);
-              setWorldMap({ name: m.name, tiles: data.tiles });
+              setWorldMap({ id: m.mapSceneId, name: m.name, tiles: data.tiles });
             } catch (err) { notify(err.response?.data?.message || 'Não deu para abrir o mapa.', 'error'); }
           };
           return (
@@ -599,7 +600,7 @@ export default function CampaignRoom() {
         )}
       </header>
 
-      {worldMap && <WorldMapOverlay name={worldMap.name} tiles={worldMap.tiles} onClose={() => setWorldMap(null)} />}
+      {worldMap && <WorldMapOverlay name={worldMap.name} sceneId={worldMap.id} tiles={worldMap.tiles} onClose={() => setWorldMap(null)} />}
 
       {notice && (
         <div role="status" className={`fixed left-1/2 top-20 z-[60] -translate-x-1/2 border-[3px] border-lead px-4 py-2 shadow-2xl ${notice.type === 'error' ? 'bg-[#2a0b12] text-red-100' : 'lit'}`}>{notice.text}</div>
@@ -650,6 +651,10 @@ export default function CampaignRoom() {
                 onViewScene={setViewSceneId}
                 onPatchItem={patchMapItem}
                 rights={rights}
+                clock={rules.clock}
+                onClockChange={(minutes) => api.put(`/campaigns/${id}/rules`, { ...rules, clock: { on: true, minutes } }).then(({ data }) => setRules(normalizeRules(data))).catch((err) => notify(err.response?.data?.message || 'Não deu para mudar a hora.', 'error'))}
+                visionCells={VISION_RADII[rules.vision ?? 9]}
+                speedFactor={loadSummary(sheet?.inventory || [], rules, user?.id).speed ?? 1}
               />
             ) : (
               <div className="grid h-full min-h-[50svh] place-items-center bg-[#050407] p-6 text-center">
@@ -687,7 +692,7 @@ export default function CampaignRoom() {
                 onOpenMap={async (m) => {
                   try {
                     const { data } = await api.get(`/campaigns/${id}/scenes/${m.mapSceneId}/worldmap`);
-                    setWorldMap({ name: m.name, tiles: data.tiles });
+                    setWorldMap({ id: m.mapSceneId, name: m.name, tiles: data.tiles });
                   } catch (err) { notify(err.response?.data?.message || 'Não deu para abrir o mapa.', 'error'); }
                 }}
                 onExit={() => { setGameMode(false); setGameChat(false); }}

@@ -22,6 +22,13 @@ function normalizeInventory(raw, keepMissing = false) {
 }
 const sheetRule = (value) => (value === 'jogador' ? 'jogador' : 'mestre');
 
+// hora do mundo em minutos (0..1425, de 15 em 15); sem valor = meio-dia
+export const clockMinutes = (v) => { const n = Number(v); return Number.isFinite(n) && v !== null && v !== '' ? ((Math.round(Math.max(0, Math.min(1439, n)) / 15) * 15) % 1440) : 720; };
+
+// 10 alcances de visao (celulas de raio); o ultimo e sem limite
+export const VISION_RADII = [2, 3, 4, 6, 8, 10, 13, 17, 24, null];
+export const VISION_LABELS = ['1 · bem curta', '2', '3', '4', '5 · média', '6', '7', '8', '9 · longe', '10 · sem limite'];
+
 export function normalizeRules(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
   const players = r.players && typeof r.players === 'object'
@@ -31,7 +38,7 @@ export function normalizeRules(raw) {
       return [id, Object.keys(inv).length ? { ...rest, inventory: inv } : rest];
     }))
     : {};
-  return { move: r.move !== false, powers: r.powers !== false, pickup: r.pickup !== false, turn: r.turn || null, inventory: normalizeInventory(r.inventory), sheet: { stats: sheetRule(r.sheet?.stats), powers: sheetRule(r.sheet?.powers) }, players };
+  return { move: r.move !== false, powers: r.powers !== false, pickup: r.pickup !== false, turn: r.turn || null, inventory: normalizeInventory(r.inventory), sheet: { stats: sheetRule(r.sheet?.stats), powers: sheetRule(r.sheet?.powers) }, clock: { on: r.clock?.on === true, minutes: clockMinutes(r.clock?.minutes) }, vision: Number.isInteger(Number(r.vision)) && r.vision !== null && r.vision !== '' ? Math.max(0, Math.min(9, Number(r.vision))) : 9, players };
 }
 
 export function playerRights(rules, userId) {

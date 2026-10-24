@@ -738,6 +738,19 @@ create table if not exists rulebook_meta (
 );
 insert into rulebook_meta ("key", value) values ('version', '0.5 Beta') on conflict ("key") do nothing;
 
+-- ficha que ja foi mostrada numa campanha: a trava da mesa (sheet.stats/powers = 'mestre') vale
+-- enquanto o dono for membro, mesmo que ele tire ou troque o personagem compartilhado
+create table if not exists campaign_character_links (
+  campaign_id uuid not null references campaigns(id) on delete cascade,
+  character_id uuid not null references characters(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (campaign_id, character_id)
+);
+insert into campaign_character_links (campaign_id, character_id)
+  select campaign_id, coalesce(shared_character_id, character_id) from campaign_members
+   where coalesce(shared_character_id, character_id) is not null
+  on conflict do nothing;
+
 -- mapa-item: quem recebeu o mapa de qual cena (o inventario e editavel pelo jogador, entao a
 -- permissao de abrir o mapa fica aqui no servidor)
 create table if not exists campaign_map_grants (

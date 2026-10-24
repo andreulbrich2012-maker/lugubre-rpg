@@ -13,6 +13,8 @@ import ItemIcon from '../icons/ItemIcon';
 import ContainerContents from './ContainerContents';
 import MonsterSprite from '../monsters/MonsterSprite';
 import { monsterLook } from '../../lib/monsters/classify';
+import { skyAt, clockLabel, phaseAt } from '../../lib/tiles/daylight';
+import { Moon, Sun } from 'lucide-react';
 
 // Construcao 3D (estilo Stardew): fachada + telhado em perspectiva, desenhada uma vez no tamanho
 // nativo (16 px/celula) e ampliada nitida pelo CSS. z-index pela linha de baixo da pegada:
@@ -88,6 +90,32 @@ function House({ building, tiles, light, open, cell, lazy = false }) {
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
+// Visao do jogador: escurece tudo fora de um circulo em volta do proprio personagem. Posicao
+// lida a cada quadro (o token anda sem re-render); raio em celulas do mapa.
+function VisionMask({ tokenRef, view, cell, radius }) {
+  const el = useRef(null);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const posRef = useRef(tokenRef);
+  posRef.current = tokenRef;
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const t = posRef.current();
+      const v = viewRef.current;
+      if (!el.current || !t) return;
+      const half = ((t.size || 1) * cell) / 2;
+      const x = v.x + (t.x + half) * v.z; const y = v.y + (t.y + half) * v.z;
+      const r = radius * cell * v.z;
+      el.current.style.background = `radial-gradient(circle at ${x}px ${y}px, transparent ${r * 0.72}px, rgba(4,3,8,.82) ${r}px, rgba(4,3,8,.97) ${r * 1.25}px)`;
+    };
+    tick();
+    return () => cancelAnimationFrame(raf);
+  }, [cell, radius]);
+  return <div ref={el} className="pointer-events-none absolute inset-0 z-[5]" aria-hidden="true" />;
+}
+
 export default function Board({
   scene,
   tokens,
@@ -116,13 +144,20 @@ export default function Board({
   onPatchBuilding,
   onCreateInterior,
   onViewScene,
-  onPatchItem
+  onPatchItem,
+  clock,
+  onClockChange,
+  visionCells = null,
+  speedFactor = 1
 }) {
   const cell = scene?.grid_size || 70;
   const isTiles = scene?.map_kind === 'tiles' && scene?.tiles;
   const width = isTiles ? scene.tiles.cols * cell : scene?.width || cell * 24;
   const height = isTiles ? scene.tiles.rows * cell : scene?.height || cell * 16;
   const viewportRef = useRef(null);
+  // luz da cena: com o relogio do mestre ligado, as cenas de fora seguem a hora (interior nao)
+  const sceneLight = isTiles && clock?.on && !scene?.parent_scene_id ? skyAt(clock.minutes) : (scene?.tiles?.light || 'dia');
+  const litTiles = useMemo(() => (isTiles && scene.tiles.light !== sceneLight ? { ...scene.tiles, light: sceneLight } : scene?.tiles), [isTiles, scene?.tiles, sceneLight]);
   const shakeRef = useRef(null);
   const tokenEls = useRef({});
   // Animacoes (lib/fx): tremida do mapa e empurrao/piscada dos tokens direto no estilo,
@@ -383,7 +418,8 @@ export default function Board({
   selectedRef.current = selected;
   useEffect(() => {
     if (!selectedMovable) return undefined;
-    const speed = Number(scene?.move_speed) || 6;
+    // carga pesada deixa o proprio personagem mais lento (lib/load.js)
+    const speed = (Number(scene?.move_speed) || 6) * (selectedRef.current?.id === myTokenId ? speedFactor : 1);
     const grid = scene?.move_mode === 'grid';
     let frame;
     let last = performance.now();
@@ -457,7 +493,7 @@ export default function Board({
       window.removeEventListener('blur', blur);
       keys.current.clear();
     };
-  }, [selectedMovable, scene?.move_speed, scene?.move_mode, cell, width, height, blocked, tokenPos, queueSend, budget]);
+  }, [selectedMovable, scene?.move_speed, scene?.move_mode, cell, width, height, blocked, tokenPos, queueSend, budget, speedFactor, myTokenId]);
 
   function toMap(event) {
     const rect = viewportRef.current.getBoundingClientRect();
@@ -579,7 +615,7 @@ export default function Board({
         <div ref={shakeRef} className="absolute inset-0">
         <div className="absolute left-0 top-0 origin-top-left" style={{ width, height, transform: `translate(${view.x}px, ${view.y}px) scale(${view.z})` }}>
           {isTiles ? (
-            <TileMapCanvas map={scene.tiles} cellSize={cell} showGrid={Boolean(scene.show_grid)} viewport={vis} scale={view.z} buildingBlocks={farAway} className="absolute inset-0" />
+            <TileMapCanvas map={litTiles} cellSize={cell} showGrid={Boolean(scene.show_grid)} viewport={vis} scale={view.z} buildingBlocks={farAway} className="absolute inset-0" />
           ) : scene?.map_url ? (
             <img src={scene.map_url} alt="" draggable={false} className="absolute inset-0 h-full w-full select-none object-fill" />
           ) : (
@@ -662,7 +698,7 @@ export default function Board({
           })}
 
           {shownBuildings.map((b) => (
-            <House key={b.id} building={b} tiles={scene.tiles} light={scene.tiles.light || 'dia'} cell={cell} open={roofOpen(b)} lazy={buildings.length > 60} />
+            <House key={b.id} building={b} tiles={scene.tiles} light={sceneLight} cell={cell} open={roofOpen(b)} lazy={buildings.length > 60} />
           ))}
 
           <FxLayer ref={fxRef} width={width} height={height} cell={cell} area={fxArea} pixel={fxPixel} onFrame={onFxFrame} className="pointer-events-none absolute left-0 top-0" style={{ zIndex: 900 }} />
@@ -691,6 +727,18 @@ export default function Board({
         </div>
         </div>
       </div>
+
+      {visionCells && !isMaster && isTiles && myToken && <VisionMask tokenRef={() => ({ ...myToken, ...(localRef.current[myToken.id] || {}) })} view={view} cell={cell} radius={visionCells} />}
+
+      {clock?.on && isTiles && !scene.parent_scene_id && (
+        <div className="pointer-events-auto absolute left-1/2 top-3 z-20 flex -translate-x-1/2 items-center gap-1 border-[3px] border-lead bg-abyss/90 px-2 py-1 text-sm text-bone shadow-lg" aria-label={`Hora: ${clockLabel(clock.minutes)}`}>
+          {isMaster && <button type="button" className="btn btn-glass !min-h-7 !w-7 !p-0" onClick={() => onClockChange?.((clock.minutes + 1425) % 1440)} aria-label="Voltar 15 minutos">‹</button>}
+          {phaseAt(clock.minutes) === 'Noite' ? <Moon size={14} className="text-[#9fb4ff]" /> : <Sun size={14} className="text-ember" />}
+          <span className="font-bold tabular-nums">{clockLabel(clock.minutes)}</span>
+          <span className="text-xs text-mist">{phaseAt(clock.minutes)}</span>
+          {isMaster && <button type="button" className="btn btn-glass !min-h-7 !w-7 !p-0" onClick={() => onClockChange?.((clock.minutes + 15) % 1440)} aria-label="Avançar 15 minutos">›</button>}
+        </div>
+      )}
 
       {housePop && isMaster && (() => {
         const b = (scene.tiles.buildings || []).find((d) => d.id === housePop);

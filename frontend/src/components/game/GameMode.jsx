@@ -59,6 +59,7 @@ export default function GameMode({
   // abrir um painel fecha o chat (e vice-versa): um por vez na direita
   const openPanel = useCallback((key) => {
     setPanel((cur) => (cur === key ? null : key));
+    setSlot(null);
     if (chatRef.current) onToggleChat(false);
   }, [onToggleChat]);
   const toggleChat = useCallback(() => {
@@ -141,7 +142,7 @@ export default function GameMode({
   return (
     <div className="game-mode pointer-events-none absolute inset-0 z-30 select-none" aria-label="Modo jogo">
       {/* vitais no canto de cima */}
-      <div className="game-wood pointer-events-auto absolute left-2 top-2 flex w-[min(19rem,calc(100vw-1rem))] items-center gap-2 p-1.5 sm:left-3 sm:top-3 sm:p-2">
+      <div className="game-wood pointer-events-auto absolute left-2 top-2 flex w-[min(19rem,calc(100vw-6.75rem))] items-center gap-2 p-1.5 sm:left-3 sm:top-3 sm:p-2">
         <button type="button" className="game-parchment grid h-14 w-12 shrink-0 place-items-end justify-center overflow-hidden sm:h-16 sm:w-14" onClick={() => openPanel('character')} aria-label="Abrir personagem">
           {sheet.appearance ? <AvatarSprite appearance={sheet.appearance} scale={2} title={sheet.character_name} /> : <span className="game-title self-center text-3xl">{sheet.character_name?.[0]}</span>}
         </button>

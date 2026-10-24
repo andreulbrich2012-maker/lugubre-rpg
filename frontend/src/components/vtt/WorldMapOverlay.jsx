@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Minus, Plus, X } from 'lucide-react';
-import MapPreview from '../buildings/MapPreview';
+import { useMapSnapshot } from '../../lib/tiles/useMapSnapshot';
 
 // Mapa completo da cena (mapa-item): uma "foto" do lugar numa moldura de pergaminho, so o lado
 // de fora, com os pontos principais numerados. Clicar num ponto abre um balao explicando o que e.
+// A imagem e gerada uma vez (worker) e fica guardada no navegador; abrir de novo e instantaneo.
 // Esc fecha.
-export default function WorldMapOverlay({ name, tiles: sceneTiles, onClose }) {
+export default function WorldMapOverlay({ name, sceneId, tiles: sceneTiles, onClose }) {
   // mapa desenhado: sempre de dia (a noite da cena deixaria ilegivel); o estilo da cena fica
   const tiles = useMemo(() => (sceneTiles ? { ...sceneTiles, light: 'dia' } : sceneTiles), [sceneTiles]);
   const box = useRef(null);
@@ -13,6 +14,7 @@ export default function WorldMapOverlay({ name, tiles: sceneTiles, onClose }) {
   const [zoom, setZoom] = useState(1);
   const [active, setActive] = useState(null);
   const pois = useMemo(() => tiles?.pois || [], [tiles]);
+  const snap = useMapSnapshot(sceneId || name, tiles);
 
   useEffect(() => {
     const el = box.current;
@@ -45,7 +47,16 @@ export default function WorldMapOverlay({ name, tiles: sceneTiles, onClose }) {
         <div ref={box} className="worldmap-parchment overflow-auto" style={{ width: 'min(96vw, 1400px)', height: 'min(92vh, 1000px)' }} onClick={() => setActive(null)}>
           <div className="relative mx-auto my-6 w-max">
             <div className="worldmap-photo relative" style={{ width: W, height: H }}>
-              <MapPreview map={tiles} cellSize={cell} />
+              {snap.url
+                ? <img src={snap.url} alt={`Mapa de ${name}`} draggable={false} style={{ width: W, height: H, imageRendering: cell >= snap.cell ? 'pixelated' : 'auto', display: 'block' }} />
+                : (
+                  <div className="worldmap-loading absolute inset-0 grid place-items-center">
+                    <div className="w-64 text-center">
+                      <p className="font-display text-xl">{snap.error ? 'Não deu para desenhar o mapa.' : 'Desenhando o mapa…'}</p>
+                      {!snap.error && <div className="mt-2 h-3 overflow-hidden rounded-sm border-2 border-[#6a4a2a] bg-[#e8d6ae]"><div className="h-full bg-[#6a4a2a] transition-[width]" style={{ width: `${Math.round((snap.progress || 0) * 100)}%` }} /></div>}
+                    </div>
+                  </div>
+                )}
               <div className="worldmap-vignette pointer-events-none absolute inset-0" />
               <p className="worldmap-name pointer-events-none absolute bottom-3 left-3">{name}</p>
               {pois.map((p, i) => (

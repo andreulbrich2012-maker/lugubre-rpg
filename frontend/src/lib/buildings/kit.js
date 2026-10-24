@@ -7,6 +7,7 @@
 // Puro (sem DOM): devolve RGBA; o Board e as previas em node usam o mesmo codigo.
 import { ramp, hexToRgb } from '../avatar/palette.js';
 import { applyStyle } from '../tiles/styles.js';
+import { resolveLight } from '../tiles/daylight.js';
 
 const tone5 = (hex) => ramp(hex).map(hexToRgb);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -635,7 +636,7 @@ export function renderBuilding(spec, { light = 'dia', locked = false, style } = 
   const groundY = H - 12;
   const ox = 4;
   const colors = { ...DEFAULT_COLORS, ...(spec.colors || {}) };
-  const ctx = { night: light === 'noite' || light === 'entardecer', seed: spec.seed || 0, locked, footH };
+  const ctx = { night: resolveLight(light).night, seed: spec.seed || 0, locked, footH };
   // de tras para frente: volumes recuados primeiro
   const order = [...spec.volumes].sort((a, b) => (b.setback || 0) - (a.setback || 0));
   if (spec.stilts) drawStilts(c, ox, spec.w * S, groundY, spec.stilts, colors);
@@ -673,7 +674,7 @@ export function renderBuilding(spec, { light = 'dia', locked = false, style } = 
   }
   applyStyle(data, style);
   // noite de lua (azul claro, legivel) igual ao LIGHT_TINT do compose.js
-  const tint = { entardecer: [242, 184, 144], noite: [104, 116, 180] }[light];
+  const tint = resolveLight(light).tint;
   if (tint) for (let i = 0; i < W * H; i++) {
     if (!data[i * 4 + 3] || c.glow[i]) continue;
     for (let k = 0; k < 3; k++) data[i * 4 + k] = (data[i * 4 + k] * tint[k]) / 255;

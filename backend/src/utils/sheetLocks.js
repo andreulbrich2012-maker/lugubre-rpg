@@ -10,11 +10,20 @@ export const POWERS_LOCKED = 'Só o mestre adiciona ou edita ataques e magias ne
 
 export async function sheetLocks(characterId, userId) {
   const result = await tryQuery(
+    // campanhas onde a ficha esta compartilhada agora OU ja foi mostrada (enquanto o dono continua
+    // membro): tirar e recompartilhar o personagem nao destrava a ficha
     `select c.master_id, c.table_rules, cm.role as viewer_role
-     from campaign_members owner_cm
-     join campaigns c on c.id = owner_cm.campaign_id
+     from campaigns c
      left join campaign_members cm on cm.campaign_id = c.id and cm.user_id = $2
-     where coalesce(owner_cm.shared_character_id, owner_cm.character_id) = $1`,
+     where c.id in (
+       select owner_cm.campaign_id from campaign_members owner_cm
+        where coalesce(owner_cm.shared_character_id, owner_cm.character_id) = $1
+       union
+       select l.campaign_id from campaign_character_links l
+         join characters ch on ch.id = l.character_id
+         join campaign_members m on m.campaign_id = l.campaign_id and m.user_id = ch.owner_id
+        where l.character_id = $1
+     )`,
     [characterId, userId]
   );
   const locks = { stats: false, powers: false };

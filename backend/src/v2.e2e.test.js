@@ -593,6 +593,10 @@ describe.skipIf(!hasDb)('API v2 com Postgres', () => {
     expect((await player.api.patch(`${base()}/characters/${playerCharacter.id}/vitals`, { mana_current: 8, spell: 'Faísca' }).expect(200)).body.mana_current).toBe(8);
     await player.api.patch(`${base()}/characters/${playerCharacter.id}/vitals`, { mana_current: 7, spell: 'Faísca' }).expect(403);
     await player.api.patch(`/api/characters/${playerCharacter.id}/play`, { wallet: { bronze: 3 } }).expect(200); // o resto continua livre
+    // tirar o personagem da campanha nao destrava a ficha (a trava fica presa enquanto ele e membro)
+    await player.api.put(`${base()}/members/me/character`, { characterId: null }).expect(200);
+    await player.api.patch(`/api/characters/${playerCharacter.id}/play`, { lifeCurrent: 1 }).expect(403);
+    await player.api.put(`${base()}/members/me/character`, { characterId: playerCharacter.id }).expect(200);
     await master.api.put(`${base()}/rules`, { sheet: { stats: 'jogador', powers: 'jogador' } }).expect(200);
     expect((await player.api.patch(`/api/characters/${playerCharacter.id}/play`, { lifeCurrent: 20 }).expect(200)).body.life_current).toBe(20);
     const { body: punched } = await player.api.post(`/api/characters/${playerCharacter.id}/powers`, { type: 'attacks', name: 'Soco', damage: '1d4' }).expect(201);

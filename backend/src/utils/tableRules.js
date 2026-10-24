@@ -4,7 +4,8 @@
 //   players: { [userId]: { move?, powers?, pickup?, inventory? } } excecoes por jogador (false trava so ele;
 //   inventory do jogador troca o limite geral so para ele, campo ausente = vale o geral),
 //   sheet: { stats, powers }: 'mestre' (padrao) = so o mestre mexe em vida/mana/sanidade (stats) ou
-//   em ataques/magias (powers) das fichas compartilhadas nesta campanha; 'jogador' = o dono tambem }
+//   em ataques/magias (powers) das fichas compartilhadas nesta campanha; 'jogador' = o dono tambem,
+//   clock: { on, minutes }: hora do mundo (0..1425, de 15 em 15); com on, a luz das cenas de fora segue a hora }
 import { z } from 'zod';
 import { httpError } from './http.js';
 
@@ -16,6 +17,9 @@ export const tableRulesSchema = z.object({
   ...flags,
   sheet: z.object({ stats: sheetOwner, powers: sheetOwner }).optional(),
   turn: z.string().uuid().nullable().optional(),
+  clock: z.object({ on: z.boolean().optional(), minutes: z.coerce.number().int().min(0).max(1439).optional() }).optional(),
+  // alcance da visao dos jogadores: 0 (bem curta) .. 9 (sem limite)
+  vision: z.coerce.number().int().min(0).max(9).optional(),
   inventory: inventorySchema.optional(),
   players: z.record(z.string().uuid(), z.object({ ...flags, inventory: inventorySchema.optional() })).optional()
 });
@@ -44,6 +48,9 @@ function normalizeInventory(raw, keepMissing = false) {
 }
 const sheetRule = (value) => (value === 'jogador' ? 'jogador' : 'mestre');
 
+// hora do mundo em minutos (0..1425, de 15 em 15); sem valor = meio-dia
+export const clockMinutes = (v) => { const n = Number(v); return Number.isFinite(n) && v !== null && v !== '' ? ((Math.round(Math.max(0, Math.min(1439, n)) / 15) * 15) % 1440) : 720; };
+
 export function normalizeRules(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
   return {
@@ -53,6 +60,8 @@ export function normalizeRules(raw) {
     turn: r.turn || null,
     inventory: normalizeInventory(r.inventory),
     sheet: { stats: sheetRule(r.sheet?.stats), powers: sheetRule(r.sheet?.powers) },
+    clock: { on: r.clock?.on === true, minutes: clockMinutes(r.clock?.minutes) },
+    vision: Number.isInteger(Number(r.vision)) && r.vision !== null && r.vision !== '' ? Math.max(0, Math.min(9, Number(r.vision))) : 9,
     players: r.players && typeof r.players === 'object'
       ? Object.fromEntries(Object.entries(r.players).map(([id, own]) => {
         const { inventory, ...rest } = own && typeof own === 'object' ? own : {};

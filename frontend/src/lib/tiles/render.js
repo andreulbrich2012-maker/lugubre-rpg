@@ -4,6 +4,7 @@
 import { SIZE, TILES, getTile, tileImages } from './catalog.js';
 import { roofPixels } from './roofs.js';
 import { renderRegion, terrainFrames, isAnimatedObject, LIGHT_TINT, NIGHT_LIGHT } from './compose.js';
+import { resolveLight } from './daylight.js';
 import { applyStyle, styleHex } from './styles.js';
 import { chunkLayout, chunkRect, visibleChunks, pickLod, diffLayers, dirtyChunks } from './chunks.js';
 
@@ -434,8 +435,8 @@ export function drawMap(ctx, map, {
   }
 
   // ciclo de luz: o ceu multiplica a cor; as fontes de luz somam brilho (mais forte a noite)
-  const light = map.light || 'dia';
-  const tintHex = LIGHT_TINT[light];
+  const sky = resolveLight(map.light);
+  const tintHex = sky.tintHex;
   if (tintHex) {
     ctx.save();
     ctx.globalCompositeOperation = 'multiply';
@@ -447,8 +448,8 @@ export function drawMap(ctx, map, {
     // luzes dos pedacos da vista e dos vizinhos (o brilho passa da borda)
     const reach = 3;
     const near = visibleChunks(L, { x0: vx0 - reach, y0: vy0 - reach, x1: vx1 + reach, y1: vy1 + reach });
-    const strength = light === 'noite' ? 1.4 : light === 'entardecer' ? 0.9 : 0.5;
-    const r = s * (light === 'noite' ? 2.6 : 1.8);
+    const strength = sky.glow;
+    const r = s * sky.radius;
     let saved = false;
     for (const [i, j] of near) {
       for (const [x, y, color] of R.chunkMeta(i, j).lights) {

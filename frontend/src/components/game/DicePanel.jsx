@@ -42,7 +42,10 @@ export default function DicePanel({ sheet, onRoll, busy }) {
   const [history, setHistory] = useState([]);
   const spin = useRef(null);
   const alive = useRef(true);
-  useEffect(() => () => { alive.current = false; clearInterval(spin.current); }, []);
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; clearInterval(spin.current); };
+  }, []);
 
   const formula = diceFormula(qty, sides, bonus);
 

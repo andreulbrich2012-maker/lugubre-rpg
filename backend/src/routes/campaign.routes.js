@@ -295,6 +295,11 @@ router.post('/', async (req, res) => {
   res.status(201).json(await createLocalCampaign(req.user.id, { ...body, invite_code: inviteCode }));
 });
 
+// registra que a ficha foi mostrada nesta campanha (base da trava da mesa; ver utils/sheetLocks.js)
+async function linkCharacter(campaignId, characterId) {
+  await tryQuery('insert into campaign_character_links (campaign_id, character_id) values ($1, $2) on conflict do nothing', [campaignId, characterId]);
+}
+
 router.post('/join', async (req, res) => {
   try {
     const body = z.object({ inviteCode: z.string().min(4), characterId: z.string().uuid().optional().nullable() }).parse(req.body);
@@ -311,6 +316,7 @@ router.post('/join', async (req, res) => {
            updated_at = now()`,
         [campaign.rows[0].id, req.user.id, body.characterId || null, memberColor(req.user.id)]
       );
+      if (body.characterId) await linkCharacter(campaign.rows[0].id, body.characterId);
       await emitEvent(campaign.rows[0].id, 'members:changed', { userId: req.user.id, action: 'joined' }, 'all', req.user.id);
       return res.json(campaign.rows[0]);
     }
@@ -453,6 +459,7 @@ router.put('/:id/members/me/character', async (req, res) => {
     if (result) {
       if (!result.rowCount) return res.status(403).json({ message: 'Você não participa desta campanha.' });
       const characterId = body.characterId || null;
+      if (characterId) await linkCharacter(req.params.id, characterId);
       await emitEvent(req.params.id, 'character:shared', { userId: req.user.id, characterId }, 'all', req.user.id);
       await emitEvent(req.params.id, 'members:changed', { userId: req.user.id, action: 'character' }, 'all', req.user.id);
       return res.json({

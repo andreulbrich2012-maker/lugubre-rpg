@@ -84,7 +84,7 @@ CAMPOS
   "floresta" pode cobrir o mapa todo: vila cercada, rio, estrada, bairro, campo, clareira e cemitério abrem a mata sozinhos. "bosque" = mancha rala.
   "praca" = só a praça central de pedra; feira/mercado ao ar livre = "terra" + barracas e tendas. "ritual" = círculo de pedras com altar (desenha sozinho). "cemiterio" ganha lápides e cerca sozinho.
 - "rivers": [{"points": [[x,y],...], "width": 1 a 6, "exit": "norte"|"sul"|"leste"|"oeste"}]. Cada braço/afluente é um item separado. Rio que sai do mapa: a ponta fica na borda (x ou y = 0 ou 1000) e "exit" diz por qual borda ele sai.
-- "roads": [{"type": "estrada"|"trilha"|"pedra"|"terra"|"cais", "width": 1 a 4, "points": [[x,y],...]}]. Onde a estrada cruza o rio vira ponte sozinha. "cais" = píer de tábuas entrando na água (porto). Estrada que sai do mapa termina na borda (0 ou 1000). Ruas de "terra" dentro da vila ligam a praça às casas.
+- "roads": [{"type": "estrada"|"trilha"|"pedra"|"terra"|"cais", "width": 1 a 4, "points": [[x,y],...]}]. Onde a estrada cruza o rio vira ponte sozinha. "cais" = píer de tábuas entrando na água (porto). Ruas seguem exatamente os seus pontos: para rua curva, ponha mais pontos ao longo da curva (ou "curva": true na rua); "ruas": "curvas" no plano deixa todas tortas. Estrada que sai do mapa termina na borda (0 ou 1000). Ruas de "terra" dentro da vila ligam a praça às casas.
 - "fences": [{"type": "cerca"|"palicada"|"muro"|"sebe", "points": [[x,y],...]}]. Feche o contorno repetindo o primeiro ponto no fim. Onde uma estrada passa pela cerca fica uma abertura sozinha.
 - "buildings": [{"type", "size": "pequena"|"media"|"grande", "x", "y", "facing", "name"}]
   type: ${types}.

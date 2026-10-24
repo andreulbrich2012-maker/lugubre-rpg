@@ -430,9 +430,12 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
   }
   // trecho reto e comprido de rua ganha curva suave (as pontas ficam no lugar). Onde outra rua
   // encosta no meio do trecho a curva zera (o cruzamento em T nao se solta)
-  // modo texto (mapa inventado) curva mais; na foto a rua fica perto de onde a imagem mostra
+  // SO quando o plano pede: "ruas": "curvas" (todas) ou "curva": true numa rua. Sem isso a rua segue
+  // exatamente os pontos (foto com rua reta = rua reta; rua curva na foto vem nos pontos)
   const TEXT = strip(plan.mode ?? plan.modo) === 'texto';
-  const bend = (p, ends, k) => {
+  const ALL_CURVY = /curv/.test(strip(plan.ruas ?? plan.streets));
+  const bend = (p, ends, k, curvy = ALL_CURVY) => {
+    if (!curvy) return p;
     const out = [p[0]];
     for (let i = 0; i + 1 < p.length; i++) {
       const [x0, y0] = p[i]; const [x1, y1] = p[i + 1];
@@ -472,7 +475,7 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
   roadList.forEach(({ r, ch, p }, k) => {
     const w = Math.max(1, Math.min(4, Math.round(num(r?.width, ch === 'û' ? 1 : 2))));
     if (ch === '-') { pier(r?.points, w); return; }
-    lineCells(bend(p, roadEnds, 50 + k * 3), paintRoad(ch, w));
+    lineCells(bend(p, roadEnds, 50 + k * 3, ALL_CURVY || r?.curva === true || /curv/.test(strip(r?.forma))), paintRoad(ch, w));
   });
   // cais: tabuas so na agua (mais ate 2 celulas de terra na raiz); cais sem agua nenhuma e ignorado
   function pier(list, w) {

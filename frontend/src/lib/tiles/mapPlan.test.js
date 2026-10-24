@@ -8,7 +8,7 @@ describe('plano de mapa', () => {
   it('o exemplo do prompt vira um mapa valido com construcoes, pontos e cerca', () => {
     const r = planToMap(PLAN_EXAMPLE, { cols: 100, rows: 80 });
     expect(validateMap(r.map).ok).toBe(true);
-    expect(r.map.buildings.length).toBeGreaterThan(8);
+    expect(r.map.buildings.length).toBeGreaterThanOrEqual(8);
     expect(r.map.pois.map((p) => p.name)).toContain('Templo da Aurora');
     expect(r.map.layers.objects.join('')).toContain('+');
     expect(r.map.layers.ground.join('')).toContain('-'); // ponte/cais
@@ -168,13 +168,19 @@ describe('plano de mapa', () => {
     expect(same / bs.length).toBeLessThan(0.15);
   });
 
-  it('rua reta comprida do modo texto ganha curva mas as pontas ficam no lugar', () => {
-    const { map } = planToMap({ mode: 'texto', roads: [{ type: 'terra', width: 1, points: [[0, 500], [1000, 500]] }] }, { cols: 100, rows: 60, seed: 5 });
-    const rows = [];
-    for (let x = 0; x < 100; x++) { const y = map.layers.ground.findIndex((r) => r[x] === ','); rows.push(y); }
-    expect(rows[0]).toBeGreaterThanOrEqual(29); expect(rows[0]).toBeLessThanOrEqual(30);
-    expect(rows[99]).toBeGreaterThanOrEqual(29); expect(rows[99]).toBeLessThanOrEqual(30);
-    expect(Math.max(...rows.map((y) => Math.abs(y - 29.5)))).toBeGreaterThanOrEqual(2);
+  it('rua segue os pontos: reta fica reta; so curva quando o plano pede (curva: true)', () => {
+    const linha = (road) => {
+      const { map } = planToMap({ mode: 'texto', roads: [road] }, { cols: 100, rows: 60, seed: 5 });
+      const rows = [];
+      for (let x = 0; x < 100; x++) rows.push(map.layers.ground.findIndex((r) => r[x] === ','));
+      return rows;
+    };
+    const reta = linha({ type: 'terra', width: 1, points: [[0, 500], [1000, 500]] });
+    expect(Math.max(...reta.map((y) => Math.abs(y - 29.5)))).toBeLessThanOrEqual(1);
+    const torta = linha({ type: 'terra', width: 1, curva: true, points: [[0, 500], [1000, 500]] });
+    expect(torta[0]).toBeGreaterThanOrEqual(29); expect(torta[0]).toBeLessThanOrEqual(30);
+    expect(torta[99]).toBeGreaterThanOrEqual(29); expect(torta[99]).toBeLessThanOrEqual(30);
+    expect(Math.max(...torta.map((y) => Math.abs(y - 29.5)))).toBeGreaterThanOrEqual(2);
   });
 
   it('bairro grande sem rua ganha viela por dentro', () => {

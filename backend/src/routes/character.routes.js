@@ -51,6 +51,12 @@ const diceSettingsSchema = z.object({
   quickRollModifier: z.coerce.number().default(0)
 });
 
+// Aparencia do boneco em pixel art (frontend/src/lib/avatar/appearance.js). O front conserta
+// qualquer versao velha (repairAppearance); aqui so garante que e um objeto pequeno.
+const appearanceSchema = z.record(z.any())
+  .refine((value) => JSON.stringify(value).length <= 8000, 'Aparência grande demais.')
+  .nullable();
+
 const characterSchema = z.object({
   playerName: z.string().trim().min(1),
   characterName: z.string().trim().min(1),
@@ -74,7 +80,8 @@ const characterSchema = z.object({
   attacks: z.array(powerSchema).default([]),
   spells: z.array(powerSchema).default([]),
   wallet: walletSchema.default({ bronze: 0, silver: 0, platinum: 0, gold: 0 }),
-  diceSettings: diceSettingsSchema.default({ quickRollModifier: 0 })
+  diceSettings: diceSettingsSchema.default({ quickRollModifier: 0 }),
+  appearance: appearanceSchema.optional()
 });
 
 async function skillKeys() {
@@ -94,6 +101,11 @@ function parseJsonField(value, fallback) {
 
 function toJson(value) {
   return JSON.stringify(value ?? null);
+}
+
+// null no SQL (e nao o json "null") quando a ficha ainda nao tem aparencia.
+function appearanceJson(value) {
+  return value && typeof value === 'object' ? JSON.stringify(value) : null;
 }
 
 function normalizeSkillTraining(skills = {}, keys = []) {
@@ -349,6 +361,7 @@ export async function enrich(row, catalogs = null) {
     wallet,
     wallet_total_dracmas: walletTotal(wallet),
     dice_settings: diceSettings,
+    appearance: parseJsonField(row.appearance, null),
     quick_roll_modifier: diceSettings.quickRollModifier,
     save_history: savesResult?.rows || row.save_history || [],
     skills_catalog: skillsCatalog,
@@ -407,10 +420,10 @@ router.post('/', async (req, res, next) => {
         await client.query('begin');
         const result = await client.query(
           `insert into characters
-           (owner_id, player_name, character_name, photo, race_id, class_id, origin_id, origin, level, life_current, life_max, sanity_current, sanity_max, mana, mana_max, defense, attributes, skills, skill_bonuses, inventory, attacks, spells, wallet, dice_settings)
-           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+           (owner_id, player_name, character_name, photo, race_id, class_id, origin_id, origin, level, life_current, life_max, sanity_current, sanity_max, mana, mana_max, defense, attributes, skills, skill_bonuses, inventory, attacks, spells, wallet, dice_settings, appearance)
+           values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
            returning *`,
-          [req.user.id, data.playerName, data.characterName, data.photo || null, data.raceId, data.classId, data.originId || null, data.origin, data.level, data.lifeCurrent, data.lifeMax, data.sanityCurrent, data.sanityMax, data.mana, data.manaMax, data.defense, toJson(data.attributes), toJson(data.skills), toJson(data.skillBonuses), toJson(data.inventory), toJson(data.attacks), toJson(data.spells), toJson(data.wallet), toJson(data.diceSettings)]
+          [req.user.id, data.playerName, data.characterName, data.photo || null, data.raceId, data.classId, data.originId || null, data.origin, data.level, data.lifeCurrent, data.lifeMax, data.sanityCurrent, data.sanityMax, data.mana, data.manaMax, data.defense, toJson(data.attributes), toJson(data.skills), toJson(data.skillBonuses), toJson(data.inventory), toJson(data.attacks), toJson(data.spells), toJson(data.wallet), toJson(data.diceSettings), appearanceJson(data.appearance)]
         );
         row = result.rows[0];
         await client.query(
@@ -571,9 +584,10 @@ router.put('/:id', async (req, res) => {
   const result = await tryQuery(
     `update characters set player_name=$1, character_name=$2, photo=$3, race_id=$4, class_id=$5,
      origin_id=$6, origin=$7, level=$8, life_current=$9, life_max=$10, sanity_current=$11, sanity_max=$12,
-     mana=$13, mana_max=$14, defense=$15, attributes=$16, skills=$17, skill_bonuses=$18, inventory=$19, attacks=$20, spells=$21, wallet=$22, dice_settings=$23, updated_at=now()
+     mana=$13, mana_max=$14, defense=$15, attributes=$16, skills=$17, skill_bonuses=$18, inventory=$19, attacks=$20, spells=$21, wallet=$22, dice_settings=$23,
+     appearance=coalesce($26, appearance), updated_at=now()
      where id=$24 and owner_id=$25 returning *`,
-    [data.playerName, data.characterName, data.photo, data.raceId || null, data.classId || null, data.originId || null, data.origin, data.level, data.lifeCurrent, data.lifeMax, data.sanityCurrent, data.sanityMax, data.mana, data.manaMax, data.defense, toJson(data.attributes), toJson(data.skills), toJson(data.skillBonuses), toJson(data.inventory), toJson(data.attacks), toJson(data.spells), toJson(data.wallet), toJson(data.diceSettings), req.params.id, req.user.id]
+    [data.playerName, data.characterName, data.photo, data.raceId || null, data.classId || null, data.originId || null, data.origin, data.level, data.lifeCurrent, data.lifeMax, data.sanityCurrent, data.sanityMax, data.mana, data.manaMax, data.defense, toJson(data.attributes), toJson(data.skills), toJson(data.skillBonuses), toJson(data.inventory), toJson(data.attacks), toJson(data.spells), toJson(data.wallet), toJson(data.diceSettings), req.params.id, req.user.id, appearanceJson(data.appearance)]
   );
   const row = result?.rows?.[0] || await updateLocalCharacter(req.params.id, req.user.id, data);
   if (!row) return res.status(404).json({ message: 'Ficha não encontrada.' });
@@ -619,6 +633,20 @@ router.patch('/:id/references', async (req, res) => {
   });
   await recordCharacterSave(updated, 'Troca de referencia');
   res.json(await enrich(updated));
+});
+
+// So a aparencia (botao "Editar aparencia" da ficha): nao mexe em nada de regra.
+router.patch('/:id/appearance', async (req, res) => {
+  const parsed = z.object({ appearance: appearanceSchema }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0]?.message || 'Aparência inválida.' });
+  const { appearance } = parsed.data;
+  const result = await tryQuery(
+    'update characters set appearance = $1, updated_at = now() where id = $2 and owner_id = $3 returning *',
+    [appearanceJson(appearance), req.params.id, req.user.id]
+  );
+  const row = result ? result.rows[0] : await updateLocalCharacter(req.params.id, req.user.id, { appearance });
+  if (!row) return res.status(404).json({ message: 'Ficha não encontrada.' });
+  res.json(await enrich(row));
 });
 
 router.patch('/:id/play', async (req, res) => {

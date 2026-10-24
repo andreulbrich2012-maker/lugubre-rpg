@@ -5,11 +5,15 @@ import Button from '../components/Button';
 import EntityImage from '../components/EntityImage';
 import { api } from '../lib/api';
 import { buildCharacterPayload, characterSaveError, validateCharacterDraft } from '../lib/characterBuilder';
+import AvatarCreator from '../components/avatar/AvatarCreator';
+import AvatarSprite from '../components/avatar/AvatarSprite';
+import { defaultAppearance, raceIdFromName } from '../lib/avatar/appearance';
 
 const attributeKeys = ['forca', 'agilidade', 'presenca', 'intelecto', 'vigor'];
 const attributeLabels = { forca: 'Força', agilidade: 'Agilidade', intelecto: 'Intelecto', vigor: 'Vigor', presenca: 'Presença' };
 const baseAttributes = Object.fromEntries(attributeKeys.map((key) => [key, 2]));
-const steps = ['Jogador', 'Personagem', 'Foto', 'Raça', 'Classe', 'Origem', 'Atributos', 'Inventário', 'Resumo'];
+// 'Aparencia' entra depois de Origem: assim as etapas 0-5 (usadas na validacao) nao mudam.
+const steps = ['Jogador', 'Personagem', 'Foto', 'Raça', 'Classe', 'Origem', 'Aparência', 'Atributos', 'Inventário', 'Resumo'];
 const stepValidationMessages = {
   0: 'Informe o nome do jogador.',
   1: 'Informe o nome do personagem.',
@@ -37,7 +41,8 @@ const initial = {
   skills: {},
   inventory: [],
   attacks: [],
-  spells: []
+  spells: [],
+  appearance: null
 };
 
 export default function CharacterBuilder() {
@@ -85,7 +90,8 @@ export default function CharacterBuilder() {
       skills: data.skills || {},
       inventory: data.inventory || [],
       attacks: data.attacks || [],
-      spells: data.spells || []
+      spells: data.spells || [],
+      appearance: data.appearance || null
     })).catch((requestError) => active && setError(characterSaveError(requestError)));
     return () => { active = false; };
   }, [id]);
@@ -99,6 +105,7 @@ export default function CharacterBuilder() {
     Boolean(form.originId || form.origin.trim()),
     true,
     true,
+    true,
     true
   ][step];
 
@@ -108,6 +115,8 @@ export default function CharacterBuilder() {
       return;
     }
     setError('');
+    // chegando na Aparencia sem nada escolhido: comeca do personagem base da raca da ficha
+    if (step === 5 && !form.appearance) setForm((cur) => ({ ...cur, appearance: defaultAppearance(raceIdFromName(selectedRace?.name)) }));
     setStep((current) => Math.min(current + 1, steps.length - 1));
   }
 
@@ -173,29 +182,30 @@ export default function CharacterBuilder() {
           ))}
         </div>
 
-        <div className="grid flex-1 items-start gap-5 py-5 sm:py-8 lg:grid-cols-[1fr_360px] lg:items-center">
-          <section className="gothic-panel min-h-[360px] p-4 sm:p-6 md:min-h-[520px] md:p-10">
+        <div className={`grid flex-1 items-start gap-5 py-5 sm:py-8 ${step === 6 ? '' : 'lg:grid-cols-[1fr_360px] lg:items-center'}`}>
+          <section className={`gothic-panel min-h-[360px] p-4 sm:p-6 md:min-h-[520px] ${step === 6 ? 'md:p-4' : 'md:p-10'}`}>
             {step === 0 && <BigInput label="Nome do jogador" value={form.playerName} onChange={(playerName) => setForm({ ...form, playerName })} />}
             {step === 1 && <BigInput label="Nome do personagem" value={form.characterName} onChange={(characterName) => setForm({ ...form, characterName })} />}
             {step === 2 && <PhotoStep form={form} setForm={setForm} setError={setError} />}
             {step === 3 && <PickList title="Escolha a raça" label="Raça" items={catalog.races} value={form.raceId} onChange={(raceId) => setForm({ ...form, raceId })} />}
             {step === 4 && <PickList title="Escolha a classe" label="Classe" items={catalog.classes} value={form.classId} onChange={(classId) => setForm({ ...form, classId })} />}
             {step === 5 && <OriginStep catalog={catalog} form={form} setForm={setForm} />}
-            {step === 6 && <AttributePreview attributes={finalAttributes} selectedRace={selectedRace} />}
-            {step === 7 && <Inventory form={form} setForm={setForm} />}
-            {step === 8 && <Summary form={form} attributes={finalAttributes} catalog={catalog} />}
+            {step === 6 && <AvatarCreator value={form.appearance} raceId={raceIdFromName(selectedRace?.name)} onChange={(appearance) => setForm((cur) => ({ ...cur, appearance }))} />}
+            {step === 7 && <AttributePreview attributes={finalAttributes} selectedRace={selectedRace} />}
+            {step === 8 && <Inventory form={form} setForm={setForm} />}
+            {step === 9 && <Summary form={form} attributes={finalAttributes} catalog={catalog} />}
             {catalogLoading && <p className="mt-6 text-sm text-mist" role="status">Carregando opções...</p>}
             {error && <p className="mt-6 border-[3px] border-lead bg-blood/40 p-3 text-sm text-bone" role="alert">{error}</p>}
           </section>
 
-          <details className="gothic-panel p-4 lg:hidden">
+          <details className={`gothic-panel p-4 lg:hidden ${step === 6 ? 'hidden' : ''}`}>
             <summary className="cursor-pointer font-display text-2xl text-bone">Preview da ficha</summary>
             <div className="mt-4">
               <SheetPreview form={form} attributes={finalAttributes} catalog={catalog} />
             </div>
           </details>
 
-          <aside className="gothic-panel hidden p-5 lg:block">
+          <aside className={`gothic-panel hidden p-5 ${step === 6 ? '' : 'lg:block'}`}>
             <SheetPreview form={form} attributes={finalAttributes} catalog={catalog} />
           </aside>
         </div>
@@ -273,7 +283,7 @@ function SheetPreview({ form, attributes, catalog }) {
   const klass = catalog.classes.find((item) => item.id === form.classId)?.name || 'Classe';
   const origin = catalog.origins.find((item) => item.id === form.originId)?.name || form.origin || 'Origem';
   const totalDefense = form.defense + form.inventory.reduce((sum, item) => sum + Number(item.defenseBonus || 0), 0);
-  return <div><h2 className="font-display text-3xl text-bone">{form.characterName || 'Personagem'}</h2><p className="text-sm text-mist">{form.playerName || 'Jogador'} · {origin}</p><p className="mt-1 text-sm text-mist">{race} · {klass}</p><div className="mt-5 grid grid-cols-1 gap-3 text-center sm:grid-cols-3"><Stat label="Vida" value={`${form.lifeCurrent}/${form.lifeMax}`} /><Stat label="Sanidade" value={`${form.sanityCurrent}/${form.sanityMax}`} /><Stat label="Mana" value={`${form.mana}/${form.manaMax || form.mana}`} /></div><div className="mt-3 grid grid-cols-1 gap-3 text-center"><Stat label="Defesa" value={totalDefense} /></div><div className="mt-5 grid grid-cols-2 gap-2 min-[420px]:grid-cols-5">{attributeKeys.map((key) => <Stat key={key} label={attributeLabels[key]} value={attributes[key]} />)}</div><p className="tabular mt-4 text-center text-sm text-mist">Esquiva {15 - attributes.agilidade}</p></div>;
+  return <div>{form.appearance && <div className="mb-3 flex justify-center"><AvatarSprite appearance={form.appearance} scale={4} title={`Aparência de ${form.characterName || 'personagem'}`} /></div>}<h2 className="font-display text-3xl text-bone">{form.characterName || 'Personagem'}</h2><p className="text-sm text-mist">{form.playerName || 'Jogador'} · {origin}</p><p className="mt-1 text-sm text-mist">{race} · {klass}</p><div className="mt-5 grid grid-cols-1 gap-3 text-center sm:grid-cols-3"><Stat label="Vida" value={`${form.lifeCurrent}/${form.lifeMax}`} /><Stat label="Sanidade" value={`${form.sanityCurrent}/${form.sanityMax}`} /><Stat label="Mana" value={`${form.mana}/${form.manaMax || form.mana}`} /></div><div className="mt-3 grid grid-cols-1 gap-3 text-center"><Stat label="Defesa" value={totalDefense} /></div><div className="mt-5 grid grid-cols-2 gap-2 min-[420px]:grid-cols-5">{attributeKeys.map((key) => <Stat key={key} label={attributeLabels[key]} value={attributes[key]} />)}</div><p className="tabular mt-4 text-center text-sm text-mist">Esquiva {15 - attributes.agilidade}</p></div>;
 }
 
 function Stat({ label, value }) {

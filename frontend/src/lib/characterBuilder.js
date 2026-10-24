@@ -20,13 +20,13 @@ export function validateCharacterDraft(form, catalog) {
   if (form.originId && !catalog.origins.some((item) => item.id === form.originId)) return { step: 5, message: 'A origem selecionada não está mais disponível. Escolha outra opção.' };
 
   if (requiredNumbers.some((field) => !Number.isFinite(Number(form[field])))) {
-    return { step: 8, message: 'A ficha contém um valor numérico inválido.' };
+    return { step: 9, message: 'A ficha contém um valor numérico inválido.' };
   }
   if (Number(form.lifeMax) < 1 || Number(form.sanityMax) < 1 || Number(form.manaMax) < 0) {
-    return { step: 8, message: 'Os valores máximos da ficha são inválidos.' };
+    return { step: 9, message: 'Os valores máximos da ficha são inválidos.' };
   }
   if (Number(form.lifeCurrent) < 0 || Number(form.sanityCurrent) < 0 || Number(form.mana) < 0) {
-    return { step: 8, message: 'Vida, Sanidade e Mana não podem ser negativas.' };
+    return { step: 9, message: 'Vida, Sanidade e Mana não podem ser negativas.' };
   }
   return null;
 }

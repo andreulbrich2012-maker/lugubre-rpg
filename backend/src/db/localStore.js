@@ -866,6 +866,7 @@ export async function createLocalCharacter(ownerId, character) {
     spells: character.spells ?? [],
     wallet: character.wallet ?? { bronze: 0, silver: 0, platinum: 0, gold: 0 },
     dice_settings: character.diceSettings ?? character.dice_settings ?? { quickRollModifier: 0 },
+    appearance: character.appearance ?? null,
     share_token: crypto.randomUUID(),
     save_history: [{ id: crypto.randomUUID(), label: 'Criacao da ficha', saved_at: now }],
     created_at: now,
@@ -900,6 +901,7 @@ export async function updateLocalCharacter(id, ownerId, character) {
     spells: character.spells ?? data.characters[index].spells ?? [],
     wallet: character.wallet ?? data.characters[index].wallet ?? { bronze: 0, silver: 0, platinum: 0, gold: 0 },
     dice_settings: character.diceSettings ?? character.dice_settings ?? data.characters[index].dice_settings ?? { quickRollModifier: 0 },
+    appearance: character.appearance ?? data.characters[index].appearance ?? null,
     save_history: nextSaveHistory(data.characters[index].save_history, label),
     updated_at: new Date().toISOString()
   };

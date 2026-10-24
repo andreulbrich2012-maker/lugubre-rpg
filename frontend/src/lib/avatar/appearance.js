@@ -48,10 +48,18 @@ export const RACE_BASE = {
   tritao: { hair: ['longo-ondulado', 'verde-musgo'], layers: { torso: ['bata-pescador', ['petroleo', 'osso', 'bronze']], legs: ['sarongue'], feet: ['sandalias-simples'] } }
 };
 
-// "Sátiro" / "satiro" / "Tritão" -> id
+// "Sátiro" / "satiro" / "Tritão" -> id. Bancos antigos ainda tem nomes de outros cenarios:
+// cada um cai na raca do livro mais parecida, para o personagem base fazer sentido.
+const RACE_ALIASES = {
+  elfo: 'sylvar', 'elfo negro': 'nocthar', drow: 'nocthar', anao: 'durkar', aasimar: 'celestiano',
+  tiefling: 'abissiano', orc: 'gorak', 'meio-orc': 'gorak', halfling: 'lumerin', gnomo: 'lumerin',
+  genasi: 'primordiano', fauno: 'satiro', tritao: 'tritao', sereiano: 'tritao'
+};
 export function raceIdFromName(name) {
-  const key = String(name || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-  return RACE_BY_ID[key] ? key : RACES.find((r) => key.startsWith(r.id))?.id || 'humano';
+  const key = String(name || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  if (RACE_BY_ID[key]) return key;
+  if (RACE_ALIASES[key]) return RACE_ALIASES[key];
+  return RACES.find((r) => key.startsWith(r.id))?.id || 'humano';
 }
 
 const SKIN_IDS = new Set(SKINS.map((s) => s.id));

@@ -6,6 +6,7 @@ import RollGlass from '../components/character-sheet/RollGlass';
 import { primordialByName } from '../components/glass/primordiais';
 import CharacterSheetMobile from '../components/character-sheet/CharacterSheetMobile';
 import CharacterSheetLoading from '../components/character-sheet/CharacterSheetLoading';
+import AppearancePanel from '../components/avatar/AppearancePanel';
 import { ResourceStepper } from '../components/character-sheet/ResourceStepper';
 import { api } from '../lib/api';
 import { calculateResourceAdjustment, normalizeResourcePair } from '../lib/characterVitals';
@@ -378,6 +379,7 @@ export default function CharacterSheet() {
   return (
     <main className="min-h-[calc(100vh-64px)] overflow-x-hidden pb-24 lg:px-4 lg:py-5">
       {creationNotice && <div className="fixed left-1/2 top-20 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 pane px-4 py-3 text-center text-sm text-bone " role="status">{creationNotice}</div>}
+      <AppearancePanel sheet={sheet} className="m-3 lg:hidden" onSaved={(data) => { sheetRef.current = { ...sheetRef.current, appearance: data.appearance }; setSheet((cur) => ({ ...cur, appearance: data.appearance })); }} />
       <CharacterSheetMobile
         sheet={sheet}
         draft={draft}
@@ -418,6 +420,7 @@ export default function CharacterSheet() {
               <InfoBlock label="Jogador" value={sheet.player_name} subLabel="Classe" subValue={sheet.class_name || 'Sem classe'} />
             </div>
           </header>
+          <AppearancePanel sheet={sheet} onSaved={(data) => { sheetRef.current = { ...sheetRef.current, appearance: data.appearance }; setSheet((cur) => ({ ...cur, appearance: data.appearance })); }} />
 
           <Panel id="sheet-attributes">
             <h2 className="text-center font-display text-2xl text-bone">Atributos</h2>

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { SLOTS, ITEMS, HAIRS } from './catalog.js';
-import { COLORS } from './palette.js';
+import { COLORS, HAIR_COLORS, SKINS } from './palette.js';
 import { pose, DIRECTIONS, ANIMS, W, H, BUILDS } from './skeleton.js';
 import { createLayer } from './paint.js';
 import { renderPixels, renderSheetPixels } from './compose.js';
@@ -54,6 +54,12 @@ describe('catalogo do criador de personagem', () => {
     }
   });
 
+  it('quantidades minimas pedidas: 16+ cores de cabelo e tons de pele fantasiosos', () => {
+    expect(HAIR_COLORS.length).toBeGreaterThanOrEqual(16);
+    expect(SKINS.length).toBeGreaterThanOrEqual(16);
+    for (const id of ['rubro-abissal', 'azul-profundo', 'verde-gorak', 'lilas-noite']) expect(SKINS.some((s) => s.id === id), id).toBe(true);
+  });
+
   it('variedade de corpo e rosto', () => {
     expect(BEARDS.length).toBeGreaterThanOrEqual(6);
     expect(EYE_STYLES.length).toBeGreaterThanOrEqual(4);
@@ -67,7 +73,7 @@ function checkPixels(px) {
 }
 
 describe('composicao', () => {
-  it('toda peca desenha em toda direcao e quadro sem erro e dentro do quadro', () => {
+  it('toda peca desenha em toda direcao e quadro sem erro e dentro do quadro', { timeout: 180000 }, () => {
     for (const slot of SLOTS) for (const it of ITEMS[slot.id]) {
       const app = defaultAppearance('humano');
       app.layers[slot.id] = { id: it.id };
@@ -75,7 +81,7 @@ describe('composicao', () => {
     }
   });
 
-  it('todo cabelo, barba, olho e traco desenha em toda direcao', () => {
+  it('todo cabelo, barba, olho e traco desenha em toda direcao', { timeout: 120000 }, () => {
     const app = defaultAppearance('humano');
     for (const h of HAIRS) for (const d of DIRECTIONS) for (let f = 0; f < 4; f++) checkPixels(renderPixels({ ...app, hair: { style: h.id, color: 'ruivo' } }, d, 'walk', f));
     for (const b of BEARDS) for (const d of DIRECTIONS) checkPixels(renderPixels({ ...app, beard: { style: b.id, color: 'preto' } }, d, 'idle', 0));

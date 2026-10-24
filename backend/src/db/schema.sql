@@ -108,6 +108,7 @@ alter table characters add column if not exists attacks jsonb not null default '
 alter table characters add column if not exists spells jsonb not null default '[]';
 alter table characters add column if not exists wallet jsonb not null default '{"bronze":0,"silver":0,"platinum":0,"gold":0}';
 alter table characters add column if not exists dice_settings jsonb not null default '{"quickRollModifier":0}';
+alter table characters add column if not exists appearance jsonb;
 update characters set mana_max = mana where mana_max = 0 and mana > 0;
 
 create table if not exists character_saves (

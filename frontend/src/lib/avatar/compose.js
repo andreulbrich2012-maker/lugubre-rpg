@@ -9,10 +9,11 @@ import { getItem, HAIR_BY_ID as HAIRSTYLE_BY_ID } from './catalog.js';
 import { repairAppearance } from './appearance.js';
 
 // Ordem das camadas por visao. 'arm' (bracos da frente) sai numa 2a passada.
+// 'knees' vem depois de 'feet': joelheira, caneleira e tornozeleira ficam por cima da bota.
 const ORDER = {
-  down: ['back', 'tail', 'hairBack', 'body', 'marks', 'legsTrait', 'legs', 'knees', 'feet', 'torso', 'waist', 'arms', 'hands', 'neck', 'over', 'faceBase', 'faceTrait', 'beard', 'hairFront', 'earsTrait', 'crest', 'horns', 'head', 'face', 'ears', 'halo', 'held'],
-  side: ['back', 'hairBack', 'tail', 'body', 'marks', 'legsTrait', 'legs', 'knees', 'feet', 'torso', 'waist', 'arms', 'hands', 'neck', 'over', 'faceBase', 'faceTrait', 'beard', 'hairFront', 'earsTrait', 'crest', 'horns', 'head', 'face', 'ears', 'halo', 'held'],
-  up: ['held', 'body', 'marks', 'legsTrait', 'legs', 'knees', 'feet', 'torso', 'waist', 'arms', 'hands', 'neck', 'hairBack', 'back', 'over', 'tail', 'hairFront', 'earsTrait', 'crest', 'horns', 'head', 'ears', 'halo']
+  down: ['back', 'tail', 'hairBack', 'body', 'marks', 'legsTrait', 'legs', 'feet', 'knees', 'torso', 'waist', 'arms', 'hands', 'neck', 'over', 'faceBase', 'faceTrait', 'beard', 'hairFront', 'earsTrait', 'crest', 'horns', 'head', 'face', 'ears', 'halo', 'held'],
+  side: ['back', 'hairBack', 'tail', 'body', 'marks', 'legsTrait', 'legs', 'feet', 'knees', 'torso', 'waist', 'arms', 'hands', 'neck', 'over', 'faceBase', 'faceTrait', 'beard', 'hairFront', 'earsTrait', 'crest', 'horns', 'head', 'face', 'ears', 'halo', 'held'],
+  up: ['held', 'body', 'marks', 'legsTrait', 'legs', 'feet', 'knees', 'torso', 'waist', 'arms', 'hands', 'neck', 'hairBack', 'back', 'over', 'tail', 'hairFront', 'earsTrait', 'crest', 'horns', 'head', 'face', 'ears', 'halo']
 };
 // Item na mao de costas fica atras do corpo (passada principal, antes de tudo).
 const EQUIP = new Set(['torso', 'legs', 'feet', 'head', 'face', 'ears', 'neck', 'back', 'waist', 'arms', 'hands', 'knees', 'held']);
@@ -104,3 +105,6 @@ export function renderSheetPixels(appearance) {
   });
   return { width: cols * W, height: rows * H, data: out };
 }
+
+// Nome pedido na especificacao: um quadro RGBA da aparencia (mesma funcao).
+export const composeFrame = renderPixels;

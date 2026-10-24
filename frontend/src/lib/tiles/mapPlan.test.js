@@ -76,6 +76,8 @@ describe('plano de mapa', () => {
   it('modo texto usa exemplo sem mar/cais; modo foto mantem o exemplo completo', () => {
     expect(buildPlanPrompt({ description: 'vila' })).not.toContain('"type":"cais"');
     expect(buildPlanPrompt({ fromImage: true })).toContain('"type":"cais"');
+    expect(buildPlanPrompt({ description: 'vila' })).toContain('"mode":"texto"');
+    expect(buildPlanPrompt({ fromImage: true })).not.toContain('"mode":"texto"');
   });
   it('mercado (terra pequena) e cemiterio ficam sem casa de bairro em cima', () => {
     const r = planToMap({ areas: [{ type: 'bairro', size: 'pequena', density: 1.5, rect: [100, 100, 800, 800] }, { type: 'terra', rect: [400, 400, 200, 200] }] }, { cols: 80, rows: 60 });
@@ -104,5 +106,26 @@ describe('plano de mapa', () => {
     const r = planToMap({ areas: [{ type: 'neve', rect: [0, 0, 1000, 1000] }, { type: 'campo', rect: [300, 300, 400, 400] }, { type: 'floresta', circle: [100, 100, 100] }] }, { cols: 80, rows: 60 });
     expect(r.map.layers.ground[30].slice(36, 44)).toMatch(/^[*]+$/);
     expect(r.map.layers.objects.join('')).not.toContain('T');
+  });
+
+  it('rio com exit: o rabo que foge para outra borda vira reto ate a borda pedida', () => {
+    const rio = { points: [[0, 300], [500, 600], [700, 650], [740, 800], [760, 1000]], width: 2 };
+    const sem = planToMap({ rivers: [rio] }, { cols: 60, rows: 40 }).map.layers.ground;
+    const com = planToMap({ rivers: [{ ...rio, exit: 'leste' }] }, { cols: 60, rows: 40 }).map.layers.ground;
+    expect(sem[39]).toContain('0');
+    expect(com[39]).not.toContain('0');
+    expect(com.some((row) => row[59] === '0')).toBe(true);
+  });
+
+  it('tenda usa projeto de tenda de verdade (nao cai em casa)', () => {
+    for (const size of ['pequena', 'media', 'grande']) expect(pickDesign({ type: 'tenda', size }).id).toMatch(/^(tenda|barraca-acampamento)-/);
+  });
+
+  it('modo texto: paliçada vazia ganha casas; sem modo texto (foto) fica como esta', () => {
+    const base = { areas: [{ type: 'praca', circle: [500, 500, 50] }], fences: [{ type: 'palicada', points: [[250, 250], [750, 250], [750, 750], [250, 750], [250, 250]] }], buildings: [{ type: 'taverna', x: 600, y: 500 }] };
+    const foto = planToMap(base, { cols: 80, rows: 60 });
+    const texto = planToMap({ ...base, mode: 'texto' }, { cols: 80, rows: 60 });
+    expect(foto.map.buildings.length).toBe(1);
+    expect(texto.map.buildings.length).toBeGreaterThan(8);
   });
 });

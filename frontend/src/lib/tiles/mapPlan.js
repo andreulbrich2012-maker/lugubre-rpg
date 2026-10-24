@@ -62,7 +62,7 @@ export const PLAN_BUILDINGS = {
   cripta: { pequena: ['cripta-7'], media: ['mausoleu-7'], grande: ['mausoleu-10'] },
   pescador: { pequena: ['pescador-5'], media: ['pescador-7'], grande: ['pescador-7'] },
   cabana_bruxa: { pequena: ['cabana-bruxa-5'], media: ['cabana-bruxa-6'], grande: ['cabana-bruxa-6'] },
-  tenda: { pequena: ['tenda-4-7'], media: ['tenda-5-8'], grande: ['tenda-6-6'] },
+  tenda: { pequena: ['barraca-acampamento-3', 'barraca-acampamento-4'], media: ['barraca-acampamento-4', 'tenda-4-7'], grande: ['tenda-6-6', 'tenda-5-8'] },
   cogumelo: { pequena: ['cogumelo-4'], media: ['cogumelo-5'], grande: ['cogumelo-6'] }
 };
 
@@ -293,19 +293,40 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     }
   };
   const brush = (x, y, w, fn) => { const h0 = -Math.floor((w - 1) / 2); for (let dy = h0; dy < h0 + w; dy++) for (let dx = h0; dx < h0 + w; dx++) fn(x + dx, y + dy); };
+  // "exit"/"from": a IA diz por qual borda o rio sai/entra; o rabo que foge para outra borda e cortado
+  // e o rio segue reto ate a borda pedida (IA fraca emenda o riacho e sai pela borda errada)
+  const EDGE = { leste: [0, SCALE], oeste: [0, 0], sul: [1, SCALE], norte: [1, 0], direita: [0, SCALE], esquerda: [0, 0], baixo: [1, SCALE], cima: [1, 0] };
+  const toBorder = (list, edge) => {
+    const e = EDGE[strip(edge)];
+    let p = (Array.isArray(list) ? list : []).filter(Array.isArray).map((q) => [num(q[0]), num(q[1])]);
+    if (!e || p.length < 2) return p;
+    const [ax, at] = e;
+    if (Math.abs(p[p.length - 1][ax] - at) < SCALE * 0.02) return p;
+    // corta do fim os trechos que andam mais no outro eixo (indo para outra borda)
+    while (p.length > 2) {
+      const [a, b] = p.slice(-2);
+      const along = Math.abs(b[ax] - a[ax]); const across = Math.abs(b[1 - ax] - a[1 - ax]);
+      if (across > along || (b[ax] - a[ax]) * (at - a[ax]) < 0) p = p.slice(0, -1); else break;
+    }
+    const last = p[p.length - 1].slice(); last[ax] = at;
+    return [...p, last];
+  };
   for (const r of Array.isArray(plan.rivers) ? plan.rivers : []) {
     const w = Math.max(1, Math.min(6, Math.round(num(r?.width, 3))));
-    line(r?.points, (x, y) => brush(x, y, w, (a, b) => { if (inside(a, b) && G[b][a] !== 'W' && G[b][a] !== '~') { G[b][a] = '0'; O[b][a] = ' '; forest[b * C + a] = 0; lock[b * C + a] = 1; } }), true);
+    let rp = toBorder(r?.points, r?.exit ?? r?.saida);
+    if (r?.from ?? r?.entrada) rp = toBorder([...rp].reverse(), r.from ?? r.entrada).reverse();
+    line(rp, (x, y) => brush(x, y, w, (a, b) => { if (inside(a, b) && G[b][a] !== 'W' && G[b][a] !== '~') { G[b][a] = '0'; O[b][a] = ' '; forest[b * C + a] = 0; lock[b * C + a] = 1; } }), true);
   }
   const ROAD = { estrada: ';', pedra: 'c', trilha: 'û', terra: ',', cais: '-' };
   const piers = []; // cais desenhados: barcos e barris depois
+  const roadCell = new Uint8Array(C * R); // celulas de estrada/rua (o enchimento automatico nao poe casa em cima)
   for (const r of Array.isArray(plan.roads) ? plan.roads : []) {
     const ch = ROAD[strip(r?.type ?? r?.tipo)] || ';';
     const w = Math.max(1, Math.min(4, Math.round(num(r?.width, ch === 'û' ? 1 : 2))));
     if (ch === '-') { pier(r?.points, w); continue; }
     line(r?.points, (x, y) => brush(x, y, w, (a, b) => {
       if (!inside(a, b)) return;
-      forest[b * C + a] = 0; lock[b * C + a] = 1; O[b][a] = ' ';
+      forest[b * C + a] = 0; lock[b * C + a] = 1; O[b][a] = ' '; roadCell[b * C + a] = 1;
       if (WATER.has(G[b][a]) || G[b][a] === '-') G[b][a] = '-'; else if (G[b][a] !== 'c' && G[b][a] !== ';') G[b][a] = ch;
     }), ch !== '-');
   }
@@ -435,10 +456,13 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
 
   // ---- bairros: casas sozinhas, sem encostar, viradas para a rua ----
   const overNoHouse = (t, tx, ty) => { for (let yy = ty; yy < ty + t.h; yy++) for (let xx = tx; xx < tx + t.w; xx++) if (inside(xx, yy) && noHouse[yy * C + xx]) return true; return false; };
-  for (const dist of districts) {
+  const overRoad = (t, tx, ty) => { for (let yy = ty; yy < ty + t.h; yy++) for (let xx = tx; xx < tx + t.w; xx++) if (inside(xx, yy) && roadCell[yy * C + xx]) return true; return false; };
+  const fillDistrict = (dist) => {
     // varre de cima para baixo e da esquerda para a direita: as casas saem em fileiras
     const order = dist.cells.map((c) => c).sort((a, b) => a[1] - b[1] || a[0] - b[0]);
-    const want = Math.round((dist.cells.length / 24) * dist.density);
+    // acampamento: tendas espalhadas, nao em fileira
+    if (dist.scatter) for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+    const want = dist.want ?? Math.round((dist.cells.length / 24) * dist.density);
     let made = 0;
     for (const [cx, cy] of order) {
       if (made >= want || buildings.length >= MAX_BUILDINGS) break;
@@ -448,13 +472,56 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
         const t = pickDesign({ type: dist.type, size }, rnd);
         if (!t) continue;
         const tx = cx - Math.floor(t.w / 2); const ty = cy - Math.floor(t.h / 2);
-        if (free(t, tx, ty) && !overNoHouse(t, tx, ty)) { d = t; x = tx; y = ty; break; }
+        if (free(t, tx, ty) && !overNoHouse(t, tx, ty) && !(dist.avoidRoad && overRoad(t, tx, ty))) { d = t; x = tx; y = ty; break; }
       }
       if (!d) continue;
       occupy(d, x, y);
       const facing = faceRoad(d, x, y);
       buildings.push({ id: `b${buildings.length + 1}`, x, y, w: d.w, h: d.h, design: d.id, name: d.name, auto: true, ...(facing !== 'sul' ? { facing } : {}) });
       made++;
+    }
+    return made;
+  };
+  for (const dist of districts) fillDistrict(dist);
+
+  // ---- modo texto: povoado vazio (palicada/muro ou praca com menos de 6 construcoes) ganha casas ----
+  // so quando o plano diz "mode":"texto" (foto fiel e esparsa nao e mexida)
+  if (strip(plan.mode ?? plan.modo) === 'texto') {
+    const polyCells = (p) => {
+      const out = [];
+      const xs = p.map((q) => q[0]); const ys = p.map((q) => q[1]);
+      for (let y = Math.max(0, Math.min(...ys)); y <= Math.min(R - 1, Math.max(...ys)); y++) for (let x = Math.max(0, Math.min(...xs)); x <= Math.min(C - 1, Math.max(...xs)); x++) {
+        let inP = false;
+        for (let i = 0, j = p.length - 1; i < p.length; j = i++) { const [xi, yi] = p[i]; const [xj, yj] = p[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi || 1e-9) + xi) inP = !inP; }
+        if (inP) out.push([x, y, 0]);
+      }
+      return out;
+    };
+    const places = [];
+    for (const f of Array.isArray(plan.fences) ? plan.fences : []) {
+      if (!['palicada', 'muro'].includes(strip(f?.type ?? f?.tipo))) continue;
+      const p = pts(f?.points);
+      if (p.length >= 4 && Math.hypot(p[0][0] - p[p.length - 1][0], p[0][1] - p[p.length - 1][1]) <= Math.max(3, C * 0.04)) places.push(polyCells(p));
+    }
+    const rad = Math.round(Math.min(C, R) * 0.12);
+    for (const a of areas) {
+      if (a.type !== 'praca') continue;
+      const pc = shapeCells(a); if (!pc.length) continue;
+      const cx = Math.round(pc.reduce((s2, c) => s2 + c[0], 0) / pc.length); const cy = Math.round(pc.reduce((s2, c) => s2 + c[1], 0) / pc.length);
+      if (places.some((cells) => cells.some(([x, y]) => x === cx && y === cy))) continue;
+      const disc = [];
+      for (let y = cy - rad; y <= cy + rad; y++) for (let x = cx - rad; x <= cx + rad; x++) if (inside(x, y) && Math.hypot(x - cx, y - cy) <= rad) disc.push([x, y, 0]);
+      places.push(disc);
+    }
+    const camp = /acampamento|bandid|salteador|tenda/.test(strip(`${plan.name ?? ''} ${plan.notes ?? ''}`)) || [...(plan.buildings || []), ...(plan.objects || [])].filter((b) => /tenda/.test(strip(b?.type ?? b?.tipo))).length >= 2;
+    if (camp) for (const a of areas) if (a.type === 'clareira') places.push(shapeCells(a));
+    for (const cells of places) {
+      if (cells.length < 60) continue;
+      const set = new Set(cells.map(([x, y]) => y * C + x));
+      const have = buildings.filter((b) => set.has((b.y + (b.h >> 1)) * C + b.x + (b.w >> 1))).length;
+      const target = Math.max(6, Math.round((cells.length / 24) * (camp ? 0.22 : 0.45)));
+      if (have >= Math.min(6, target) && have >= target * 0.5) continue;
+      fillDistrict({ cells, small: 0.7, density: 1, type: camp ? 'tenda' : 'casa', want: target - have, avoidRoad: true, scatter: camp });
     }
   }
 

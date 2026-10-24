@@ -21,7 +21,7 @@ export const PLAN_EXAMPLE = {
     { type: 'cemiterio', rect: [740, 300, 110, 90] },
     { type: 'mar', points: [[880, 450], [1000, 380], [1000, 760], [900, 700]] }
   ],
-  rivers: [{ points: [[200, 0], [240, 300], [300, 700], [260, 1000]], width: 3 }, { points: [[600, 0], [450, 200], [250, 330]], width: 2 }],
+  rivers: [{ points: [[200, 0], [240, 300], [300, 700], [260, 1000]], width: 3, exit: 'sul' }, { points: [[600, 0], [450, 200], [250, 330]], width: 2 }],
   roads: [
     { type: 'estrada', width: 2, points: [[0, 520], [470, 500], [1000, 480]] },
     { type: 'trilha', points: [[470, 500], [500, 250], [550, 0]] },
@@ -55,6 +55,7 @@ export const PLAN_EXAMPLE = {
 
 // exemplo do modo texto: sem mar, cais, barco nem pescador (a IA fraca copiava o porto do exemplo)
 export const TEXT_EXAMPLE = {
+  mode: 'texto',
   ...PLAN_EXAMPLE,
   areas: [PLAN_EXAMPLE.areas[0], { type: 'campo', rect: [280, 280, 480, 480] }, ...PLAN_EXAMPLE.areas.slice(1).filter((a) => a.type !== 'mar')],
   rivers: PLAN_EXAMPLE.rivers.slice(0, 1),
@@ -82,7 +83,7 @@ CAMPOS
   "bairro" = área cheia de casas: o sistema enche ela de casas sozinho, em fileiras, viradas para a rua mais perto ("density" de 0.5 a 1.5; "size": "pequena"|"media"|"grande").
   "floresta" pode cobrir o mapa todo: vila cercada, rio, estrada, bairro, campo, clareira e cemitério abrem a mata sozinhos. "bosque" = mancha rala.
   "praca" = só a praça central de pedra; feira/mercado ao ar livre = "terra" + barracas e tendas. "ritual" = círculo de pedras com altar (desenha sozinho). "cemiterio" ganha lápides e cerca sozinho.
-- "rivers": [{"points": [[x,y],...], "width": 1 a 6}]. Cada braço/afluente é um item separado. Rio que sai do mapa: a ponta fica na borda (x ou y = 0 ou 1000).
+- "rivers": [{"points": [[x,y],...], "width": 1 a 6, "exit": "norte"|"sul"|"leste"|"oeste"}]. Cada braço/afluente é um item separado. Rio que sai do mapa: a ponta fica na borda (x ou y = 0 ou 1000) e "exit" diz por qual borda ele sai.
 - "roads": [{"type": "estrada"|"trilha"|"pedra"|"terra"|"cais", "width": 1 a 4, "points": [[x,y],...]}]. Onde a estrada cruza o rio vira ponte sozinha. "cais" = píer de tábuas entrando na água (porto). Estrada que sai do mapa termina na borda (0 ou 1000). Ruas de "terra" dentro da vila ligam a praça às casas.
 - "fences": [{"type": "cerca"|"palicada"|"muro"|"sebe", "points": [[x,y],...]}]. Feche o contorno repetindo o primeiro ponto no fim. Onde uma estrada passa pela cerca fica uma abertura sozinha.
 - "buildings": [{"type", "size": "pequena"|"media"|"grande", "x", "y", "facing", "name"}]
@@ -99,7 +100,7 @@ ${fromImage ? `PASSO A PASSO (faça nesta ordem)
 1. NOMES: leia a legenda (1, 2, 3...) e todo nome escrito no mapa → "pois".
 2. VILA: siga com o dedo a borda da vila e faça a cerca com esses pontos (repita o 1º no fim): muralha de pedra cinza = "muro"; troncos = "palicada"; sem cerca na imagem = nenhuma.
 3. CHÃO: olhe entre a vila e a borda da imagem. Árvores grudadas cobrindo tudo → uma "floresta" do mapa inteiro [[0,0],[1000,0],[1000,1000],[0,1000]]. Grama verde aberta → NADA de floresta do mapa inteiro: uma "floresta" (points) para CADA mancha de mata, "bosque" para árvores soltas. "campo"/"clareira" para descampados; "rocha"/"montanha" onde houver; costa = "mar" até a borda + "areia" na praia.
-4. ÁGUA: o rio principal é o mais largo. Ache ANTES onde as duas pontas dele tocam a moldura da imagem (ex.: sai pela direita → x=1000) e siga-o na MESMA direção até lá. Riacho/afluente = outro item que começa na borda ou na nascente e TERMINA num ponto do rio principal. Píer = "cais" da praia para dentro do mar.
+4. ÁGUA: o rio principal é o mais largo. Olhe na moldura da imagem por qual borda ele sai e diga em "exit" (direita = "leste"); siga-o até lá. Riacho/afluente = outro item que começa na borda ou na nascente e TERMINA num ponto do rio principal. Píer = "cais" da praia para dentro do mar.
 5. CAMINHOS: cada estrada até a borda (0 ou 1000); a estrada que contorna a vila também; ruas de "terra" da praça até cada grupo de casas.
 6. CASAS: um "bairro" para CADA amontoado de telhados, até os de 3–4 casas, do tamanho do amontoado (não junte dois). Vila pintada e apertada: "size":"pequena", "density":1.5.
 7. ESPECIAIS: em "buildings" cada prédio com nome e cada telhado diferente (castelo = pedra cinza com torre, templo, taverna junto à praça, capela, celeiro, estábulo, serraria...). Quadrado cercado com lápides = "cemiterio" (plantação tem fileiras de terra).
@@ -114,7 +115,7 @@ CONFIRA ANTES DE RESPONDER
 [ ] pois = legenda + nomes escritos fora dela; nenhum nome do EXEMPLO
 
 ` : `REGRAS PARA FICAR BONITO
-O pedido costuma ser curto e informal: complete com o que combina com ele (nomes, construções, detalhes, clima). Mapa pequeno e simples só se pedir.
+Ponha "mode":"texto" no JSON. O pedido costuma ser curto e informal: complete com o que combina com ele (nomes, construções, detalhes, clima). Mapa pequeno e simples só se pedir.
 1. Siga o pedido item por item, no lado pedido. Não invente rio, mar, lago ou cais que ele não pede. NÃO copie nomes, frases nem coordenadas do EXEMPLO.
 2. Casas: muitos "bairro" retangulares de ~90x80, "size":"pequena", "density":1.5, com uma rua de "terra" entre eles. Aldeia/acampamento: 3–6. Vila: 8–12. Cidade: 15–25 enchendo todo o espaço dentro do muro. Prédios com função (taverna, templo, mercado, celeiro...) vão em "buildings" DENTRO da vila, na beira da praça ou de uma rua, fora dos retângulos de bairro.
 3. Chão: "floresta" no mapa todo ou só no lado pedido; depois um "campo" cobrindo a vila com 80 de folga. Nunca "campo" no mapa inteiro. Neve = "neve" no mapa todo. Pântano = "pantano" no mapa todo + 3–5 "lago"; a vila fica num "campo" (chão firme); palafitas = "bairro" na beira de um lago com "cais" entrando na água.

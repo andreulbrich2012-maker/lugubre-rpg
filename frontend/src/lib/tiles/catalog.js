@@ -6,6 +6,7 @@
 import { MORE_TILES, REPAINT } from './extra.js';
 import { toImages } from './paint.js';
 import { WATER_TILES } from './water.js';
+import { draw3d } from './objects3d.js';
 
 export const SIZE = 16;
 export const DEFAULT_GROUND = '.';
@@ -1996,6 +1997,18 @@ for (const t of TILES) {
   t.pixels = images[0];
   t.palette = palette;
   delete t.frames;
+}
+
+// objetos com volume 3/4 (objects3d.js): troca so os pixels, mantendo quadros/variantes
+for (const t of TILES) {
+  const canvases = draw3d(t.code);
+  if (!canvases) continue;
+  const old = t.frames || t.variants || [t.pixels];
+  if (canvases.length !== old.length) throw new Error(`objects3d ${t.code}: ${canvases.length} imagens, catalogo tem ${old.length}`);
+  const { images, palette } = toImages(canvases);
+  if (t.frames) t.frames = images; else if (t.variants) t.variants = images;
+  t.pixels = images[0];
+  t.palette = palette;
 }
 
 export const TILE_BY_CODE = Object.fromEntries(TILES.map((t) => [t.code, t]));

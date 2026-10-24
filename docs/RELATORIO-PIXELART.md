@@ -272,3 +272,20 @@ Bancos antigos que ainda têm raças de outro cenário caem na raça do livro ma
 - **Monstros:** o nível é estimado (não há coluna de nível); quadrúpedes de frente ficam estreitos; a aranha e a esfinge a 16 px leem fraco.
 - **Ícones:** as raízes de Gaia parecem um "Ω"; espadas parecidas a 24 px; dardos, linguiça, cinto, pote de mel e bestas mais fracos.
 - **Pendências do catálogo** (nomes de raças diferentes do livro, raças, origens e perícias faltando): o prompt manda perguntar antes de mexer, então não mexi. Por enquanto as raças antigas caem na raça do livro mais parecida, só para a aparência.
+
+# Terceira rodada (construções 3D, portas, regras do mestre, estilos)
+
+## O que entrou
+- **Construções no estilo Stardew** (`frontend/src/lib/buildings/kit.js`): visão 3/4 de verdade — fachada, telhado em perspectiva (frontal, empena, celeiro/gambrel, plano com ameias), varandas, toldos, pórticos, campanários, torres, silos, palafitas, ruínas, casa-cogumelo e tenda. Contorno sépia, luz de cima-esquerda, sombra no chão.
+- **Catálogo de 250 projetos** (`designs.js`): 100 casas (pequenina → mansão, 15 formatos), fazenda (celeiros, estábulos, silos, estufas, moinhos), comércio (lojas, padaria, taverna, ferraria, mercado...), cidade (prefeitura, biblioteca, escola, quartel, farol, muralhas), religião (capelas, igrejas, templos, criptas) e fantasia/ruínas (torres de mago, cabana da bruxa, castelos, iurtas).
+- **Material e cores trocáveis sem refazer nada**: cada construção do mapa guarda `design` + `material` (tábuas, troncos, pedra, tijolo, reboco/enxaimel, tábuas verticais, vidro) + `roofStyle` (telha, ardósia, palha, tabuinhas, vidro) + `colors` (telhado, parede, detalhes). 7 materiais × 5 telhados × cores livres → bem mais de 500 combinações. Trocar material puxa a cor natural (tijolo avermelhado, palha dourada); o mestre pode recolorir. Mapas antigos (casas desenhadas com paredes) passam a usar o mesmo kit.
+- **Interiores prontos** (`interiors.js`): 15 tipos (casa, taverna, loja, ferraria, alquimista, biblioteca, capela/igreja, celeiro/estábulo, armazém, quartel, prefeitura, torre, cripta, moinho, mansão) com cômodos, portas, móveis e luz; o tamanho segue o projeto. "Criar interior" no painel da casa já gera o mapa mobiliado.
+- **Editor de mapa mais simples**: abas Pintar / Construções / Itens / Ambiente; galeria de construções com busca e filtro de tamanho; na IA, perguntas "Itens para pegar? Sim/Não" e "Monstros no mapa? Sim/Não" (monstros viram tokens ao salvar).
+- **Água nova** (rasa, funda, rio, cachoeira, mar, lodo) com espuma animada nas margens, e **20 estilos de mapa** (Obscuro, Arco-íris, Outono, Inverno, Sépia, Gótico, Neon, Aquarela...) que valem para chão, construções, personagens e monstros.
+- **Cursor do mestre** aparece para os jogadores (botão para esconder).
+
+## Prévias
+`construcoes-casas.png`, `construcoes-2.png`, `construcoes-3.png`, `construcoes-materiais.png`, `interiores.png`, `interiores-casas.png`, `agua-nova.png`, `estilos-de-mapa.png`.
+
+## Depois do deploy
+O schema só acrescentou colunas (`campaign_scenes.parent_scene_id`, `parent_building_id`, `campaigns.table_rules`, `characters.appearance`): depois do deploy, Admin > Sistema > backup e "Atualizar banco".

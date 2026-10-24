@@ -4,6 +4,7 @@
 // Os codigos ASCII acabaram; estes usam letras do Latin-1 (a validacao aceita ¡-ÿ).
 import { canvas, tone, hash, toImages, thumbnail } from './paint.js';
 import { WATER_TILES } from './water.js';
+import { STAMP3D } from './objects3d.js';
 
 const N = 16;
 // Pinta 'n' imagens (variantes ou quadros) chamando fn(c, i) em cada canvas 16x16.
@@ -200,6 +201,8 @@ const TERRAINS = [
 ];
 
 // ---------------- objetos de 1 celula ----------------
+// Os desenhos abaixo sao a versao chapada original; o catalogo troca os pixels pela versao com
+// volume 3/4 de objects3d.js (OBJ3D). Para mudar o visual, edite la.
 function obj(def, draw, n = 1) {
   return tile({ layer: 'objects', ...def }, images((c, i) => { draw(c, i); c.outline(); }, n));
 }
@@ -299,92 +302,16 @@ function stamp(def, w, h, draw, fw = 2, fh = 1) {
 }
 
 const STAMPS = [
-  stamp({ code: 'Ô', name: 'Poço de pedra', category: 'Construções' }, 32, 40, (c) => {
-    c.ellipse(16, 32, 13, 6.5, '#8a8494');
-    c.shape((x, y) => y >= 24 && y <= 32 && x >= 3 && x <= 28, '#8a8494');
-    for (let y = 25; y <= 31; y += 3) for (let x = 4 + (y % 2) * 2; x < 28; x += 5) c.set(x, y, tone('#8a8494', 0));
-    c.ellipse(16, 24, 12, 5, '#9a94a4');
-    c.ellipse(16, 24, 9, 3.5, '#1e3a5a', { spec: false });
-    c.rect(4, 6, 5, 25, WOOD); c.rect(26, 6, 27, 25, WOOD);
-    c.shape((x, y) => y >= 1 && y <= 9 && Math.abs(x + 0.5 - 16) <= 6 + (y - 1) * 1.4, '#a8402e');
-    for (let y = 3; y <= 9; y += 2) for (let x = 0; x < 32; x++) if (c.get(x, y)) c.set(x, y, tone('#a8402e', 1));
-    c.rect(15, 10, 16, 18, '#7a6a5a'); c.rect(13, 18, 18, 20, '#8a5a34');
-  }, 2, 2),
-  stamp({ code: 'Õ', name: 'Moinho', category: 'Construções', light: null }, 48, 72, (c) => {
-    c.shape((x, y) => y >= 30 && y <= 71 && Math.abs(x + 0.5 - 24) <= 12 - (71 - y) * 0.12, '#d8c8a8');
-    for (let y = 34; y < 72; y += 6) for (let x = 0; x < 48; x++) if (c.get(x, y)) c.set(x, y, tone('#d8c8a8', 1));
-    c.rect(20, 58, 27, 71, '#6a4632'); c.set(23, 64, tone('#c49a3a', 4));
-    c.rect(22, 42, 25, 46, '#3a5a8a');
-    c.shape((x, y) => y >= 18 && y <= 31 && Math.abs(x + 0.5 - 24) <= (y - 18) * 1.1 + 1, '#7a3a2a');
-    const cx = 24; const cy = 22;
-    for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
-      for (let k = 2; k < 20; k++) {
-        const x = cx + dx * k; const y = cy + dy * k * 0.95;
-        c.set(x, y, tone(WOOD, 1));
-        if (k > 6) for (let j = 1; j <= 3; j++) c.set(x + dy * j * 0.7, y - dx * j * 0.7, tone('#e8dcc0', j === 1 ? 2 : 3));
-      }
-    }
-    c.ellipse(cx, cy, 2.5, 2.5, '#5a3a28');
-  }, 3, 2),
-  stamp({ code: 'Ö', name: 'Barraca de feira', category: 'Construções' }, 34, 36, (c) => {
-    c.rect(3, 12, 4, 35, WOOD); c.rect(29, 12, 30, 35, WOOD);
-    c.rect(2, 24, 31, 28, WOOD); c.rect(2, 29, 31, 30, WOOD, { bias: -1 });
-    for (let x = 4; x < 30; x += 4) { c.ellipse(x + 1, 23, 1.6, 1.4, ['#e0524c', '#ffd04a', '#88c04a', '#e88ac8'][(x / 4) % 4]); }
-    c.shape((x, y) => y >= 3 && y <= 12 && x >= 0 && x <= 33 - 0 && y >= 3 + Math.abs(x - 16.5) * 0.15, '#e8e0d0');
-    for (let y = 3; y <= 12; y++) for (let x = 0; x < 34; x++) if (c.get(x, y) && Math.floor(x / 4) % 2 === 0) c.set(x, y, tone('#c0403a', y < 6 ? 3 : 2));
-    for (let x = 0; x < 34; x += 4) { c.set(x + 1, 13, tone('#c0403a', 1)); c.set(x + 2, 13, tone('#c0403a', 1)); }
-  }, 2, 1),
-  stamp({ code: 'Ø', name: 'Carroça', category: 'Construções' }, 36, 28, (c) => {
-    c.rect(2, 8, 33, 18, WOOD); for (let x = 6; x < 33; x += 6) c.rect(x, 9, x, 17, tone(WOOD, 0), { flat: true, bias: -2 });
-    c.ellipse(18, 7, 13, 5, '#d8b860');
-    for (let i = 0; i < 6; i++) c.set(8 + i * 4, 5 + (i % 2), tone('#d8b860', 4));
-    for (const wx of [9, 27]) { c.ellipse(wx, 21, 5.5, 5.5, '#6a4632', { spec: false }); c.ellipse(wx, 21, 3.5, 3.5, '#8a5a34', { spec: false }); c.ellipse(wx, 21, 1.2, 1.2, '#3a3c48', { spec: false }); }
-    c.line(0, 14, 2, 12, tone(WOOD, 1));
-  }, 2, 1),
-  stamp({ code: 'Ù', name: 'Barco', category: 'Construções' }, 48, 30, (c) => {
-    c.shape((x, y) => y >= 16 && y <= 28 && x >= 3 + (y - 16) * 0.6 && x <= 44 - (y - 16) * 0.6, '#7a4a2e');
-    for (let y = 19; y <= 27; y += 3) for (let x = 0; x < 48; x++) if (c.get(x, y)) c.set(x, y, tone('#7a4a2e', 1));
-    c.rect(3, 15, 44, 16, '#c08746');
-    c.rect(23, 1, 24, 15, '#6a4632');
-    c.shape((x, y) => y >= 2 && y <= 13 && x >= 25 && x <= 25 + (y - 1) * 1.2, '#ece4d2');
-  }, 3, 1),
-  stamp({ code: 'Ú', name: 'Fonte', category: 'Construções' }, 32, 34, (c) => {
-    c.ellipse(16, 25, 15, 7.5, '#a8a2b4');
-    c.ellipse(16, 24, 12.5, 5.5, '#3a92cc', { spec: false });
-    for (let i = 0; i < 6; i++) c.set(8 + i * 3, 23 + (i % 2), tone('#c4eef2', 4));
-    c.rect(14, 8, 17, 24, '#a8a2b4');
-    c.ellipse(16, 8, 6, 2.6, '#a8a2b4');
-    c.ellipse(16, 4, 2.2, 3, '#5cb8e0');
-    c.set(15, 2, '#f6f9ff'); c.set(12, 10, '#c4eef2'); c.set(20, 11, '#c4eef2');
-  }, 2, 2),
-  stamp({ code: 'Û', name: 'Estátua grande', category: 'Decoração' }, 32, 48, (c) => {
-    c.rect(5, 38, 26, 47, '#8a8494'); c.rect(3, 36, 28, 38, '#9a94a4');
-    c.ellipse(16, 30, 5.5, 7, '#a8a2b4');
-    c.ellipse(16, 18, 6, 7.5, '#a8a2b4');
-    c.ellipse(16, 7, 4, 4.5, '#a8a2b4');
-    c.rect(22, 4, 23, 32, '#a8a2b4'); c.shape((x, y) => y >= 0 && y <= 4 && Math.abs(x - 22.5) <= 2 - y * 0.4, '#c4ccd6');
-    c.rect(8, 14, 9, 26, '#a8a2b4');
-  }, 2, 1),
-  stamp({ code: 'Ü', name: 'Forja', category: 'Construções', light: '#eb7a34' }, 32, 36, (c) => {
-    c.shape((x, y) => y >= 8 && y <= 35 && x >= 2 && x <= 29, '#6a5a5a');
-    for (let y = 10; y < 36; y += 4) for (let x = 2 + ((y / 4) % 2) * 3; x < 30; x += 6) c.set(x, y, tone('#6a5a5a', 0));
-    c.shape((x, y) => y >= 18 && y <= 30 && Math.abs(x + 0.5 - 16) <= 7 - (y < 21 ? 21 - y : 0), '#2a1418');
-    for (let i = 0; i < 9; i++) c.set(11 + Math.floor(hash(i, 1, 2) * 10), 23 + Math.floor(hash(i, 2, 2) * 7), i % 3 ? '#f07c2e' : '#ffd27a');
-    c.rect(11, 0, 20, 8, '#5a4a4a');
-  }, 2, 2),
-  stamp({ code: 'Ý', name: 'Tenda grande', category: 'Construções' }, 48, 40, (c) => {
-    c.shape((x, y) => y >= 4 && y <= 38 && Math.abs(x + 0.5 - 24) <= (y - 3) * 0.66, '#d8c8a0');
-    for (let y = 4; y <= 38; y++) for (let x = 0; x < 48; x++) if (c.get(x, y) && x > 24) c.set(x, y, tone('#d8c8a0', 1));
-    c.shape((x, y) => y >= 22 && y <= 38 && Math.abs(x + 0.5 - 24) <= (y - 21) * 0.4, '#3a2418');
-    c.line(24, 0, 24, 5, tone(WOOD, 1)); c.set(24, 0, '#c0403a'); c.set(25, 0, '#c0403a'); c.set(25, 1, '#c0403a');
-    for (let y = 8; y <= 38; y += 6) for (let x = 0; x < 48; x++) if (c.get(x, y) && x <= 24 && (x + y) % 3 === 0) c.set(x, y, tone('#c0403a', 2));
-  }, 3, 2),
-  stamp({ code: 'Þ', name: 'Pedra grande', category: 'Natureza' }, 32, 28, (c) => {
-    c.ellipse(16, 17, 14, 10.5, '#8a8494');
-    c.ellipse(11, 12, 6, 5, '#9a94a4');
-    c.line(17, 9, 21, 17, tone('#8a8494', 0)); c.line(21, 17, 19, 22, tone('#8a8494', 0));
-    for (let i = 0; i < 6; i++) c.set(6 + Math.floor(hash(i, 1, 6) * 20), 8 + Math.floor(hash(i, 2, 6) * 6), tone('#5a8a34', 2 + (i % 2)));
-  }, 2, 1)
+  stamp({ code: 'Ô', name: 'Poço de pedra', category: 'Construções' }, 32, 40, STAMP3D['Ô'], 2, 2),
+  stamp({ code: 'Õ', name: 'Moinho', category: 'Construções', light: null }, 48, 72, STAMP3D['Õ'], 3, 2),
+  stamp({ code: 'Ö', name: 'Barraca de feira', category: 'Construções' }, 34, 36, STAMP3D['Ö'], 2, 1),
+  stamp({ code: 'Ø', name: 'Carroça', category: 'Construções' }, 36, 28, STAMP3D['Ø'], 2, 1),
+  stamp({ code: 'Ù', name: 'Barco', category: 'Construções' }, 48, 30, STAMP3D['Ù'], 3, 1),
+  stamp({ code: 'Ú', name: 'Fonte', category: 'Construções' }, 32, 34, STAMP3D['Ú'], 2, 2),
+  stamp({ code: 'Û', name: 'Estátua grande', category: 'Decoração' }, 32, 48, STAMP3D['Û'], 2, 1),
+  stamp({ code: 'Ü', name: 'Forja', category: 'Construções', light: '#eb7a34' }, 32, 36, STAMP3D['Ü'], 2, 2),
+  stamp({ code: 'Ý', name: 'Tenda grande', category: 'Construções' }, 48, 40, STAMP3D['Ý'], 3, 2),
+  stamp({ code: 'Þ', name: 'Pedra grande', category: 'Natureza' }, 32, 28, STAMP3D['Þ'], 2, 1)
 ];
 
 // Arvores novas: desenhadas pelo gerador de arvores do compose.js (copa por cima, 2x3 celulas).

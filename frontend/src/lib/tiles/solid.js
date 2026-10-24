@@ -57,7 +57,8 @@ export function cyl(c, cx, y, rx, ry, h, col, o = {}) {
       if (nx > 0.75) t -= 0.4;
       if (py >= yb - 1) t -= 0.6;
       if (o.band) t += o.band(py - Math.round(cy), nx) || 0;
-      c.set(x, py, T(col, Math.round(t)));
+      const over = o.paint ? o.paint(py - Math.round(cy), nx) : null;
+      c.set(x, py, T(over || col, Math.round(t)));
     }
   }
   for (let py = Math.floor(cy - ry); py <= Math.ceil(cy + ry); py++) {
@@ -125,4 +126,18 @@ export function post(c, x, y0, y1, col, w = 2) {
     const t = k === 0 ? 3 : k === w - 1 ? 1 : 2;
     c.set(x + k, y, T(col, y === y1 ? t - 1 : t));
   }
+}
+
+// Extrusao de uma silhueta (lapide, cruz, placa): a mesma forma repetida d px acima com tom de
+// tampo vira a espessura vista de cima; a frente fica com o relevo normal do pintor.
+export function extrude(c, inside, d, col, o = {}) {
+  const top = o.top || col;
+  for (let k = d; k >= 1; k--) {
+    for (let y = 0; y < c.h; y++) for (let x = 0; x < c.w; x++) {
+      if (!inside(x, y + k)) continue;
+      const edge = !inside(x + 1, y + k);
+      c.set(x, y, T(top, k === d ? (edge ? 3 : 4) : edge ? 2 : 3));
+    }
+  }
+  c.shape(inside, o.front || col, { bias: o.bias || 0 });
 }

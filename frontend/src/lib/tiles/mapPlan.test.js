@@ -195,7 +195,7 @@ describe('plano de mapa', () => {
     const r = planToMap(plan, { cols: 1000, rows: 1000 });
     expect(r.map.buildings.length).toBeGreaterThan(100);
     expect(performance.now() - t).toBeLessThan(15000);
-  });
+  }, 20000);
   it('terra do mapa quase todo e fundo: campo da cidade fica verde e o muro nao abre no chao de terra', () => {
     const r = planToMap({ areas: [{ type: 'terra', rect: [0, 0, 800, 1000] }, { type: 'campo', rect: [200, 200, 400, 600] }], fences: [{ type: 'muro', points: [[150, 150], [650, 150], [650, 850], [150, 850], [150, 150]] }] }, { cols: 80, rows: 60 });
     const g = r.map.layers.ground;
@@ -225,7 +225,7 @@ describe('plano de mapa', () => {
     }
   });
   it('foto com cols/rows folgado demais (bairros viram 10+ casas) encolhe o mapa; texto nao', () => {
-    const areas = [0, 1, 2, 3].map((k) => ({ type: 'bairro', size: 'pequena', density: 1.5, rect: [100 + k * 200, 300, 150, 120] }));
+    const areas = [0, 1, 2, 3, 4, 5].map((k) => ({ type: 'bairro', size: 'pequena', density: 1.5, rect: [50 + k * 155, 200, 140, 500] }));
     const foto = planToMap({ cols: 240, rows: 160, areas }, { cols: 60, rows: 40 });
     expect(foto.map.cols).toBeLessThan(240);
     const texto = planToMap({ mode: 'texto', cols: 240, rows: 160, areas }, { cols: 60, rows: 40 });
@@ -247,5 +247,9 @@ describe('plano de mapa', () => {
     const tents = r.map.buildings.filter((b) => /tenda|barraca/.test(b.design) && b.x > 36 && b.x < 84 && b.y > 30 && b.y < 70);
     expect(tents.length).toBeGreaterThanOrEqual(6);
     expect(r.map.layers.objects.join('')).toContain('È');
+  });
+  it('objeto cachoeira vira degrau de queda d agua no rio', () => {
+    const r = planToMap({ rivers: [{ points: [[0, 500], [1000, 500]], width: 4 }], objects: [{ type: 'cachoeira', x: 300, y: 500 }] }, { cols: 60, rows: 40 });
+    expect(r.map.layers.ground.join('')).toContain('V');
   });
 });

@@ -210,9 +210,10 @@ export function planToMap(plan0, opts = {}) {
   let r = planToMapOnce(plan, opts);
   if (!(num(plan?.cols, 0) > 0 && num(plan?.rows, 0) > 0)) return r;
   let p = plan;
-  // mapa folgado demais (IA mandou o dobro): cada bairro da foto vira 10+ casas. Encolhe ate ~5 por bairro
+  // mapa folgado demais (IA mandou o dobro): bairros pedem 300+ casas e cada um vira 5+. Encolhe (pintura com
+  // bairros compactos nao entra: pede menos de 300)
   if (strip(plan.mode ?? plan.modo) !== 'texto') {
-    for (let k = 0; k < 4 && r.districts >= 3 && r.auto / r.districts > 5.5; k++) {
+    for (let k = 0; k < 4 && r.districts >= 3 && r.auto / r.districts > 5.5 && r.distWant > 300; k++) {
       const q = { ...p, cols: Math.round(num(p.cols) / 1.2), rows: Math.round(num(p.rows) / 1.2) };
       if (q.cols < 24 || q.rows < 18) break;
       const r2 = planToMapOnce(q, opts);
@@ -535,6 +536,16 @@ function planToMapOnce(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     let rp = toBorder(r?.points, r?.exit ?? r?.saida);
     if (r?.from ?? r?.entrada) rp = toBorder([...rp].reverse(), r.from ?? r.entrada).reverse();
     line(rp, (x, y) => brush(x, y, w, (a, b) => { if (inside(a, b) && G[b][a] !== 'W' && G[b][a] !== '~') { G[b][a] = '0'; O[b][a] = ' '; forest[b * C + a] = 0; lock[b * C + a] = 1; } }), true);
+  }
+  // cachoeira (objeto "cachoeira"): o trecho de rio mais perto vira degrau de queda d'agua ('V'), 2 linhas
+  for (const o of Array.isArray(plan.objects) ? plan.objects : []) {
+    if (!/cachoeira|queda/.test(strip(o?.type ?? o?.tipo))) continue;
+    const ox = px(o.x); const oy = py(o.y);
+    let best = null;
+    for (let r = 0; r <= 8 && !best; r++) for (let dy = -r; dy <= r && !best; dy++) for (let dx = -r; dx <= r && !best; dx++) if (inside(ox + dx, oy + dy) && G[oy + dy][ox + dx] === '0') best = [ox + dx, oy + dy];
+    if (!best) continue;
+    const [bx, by] = best;
+    for (let yy = by; yy <= by + 1; yy++) for (let xx = bx - 8; xx <= bx + 8; xx++) if (inside(xx, yy) && G[yy][xx] === '0') G[yy][xx] = 'V';
   }
   // trecho reto e comprido de rua ganha curva suave (as pontas ficam no lugar). Onde outra rua
   // encosta no meio do trecho a curva zera (o cruzamento em T nao se solta)
@@ -1260,5 +1271,5 @@ function planToMapOnce(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
   const asked = (Array.isArray(plan.buildings) ? plan.buildings : []).filter((b) => !/moinho|portao/.test(strip(b?.type ?? b?.tipo))).length;
   const placed = buildings.filter((b) => !b.auto).length;
   if (asked > placed) warnings.push(`${asked - placed} construção(ões) não couberam no mapa e ficaram de fora.`);
-  return { map, warnings, monsters, asked, missing: Math.max(0, asked - placed), auto: buildings.filter((b) => b.auto).length, districts: districts.length, name: String(plan.name ?? plan.nome ?? '').slice(0, 80), notes: String(plan.notes ?? plan.notas ?? '').slice(0, 300) };
+  return { map, warnings, monsters, asked, missing: Math.max(0, asked - placed), auto: buildings.filter((b) => b.auto).length, districts: districts.length, distWant: districts.reduce((n, d) => n + Math.round((d.cells.length / 24) * d.density), 0), name: String(plan.name ?? plan.nome ?? '').slice(0, 80), notes: String(plan.notes ?? plan.notas ?? '').slice(0, 300) };
 }

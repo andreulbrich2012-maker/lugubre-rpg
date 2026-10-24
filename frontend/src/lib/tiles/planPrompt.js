@@ -96,19 +96,24 @@ CAMPOS
 ${items ? `- "items": coisas para os jogadores pegarem (até 20): {"x","y","name","quantity","weight" (kg, realista),"category"} com category em ${ITEM_CATEGORIES.map((c) => `"${c}"`).join(', ')}; dinheiro: "dracmas". Mochila/baú: "container": true e "contents": [itens].` : '- "items": [] (o mestre não quer itens).'}
 ${monsters ? '- "monsters": [{"name","x","y","hp"}] (até 12), em lugares onde dá para andar, longe da entrada.' : ''}
 
-${fromImage ? `PASSO A PASSO (faça nesta ordem)
+${fromImage ? `PRIMEIRO OLHE, DEPOIS DESENHE
+O JSON começa com "leitura" (o sistema ignora; é o seu rascunho): uma lista de 9 frases, uma por setor da imagem dividida em 3×3 — "NO (x 0–333, y 0–333): ...", "N", "NE", "O", "C", "L", "SO", "S", "SE". Em cada frase diga TUDO que se vê ali, com coordenadas: mata, rocha/penhasco, montanha, água (rio largo? cachoeira? riacho?), estradas e por onde entram/saem do setor, casas (muitas? poucas?), nomes escritos. Depois "referencias": [{"o": "...", "x", "y"}] com os pontos-chave: topo, base, ponta oeste e ponta leste da vila; praça; cada ponte; onde cada rio e cada estrada tocam a moldura.
+Todo o resto (areas, rivers, roads, fences, buildings) sai da leitura e das referências: cada coisa citada na leitura vira um item, no lugar citado.
+
+PASSO A PASSO (faça nesta ordem)
 0. TAMANHO (obrigatório): ponha "cols" e "rows" no JSON (números, no topo, junto de "name"). cols = 8 × (largura da imagem ÷ largura de uma casa comum); rows = cols × altura ÷ largura da imagem. Só se for PINTURA feita à mão (não mapa de jogo em pixel) com casas miúdas e 40+ telhados: cols entre 200 e 260.
 1. NOMES: leia a legenda (1, 2, 3...) e todo nome escrito no mapa → "pois".
 2. VILA: siga com o dedo a borda da vila e faça a cerca com esses pontos (repita o 1º no fim): muralha de pedra cinza = "muro"; troncos = "palicada"; sem cerca na imagem = nenhuma.
 3. CHÃO: olhe entre a vila e a borda da imagem. Árvores grudadas cobrindo tudo → uma "floresta" do mapa inteiro [[0,0],[1000,0],[1000,1000],[0,1000]]. Grama verde aberta → NADA de floresta do mapa inteiro: uma "floresta" (points) para CADA mancha de mata, "bosque" para árvores soltas. "campo"/"clareira" para descampados; "rocha"/"montanha" onde houver; costa = "mar" até a borda + "areia" na praia.
-4. ÁGUA: para cada rio diga por qual borda ele ENTRA ("from") e por qual SAI ("exit"): olhe os 4 lados da moldura e veja onde a água toca. O rio principal é o mais largo; rio largo não vira 90° de repente: onde parece virar para outra borda, o braço que vira é um riacho (outro item) e o largo continua na direção em que vinha. Riacho/afluente = outro item que começa na borda ou na nascente e TERMINA num ponto do rio principal. Píer = "cais" da praia para dentro do mar.
+4. ÁGUA: para cada rio diga por qual borda ele ENTRA ("from") e por qual SAI ("exit"): olhe os 4 lados da moldura e veja onde a água toca. O rio principal é o mais largo; rio largo não vira 90° de repente: onde parece virar para outra borda, o braço que vira é um riacho (outro item) e o largo continua na direção em que vinha. Riacho/afluente = outro item que começa na borda ou na nascente e TERMINA num ponto do rio principal. Rio mais largo que uma casa = "width": 6; margem de pedra/penhasco = "rocha" (points) estreita ao longo dela; cachoeira = objeto "cachoeira" no ponto do rio. Píer = "cais" da praia para dentro do mar.
 5. CAMINHOS: cada estrada até a borda (0 ou 1000); a estrada que contorna a vila também; ruas de "terra" da praça até cada grupo de casas.
-6. CASAS: um "bairro" para CADA amontoado de telhados, até os de 3–4 casas, cobrindo TODOS os telhados dele com folga de meia casa em volta (não junte dois). Vila pintada e apertada: "size":"pequena", "density":1.5.
+6. CASAS: um "bairro" para CADA amontoado de telhados, até os de 3–4 casas, cobrindo TODOS os telhados dele com folga de meia casa em volta (não junte dois). Vila pintada e apertada (telhados encostados, chão de terra): "size":"pequena", "density":1.5, bairros cobrindo TODO o interior da cerca (sobra só praça, ruas e hortas) e uma área "terra" do contorno da vila como chão.
 7. ESPECIAIS: em "buildings" cada prédio com nome e cada telhado diferente (castelo = pedra cinza com torre, templo, taverna junto à praça, capela, celeiro, estábulo, serraria...). Casa de pedra cinza com sininho = "capela"; prédio com colunas na porta = "prefeitura"; "igreja_gotica" só se for escura, alta e pontuda. Quadrado cercado com lápides = "cemiterio" (plantação tem fileiras de terra).
 8. DETALHES: praça com fogueira grande, bancos e tochas em volta; mercado: área "terra" com barracas, tendas e carroça; placas nas saídas; troncos na serraria.
 9. CLIMA: igual ao da imagem (noite escura → "light": "noite"; tons sombrios → "style": "obscuro").
 
 CONFIRA ANTES DE RESPONDER
+[ ] cada coisa da "leitura" virou um item no mesmo lugar
 [ ] a cerca/muro contorna a vila
 [ ] "floresta" do mapa inteiro só se fora da vila a imagem é mata fechada
 [ ] toda estrada e todo rio que saem do mapa terminam em 0 ou 1000, na MESMA borda da imagem

@@ -62,6 +62,9 @@ export default function CampaignRoom() {
   const [pending, setPending] = useState([]);
   const [effects, setEffects] = useState({});
   const [pings, setPings] = useState([]);
+  // cursor do mestre visto pelos jogadores; o mestre escolhe se mostra (fica salvo neste navegador)
+  const [gmCursor, setGmCursor] = useState(null);
+  const [showCursor, setShowCursor] = useState(() => { try { return localStorage.getItem('lugubre:cursor') !== 'off'; } catch { return true; } });
   const [rollQueue, setRollQueue] = useState([]);
   const [busy, setBusy] = useState(false);
   const [content, setContent] = useState('');
@@ -244,6 +247,9 @@ export default function CampaignRoom() {
             });
           }
           break;
+        case 'cursor':
+          if (!master) setGmCursor(p.off || p.sceneId !== sid ? null : { x: p.x, y: p.y, name: p.name, at: Date.now() });
+          break;
         case 'ping':
           if (p.sceneId === sid) {
             const pid = `${ev.id}`;
@@ -356,6 +362,36 @@ export default function CampaignRoom() {
       loadScene(stateRef.current.viewSceneId).catch(() => null);
     }
   }, [id, notify, loadScene]);
+
+  // manda a posicao no maximo a cada 350 ms (e a ultima depois de parar)
+  const cursorSend = useRef({ last: 0, timer: 0, pos: null });
+  const sendCursor = useCallback((pos) => {
+    if (!scene || !isMaster || !showCursor) return;
+    const c = cursorSend.current;
+    c.pos = pos;
+    const fire = () => {
+      c.last = Date.now(); c.timer = 0;
+      const q = c.pos;
+      api.post(`/campaigns/${id}/cursor`, q ? { x: q.x, y: q.y, sceneId: scene.id } : { x: 0, y: 0, sceneId: scene.id, off: true }).catch(() => null);
+    };
+    if (c.timer) return;
+    const wait = Math.max(0, 350 - (Date.now() - c.last));
+    c.timer = setTimeout(fire, wait);
+  }, [id, scene, isMaster, showCursor]);
+  const toggleCursor = useCallback(() => {
+    setShowCursor((v) => {
+      const next = !v;
+      try { localStorage.setItem('lugubre:cursor', next ? 'on' : 'off'); } catch { /* sem armazenamento */ }
+      if (!next && scene) api.post(`/campaigns/${id}/cursor`, { x: 0, y: 0, sceneId: scene.id, off: true }).catch(() => null);
+      return next;
+    });
+  }, [id, scene]);
+  // some sozinho se o mestre parar de mandar (aba fechada, saiu do mapa)
+  useEffect(() => {
+    if (!gmCursor) return undefined;
+    const t = setTimeout(() => setGmCursor(null), 8000);
+    return () => clearTimeout(t);
+  }, [gmCursor]);
 
   const ping = useCallback((x, y) => {
     if (!scene) return;
@@ -544,6 +580,10 @@ export default function CampaignRoom() {
                 effects={effects}
                 pings={pings}
                 onPing={ping}
+                gmCursor={gmCursor}
+                onCursor={sendCursor}
+                showCursor={showCursor}
+                onToggleCursor={toggleCursor}
                 budget={budget}
                 myTokenId={myToken?.id}
                 onPickup={pickup}

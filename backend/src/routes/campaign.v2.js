@@ -330,7 +330,7 @@ export function registerCampaignV2Routes(router) {
   }
   router.use('/:id', (req, res, next) => {
     // recursos v2 dependem do Postgres
-    if (/^\/(events|notes|characters|scenes|npcs|tokens|rolls|ping|maps)(\/|$)/.test(req.path)) requireDatabase();
+    if (/^\/(events|notes|characters|scenes|npcs|tokens|rolls|ping|cursor|maps)(\/|$)/.test(req.path)) requireDatabase();
     next();
   });
 
@@ -352,6 +352,14 @@ export function registerCampaignV2Routes(router) {
     const payload = { userId: req.user.id, name: req.user.name, color: member?.color || '#d6a65f', x: body.x, y: body.y, sceneId: body.sceneId || null };
     await emitEvent(req.params.id, 'ping', payload, 'all', req.user.id);
     res.status(201).json(payload);
+  });
+
+  // Cursor do mestre: os jogadores veem onde ele aponta (o cliente manda no maximo ~3x por segundo).
+  router.post('/:id/cursor', async (req, res) => {
+    await assertCampaignMaster(req.params.id, req.user);
+    const body = z.object({ x: z.coerce.number(), y: z.coerce.number(), sceneId: z.string().uuid(), off: z.boolean().optional() }).parse(req.body);
+    await emitEvent(req.params.id, 'cursor', { x: Math.round(body.x), y: Math.round(body.y), sceneId: body.sceneId, off: Boolean(body.off), name: req.user.name }, 'all', req.user.id);
+    res.status(204).end();
   });
 
   // ===== notas =====

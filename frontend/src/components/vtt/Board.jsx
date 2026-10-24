@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Crosshair, DoorOpen, Eye, EyeOff, Footprints, Hand, Lock, LockOpen, LocateFixed, Minus, Plus, X } from 'lucide-react';
+import { Crosshair, DoorOpen, Eye, EyeOff, Footprints, Hand, Lock, LockOpen, LocateFixed, Minus, MousePointer2, Plus, X } from 'lucide-react';
 import TileMapCanvas from './TileMapCanvas';
 import Crack from '../glass/Crack';
 import { buildingAt, isSolid, PICKUP_RANGE, tokenBuilding, tokenItemDistance } from '../../lib/tiles/format';
@@ -56,6 +56,10 @@ export default function Board({
   effects = {},
   pings = [],
   onPing,
+  gmCursor,
+  onCursor,
+  showCursor,
+  onToggleCursor,
   budget,
   myTokenId,
   onPickup,
@@ -444,6 +448,7 @@ export default function Board({
   }
 
   function onPointerMove(event) {
+    if (isMaster && onCursor) onCursor(toMap(event));
     const d = drag.current;
     if (!d) { onHover(event); return; }
     if (d.kind === 'pan') {
@@ -487,7 +492,7 @@ export default function Board({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onPointerLeave={() => setHover(null)}
+        onPointerLeave={() => { setHover(null); if (isMaster) onCursor?.(null); }}
         role="application"
         aria-label="Mesa virtual. Arraste para mover o mapa, roda do mouse para zoom, WASD para andar com o token selecionado, Alt+clique para marcar um ponto."
       >
@@ -592,6 +597,12 @@ export default function Board({
             </svg>
           )}
 
+          {gmCursor && !isMaster && (
+            <div className="vtt-gm-cursor" style={{ left: gmCursor.x, top: gmCursor.y, transform: `scale(${1 / Math.max(0.4, view.z)})` }} aria-label="Cursor do mestre">
+              <svg width="22" height="26" viewBox="0 0 22 26" aria-hidden="true"><path d="M2 2 L2 21 L7 16 L11 24 L14 22.5 L10 15 L17 15 Z" fill="#f2c14e" stroke="#2a1a22" strokeWidth="2" strokeLinejoin="round" /></svg>
+              <span>Mestre</span>
+            </div>
+          )}
           {pings.map((p) => (
             <span key={p.id} className="vtt-ping" style={{ left: p.x, top: p.y, '--pc': p.color || 'var(--color-ember)' }} />
           ))}
@@ -717,6 +728,11 @@ export default function Board({
         {canFollow && (
           <button type="button" className={`btn btn-glass !min-h-10 !w-10 !p-0 ${follow ? 'lit' : ''}`} onClick={() => setFollow((v) => !v)} aria-pressed={follow} aria-label="Modo jogo: câmera segue seu personagem" title="Câmera segue seu personagem">
             <Footprints size={18} />
+          </button>
+        )}
+        {isMaster && onToggleCursor && (
+          <button type="button" className={`btn btn-glass !min-h-10 !w-10 !p-0 ${showCursor ? 'lit' : ''}`} onClick={onToggleCursor} aria-pressed={Boolean(showCursor)} aria-label="Jogadores veem o seu cursor" title={showCursor ? 'Jogadores veem o seu cursor (clique para esconder)' : 'Cursor escondido dos jogadores (clique para mostrar)'}>
+            <MousePointer2 size={18} />
           </button>
         )}
         <button type="button" className="btn btn-glass !min-h-10 !w-10 !p-0" onClick={() => zoomBy(1.25)} aria-label="Aproximar"><Plus size={18} /></button>

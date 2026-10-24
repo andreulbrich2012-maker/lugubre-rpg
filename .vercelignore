@@ -1,0 +1,10 @@
+# Nunca enviar segredos locais nem arquivos de trabalho para a Vercel.
+.env
+.env.*
+backend/.env
+backend/.env.*
+frontend/.impeccable
+node_modules
+**/node_modules
+data
+scripts

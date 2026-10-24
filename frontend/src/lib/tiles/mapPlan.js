@@ -130,8 +130,14 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
     return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy; };
 
   // ---- areas ----
+  // area natural em retangulo (campo, floresta, pantano...) vira poligono: borda organica, nada de quadrado
+  const NATURAL = new Set(['floresta', 'bosque', 'campo', 'neve', 'areia', 'pantano', 'lago', 'rocha', 'montanha', 'clareira', 'mar', 'lava']);
   const shapeCells = (a) => {
     const cells = [];
+    if (Array.isArray(a.rect) && !Array.isArray(a.points) && NATURAL.has(a.type)) {
+      const [x, y, w, h] = a.rect.map((v) => num(v));
+      return shapeCells({ type: a.type, points: [[x, y], [x + w, y], [x + w, y + h], [x, y + h]] });
+    }
     if (Array.isArray(a.circle)) {
       const cx = px(a.circle[0]); const cy = py(a.circle[1]);
       const rx = Math.max(1, (num(a.circle[2], SCALE / 20) / SCALE) * C); const ry = Math.max(1, (num(a.circle[2], SCALE / 20) / SCALE) * R);
@@ -164,7 +170,17 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
   };
   // mar cedo: o que vem depois (rocha, montanha) pode virar ponta/ilha; o resto nao apaga a agua
   const ORDER = { bairro: 10, mar: 1.5, floresta: 0, bosque: 1, montanha: 2, rocha: 3, campo: 4, neve: 4, areia: 5, terra: 5, pantano: 6, lago: 7, lava: 7, plantacao: 8, cemiterio: 8, clareira: 9, ritual: 9, praca: 10 };
-  const areas = (Array.isArray(plan.areas) ? plan.areas : []).map((a) => ({ ...a, type: strip(a?.type ?? a?.tipo) })).filter((a) => ORDER[a.type] !== undefined).sort((a, b) => ORDER[a.type] - ORDER[b.type]);
+  // chao do mapa quase todo (pantano, neve, campo, areia) e o fundo: pinta primeiro, a vila vem por cima
+  const bbox = (a) => {
+    if (Array.isArray(a.rect)) return [num(a.rect[2]), num(a.rect[3])];
+    if (Array.isArray(a.circle)) return [num(a.circle[2]) * 2, num(a.circle[2]) * 2];
+    const p = Array.isArray(a.points) ? a.points.filter(Array.isArray) : [];
+    if (!p.length) return [0, 0];
+    return [Math.max(...p.map((q) => num(q[0]))) - Math.min(...p.map((q) => num(q[0]))), Math.max(...p.map((q) => num(q[1]))) - Math.min(...p.map((q) => num(q[1])))];
+  };
+  const rank = (a) => (['pantano', 'neve', 'campo', 'areia'].includes(a.type) && bbox(a).every((v) => v >= SCALE * 0.8) ? -1 : ORDER[a.type]);
+  const areas = (Array.isArray(plan.areas) ? plan.areas : []).map((a) => ({ ...a, type: strip(a?.type ?? a?.tipo) })).filter((a) => ORDER[a.type] !== undefined).sort((a, b) => rank(a) - rank(b));
+  const noHouse = new Uint8Array(C * R); // mercado, cemiterio, ritual: o bairro nao poe casa em cima
   const forest = new Uint8Array(C * R); // 1 bosque, 2 floresta, 3 montanha
   const districts = []; // areas de bairro: o sistema enche de casas
   const sea = new Uint8Array(C * R); // 1 = celula de mar
@@ -186,9 +202,17 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
         case 'neve': G[y][x] = '*'; break;
         case 'areia': G[y][x] = ':'; forest[y * C + x] = 0; break;
         case 'terra': G[y][x] = ','; forest[y * C + x] = 0; break;
-        case 'pantano': G[y][x] = d < 0.7 ? '%' : 'j'; forest[y * C + x] = 0; break;
-        case 'lago': G[y][x] = d < 0.55 ? 'W' : '~'; forest[y * C + x] = 0; lock[y * C + x] = 1; break;
-        case 'mar': G[y][x] = d < 0.82 ? 'ó' : '~'; forest[y * C + x] = 0; lock[y * C + x] = 1; sea[y * C + x] = 1; break;
+        case 'pantano': {
+          // manchas de agua parada e lama no meio do capim (ruido), mais ralas na borda da area
+          const n = wob(x, y, 5) * 0.7 + wob(x * 2, y * 2, 6) * 0.3 - Math.max(0, d - 0.6) * 0.6;
+          G[y][x] = n > 0.54 ? '%' : n > 0.46 ? 'j' : 'g';
+          forest[y * C + x] = 0;
+          const r = rnd();
+          if (n <= 0.46 && r < 0.06) setO(x, y, r < 0.03 ? 'T' : r < 0.05 ? 'd' : 'm');
+          break;
+        }
+        case 'lago': G[y][x] = d < 0.55 ? 'W' : '~'; O[y][x] = ' '; forest[y * C + x] = 0; lock[y * C + x] = 1; break;
+        case 'mar': G[y][x] = d < 0.82 ? 'ó' : '~'; O[y][x] = ' '; forest[y * C + x] = 0; lock[y * C + x] = 1; sea[y * C + x] = 1; break;
         case 'lava': G[y][x] = 'L'; forest[y * C + x] = 0; lock[y * C + x] = 1; break;
         case 'plantacao': G[y][x] = 'â'; forest[y * C + x] = 0; lock[y * C + x] = 1; if (y % 2 === 0) setO(x, y, 'Ñ'); break;
         case 'cemiterio': forest[y * C + x] = 0; lock[y * C + x] = 1; cemetery.push([x, y, d]); break;
@@ -199,6 +223,8 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
         default: break;
       }
     }
+    // chao de terra pequeno = feira/mercado (o grande e o chao da vila); cemiterio e ritual tambem ficam sem casa
+    if ((a.type === 'terra' && cells.length < C * R * 0.06) || a.type === 'cemiterio' || a.type === 'ritual') for (const [x, y] of cells) noHouse[y * C + x] = 1;
     if (a.type === 'bairro') districts.push({ cells, small: strip(a.size ?? a.tamanho) === 'grande' ? 0.2 : strip(a.size ?? a.tamanho) === 'media' ? 0.4 : 0.7, density: Math.max(0.2, Math.min(1.5, num(a.density ?? a.densidade, 1))), type: strip(a.buildings ?? a.tipo_casas ?? 'casa') });
     if (a.type === 'cemiterio') {
       for (const [x, y, d] of cemetery) {
@@ -404,6 +430,7 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
   }
 
   // ---- bairros: casas sozinhas, sem encostar, viradas para a rua ----
+  const overNoHouse = (t, tx, ty) => { for (let yy = ty; yy < ty + t.h; yy++) for (let xx = tx; xx < tx + t.w; xx++) if (inside(xx, yy) && noHouse[yy * C + xx]) return true; return false; };
   for (const dist of districts) {
     // varre de cima para baixo e da esquerda para a direita: as casas saem em fileiras
     const order = dist.cells.map((c) => c).sort((a, b) => a[1] - b[1] || a[0] - b[0]);
@@ -417,7 +444,7 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
         const t = pickDesign({ type: dist.type, size }, rnd);
         if (!t) continue;
         const tx = cx - Math.floor(t.w / 2); const ty = cy - Math.floor(t.h / 2);
-        if (free(t, tx, ty)) { d = t; x = tx; y = ty; break; }
+        if (free(t, tx, ty) && !overNoHouse(t, tx, ty)) { d = t; x = tx; y = ty; break; }
       }
       if (!d) continue;
       occupy(d, x, y);
@@ -438,6 +465,15 @@ export function planToMap(plan, { cols = 64, rows = 48, seed = 1 } = {}) {
       for (let r = 1; r <= 6 && !best; r++) for (let dy = -r; dy <= r && !best; dy++) for (let dx = -r; dx <= r && !best; dx++) {
         const X = x + dx; const Y = y + dy;
         if (inside(X, Y) && !WATER.has(G[Y][X]) && G[Y][X] !== '-' && lock[Y * C + X] !== 2 && O[Y][X] === ' ') best = [X, Y];
+      }
+      if (!best) continue;
+      [x, y] = best;
+    }
+    // barco em terra: vai para a agua mais perto; sem agua perto, nao entra
+    if (ch === 'Ù' && inside(x, y) && !WATER.has(G[y][x])) {
+      let best = null;
+      for (let r = 1; r <= 8 && !best; r++) for (let dy = -r; dy <= r && !best; dy++) for (let dx = -r; dx <= r && !best; dx++) {
+        if (inside(x + dx, y + dy) && WATER.has(G[y + dy][x + dx]) && O[y + dy][x + dx] === ' ') best = [x + dx, y + dy];
       }
       if (!best) continue;
       [x, y] = best;

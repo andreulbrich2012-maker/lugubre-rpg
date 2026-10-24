@@ -77,4 +77,27 @@ describe('plano de mapa', () => {
     expect(buildPlanPrompt({ description: 'vila' })).not.toContain('"type":"cais"');
     expect(buildPlanPrompt({ fromImage: true })).toContain('"type":"cais"');
   });
+  it('mercado (terra pequena) e cemiterio ficam sem casa de bairro em cima', () => {
+    const r = planToMap({ areas: [{ type: 'bairro', size: 'pequena', density: 1.5, rect: [100, 100, 800, 800] }, { type: 'terra', rect: [400, 400, 200, 200] }] }, { cols: 80, rows: 60 });
+    const x0 = Math.round(0.42 * 79); const x1 = Math.round(0.58 * 79); const y0 = Math.round(0.42 * 59); const y1 = Math.round(0.58 * 59);
+    const over = r.map.buildings.filter((b) => b.x < x1 && b.x + b.w > x0 && b.y < y1 && b.y + b.h > y0);
+    expect(r.map.buildings.length).toBeGreaterThan(10);
+    expect(over.length).toBe(0);
+  });
+
+  it('pantano do mapa todo e o fundo: o campo da vila fica por cima e tem agua parada', () => {
+    const r = planToMap({ areas: [{ type: 'campo', rect: [400, 400, 200, 200] }, { type: 'pantano', rect: [0, 0, 1000, 1000] }] }, { cols: 80, rows: 60 });
+    const g = r.map.layers.ground;
+    expect(g.join('')).toContain('%');
+    expect(g[30].slice(36, 44)).not.toMatch(/[%j]/);
+  });
+
+  it('barco em terra vai para a agua mais perto', () => {
+    const r = planToMap({ areas: [{ type: 'mar', rect: [700, 0, 300, 1000] }], objects: [{ type: 'barco', x: 650, y: 500 }, { type: 'barco', x: 100, y: 100 }] }, { cols: 60, rows: 40 });
+    const o = r.map.layers.objects;
+    const boats = o.join('\n').split('Ù').length - 1;
+    expect(boats).toBe(1);
+    const y = o.findIndex((row) => row.includes('Ù'));
+    expect(r.map.layers.ground[y][o[y].indexOf('Ù')]).toMatch(/[ó~]/);
+  });
 });

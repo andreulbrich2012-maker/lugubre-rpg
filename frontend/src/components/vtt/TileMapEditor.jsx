@@ -8,7 +8,8 @@ import { TILES, CATEGORIES, DEFAULT_GROUND, EMPTY_OBJECT, getTile } from '../../
 import { renderTilePreview } from '../../lib/tiles/render';
 import {
   emptyMap, repairMap, resizeMap, setCell, floodFill, rectFill, getCell, MIN_SIZE, MAX_SIZE,
-  addItem, updateItem, removeItem, placeBuilding, updateBuilding, removeBuilding, itemAt, ITEM_CATEGORIES, MAX_ITEMS
+  addItem, updateItem, removeItem, placeBuilding, updateBuilding, removeBuilding, itemAt, ITEM_CATEGORIES, MAX_ITEMS,
+  setAmbience
 } from '../../lib/tiles/format';
 import { ROOFS, ROOF_LABEL } from '../../lib/tiles/roofs';
 import { buildMapPrompt, parseMapResponse } from '../../lib/tiles/aiPrompt';
@@ -41,6 +42,8 @@ const EXAMPLES = [
 const WALLS = [['#', 'Pedra'], ['B', 'Tijolo'], ['M', 'Madeira']];
 const FLOORS = [['=', 'Assoalho'], ['_', 'Pedra'], ['Q', 'Templo']];
 const LAYER_LABEL = { ground: 'Chão', objects: 'Objetos' };
+const LIGHT_OPTIONS = [['dia', 'Dia'], ['entardecer', 'Entardecer'], ['noite', 'Noite']];
+const DECOR_OPTIONS = [['nenhuma', 'Nenhuma'], ['pouca', 'Pouca'], ['normal', 'Normal'], ['muita', 'Muita']];
 const emptyFor = (layer) => (layer === 'ground' ? DEFAULT_GROUND : EMPTY_OBJECT);
 
 // Celulas entre dois pontos (Bresenham): arrasto rapido nao deixa buracos no traco.
@@ -432,6 +435,23 @@ export default function TileMapEditor({ initialMap, onSave, onCancel }) {
                 </div>
               ))}
             </div>
+          </section>
+
+          <section className="gothic-panel flex flex-col gap-2 rounded-md p-3">
+            <h3 className="font-display text-xl">Ambiente</h3>
+            <div className="grid grid-cols-2 gap-2">
+              <label className="text-sm text-mist">Luz da cena
+                <select className="field py-1.5" value={map.light || 'dia'} onChange={(e) => commit(setAmbience(map, { light: e.target.value }))}>
+                  {LIGHT_OPTIONS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+                </select>
+              </label>
+              <label className="text-sm text-mist">Decoração
+                <select className="field py-1.5" value={map.decor || 'normal'} onChange={(e) => commit(setAmbience(map, { decor: e.target.value }))}>
+                  {DECOR_OPTIONS.map(([v, n]) => <option key={v} value={v}>{n}</option>)}
+                </select>
+              </label>
+            </div>
+            <p className="text-xs text-mist">À noite, tochas, fogueiras, janelas e cristais brilham. A decoração (grama, flores, pedrinhas) é espalhada sozinha, sem cobrir caminhos, portas ou objetos.</p>
           </section>
 
           {tool === 'building' && (

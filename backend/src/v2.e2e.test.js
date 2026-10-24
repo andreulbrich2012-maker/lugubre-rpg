@@ -278,7 +278,7 @@ describe.skipIf(!hasDb)('API v2 com Postgres', () => {
     const sceneNow = (await player.api.get(`${base()}/scenes/${scene.id}`).expect(200)).body;
     expect(sceneNow.tiles.items.map((entry) => entry.id)).toEqual(['longe', 'erva', 'osso']);
     const events = await eventsAfter(other.api, cursor.cursor);
-    expect(events.filter((event) => event.type === 'scene:items').at(-1).payload.items).toHaveLength(3);
+    expect(events.filter((event) => event.type === 'scene:updated' && event.payload.changed?.includes('items')).at(-1).payload.items).toHaveLength(3);
     expect(events.some((event) => event.type === 'message:created' && event.payload.message.content === 'Heroína V2 pegou Poção de cura ×2')).toBe(true);
     expect(events.some((event) => event.type === 'character:updated')).toBe(true);
 

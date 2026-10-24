@@ -1,5 +1,5 @@
 // Validacao do mapa em tiles (o editor do front conserta; aqui so aceita o que esta certo).
-// Formato: {cols, rows, layers:{ground, objects}, items?, buildings?, light?} — ver docs/API-v2.md.
+// Formato: {cols, rows, layers:{ground, objects}, items?, buildings?, light?, decor?} — ver docs/API-v2.md.
 import { z } from 'zod';
 import { httpError } from './http.js';
 
@@ -32,7 +32,8 @@ const buildingSchema = z.object({
 const extrasSchema = z.object({
   items: z.array(itemSchema).max(60, 'No máximo 60 itens no mapa.').optional().default([]),
   buildings: z.array(buildingSchema).max(30, 'No máximo 30 construções no mapa.').optional().default([]),
-  light: z.enum(['dia', 'entardecer', 'noite']).optional()
+  light: z.enum(['dia', 'entardecer', 'noite']).optional(),
+  decor: z.enum(['nenhuma', 'pouca', 'normal', 'muita']).optional()
 });
 
 // Valida o formato {cols, rows, layers:{nome:[linhas]}} com 1 caractere ASCII por celula,
@@ -61,7 +62,7 @@ export function validateTiles(tiles) {
     const issue = parsed.error.issues[0];
     throw httpError(`Mapa: ${issue.path.join('.')} — ${issue.message}`);
   }
-  const { items, buildings, light } = parsed.data;
+  const { items, buildings, light, decor } = parsed.data;
   for (const list of [items, buildings]) {
     if (new Set(list.map((entry) => entry.id)).size !== list.length) throw httpError('Mapa: ids repetidos em itens ou construções.');
   }
@@ -69,7 +70,7 @@ export function validateTiles(tiles) {
   if (buildings.some((b) => b.x + b.w > cols || b.y + b.h > rows)) throw httpError('Mapa: construção fora do mapa.');
   return {
     cols, rows, layers: Object.fromEntries(names.map((name) => [name, [...layers[name]]])),
-    items, buildings, ...(light ? { light } : {})
+    items, buildings, ...(light ? { light } : {}), ...(decor ? { decor } : {})
   };
 }
 

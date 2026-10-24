@@ -948,8 +948,8 @@ export function registerCampaignV2Routes(router) {
     }
 
     const { updatedScene } = result;
-    // 'scene:items': evento leve so com a lista nova (nao recarrega o mapa inteiro)
-    await emitEvent(req.params.id, 'scene:items', { sceneId: updatedScene.id, items: parseJson(updatedScene.tiles, {}).items || [] }, updatedScene.is_active ? 'all' : 'master', req.user.id);
+    // scene:updated leve: so o id da cena e a lista nova de itens (nao manda o mapa inteiro de novo)
+    await emitEvent(req.params.id, 'scene:updated', { scene: { id: updatedScene.id }, changed: ['items'], items: parseJson(updatedScene.tiles, {}).items || [] }, updatedScene.is_active ? 'all' : 'master', req.user.id);
     await emitEvent(req.params.id, 'message:created', { message: { ...result.message, account_name: req.user.name, character_name: result.character.character_name } }, 'all', req.user.id);
     await emitEvent(req.params.id, 'character:updated', { characterId: result.character.id }, 'all', req.user.id);
     if (result.combatState) await emitCombat(req.params.id, updatedScene, req.user.id);

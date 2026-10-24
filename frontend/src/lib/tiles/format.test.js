@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   emptyMap, validateMap, repairMap, resizeMap, setCell, floodFill, rectFill, isSolid, canMoveTo, serializeMap, cloneMap,
-  placeBuilding, addItem, updateItem, removeItem
+  placeBuilding, addItem, updateItem, removeItem, setAmbience
 } from './format.js';
 
 describe('formato do mapa', () => {
@@ -129,5 +129,18 @@ describe('itens pegaveis e construcoes', () => {
     expect(resizeMap(m, 5, 5).items).toEqual([]);
     expect(removeItem(m, id).items).toEqual([]);
     expect(JSON.parse(serializeMap(m)).items).toHaveLength(1);
+  });
+
+  it('luz e decoracao da cena: so guarda o que foge do padrao e sobrevive a reparo/redimensionar', () => {
+    const m = setAmbience(emptyMap(8, 8), { light: 'noite', decor: 'muita' });
+    expect(m.light).toBe('noite');
+    expect(validateMap(m).ok).toBe(true);
+    expect(JSON.parse(serializeMap(m))).toMatchObject({ light: 'noite', decor: 'muita' });
+    expect(repairMap(JSON.parse(serializeMap(m))).map.decor).toBe('muita');
+    expect(resizeMap(m, 6, 6).light).toBe('noite');
+    expect(cloneMap(m).decor).toBe('muita');
+    const back = setAmbience(m, { light: 'dia', decor: 'normal' });
+    expect('light' in back || 'decor' in back).toBe(false);
+    expect(repairMap({ ...emptyMap(4, 4), light: 'meio-dia' }).map.light).toBeUndefined();
   });
 });

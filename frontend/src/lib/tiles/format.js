@@ -1,7 +1,8 @@
 // Formato do mapa (o backend valida igual):
 // {cols, rows, layers: {ground: [rows de cols chars], objects: [idem]},
 //  items: [{id, x, y, name, description, quantity, weight, category, dracmas?}],   (pegaveis, max 60)
-//  buildings: [{id, x, y, w, h, name, roof}]}                                      (telhados, max 30)
+//  buildings: [{id, x, y, w, h, name, roof}],                                     (telhados, max 30)
+//  light: 'dia'|'entardecer'|'noite', decor: 'nenhuma'|'pouca'|'normal'|'muita'}  (ambiente da cena)
 // Funcoes puras: sempre devolvem um mapa novo (o desfazer guarda as versoes antigas).
 import { DEFAULT_GROUND, EMPTY_OBJECT, getTile } from './catalog.js';
 
@@ -17,6 +18,19 @@ export const MAX_ITEMS = 60;
 export const MAX_BUILDINGS = 30;
 export const ITEM_CATEGORIES = ['Achados', 'Armas', 'Armaduras', 'Poções', 'Tesouro', 'Livros', 'Ingredientes', 'Outros'];
 export const ROOF_TYPES = ['telha', 'palha', 'ardosia', 'madeira'];
+export const LIGHTS = ['dia', 'entardecer', 'noite'];
+export const DECORS = ['nenhuma', 'pouca', 'normal', 'muita'];
+// Ambiente so entra no mapa quando foge do padrao (dia / normal): mapa antigo continua igual.
+function ambience(src) {
+  const out = {};
+  if (LIGHTS.includes(src?.light) && src.light !== 'dia') out.light = src.light;
+  if (DECORS.includes(src?.decor) && src.decor !== 'normal') out.decor = src.decor;
+  return out;
+}
+export const setAmbience = (map, patch) => {
+  const { light, decor, ...rest } = map;
+  return { ...rest, ...ambience({ light, decor, ...patch }) };
+};
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 const num = (v, min, max, dflt) => {
   const n = Number(v);
@@ -92,12 +106,13 @@ export function emptyMap(cols = 16, rows = 12) {
 export function cloneMap(map) {
   return {
     cols: map.cols, rows: map.rows, layers: { ground: [...map.layers.ground], objects: [...map.layers.objects] },
-    items: (map.items || []).map((it) => ({ ...it })), buildings: (map.buildings || []).map((b) => ({ ...b }))
+    items: (map.items || []).map((it) => ({ ...it })), buildings: (map.buildings || []).map((b) => ({ ...b })),
+    ...ambience(map)
   };
 }
 
 export function serializeMap(map) {
-  return JSON.stringify({ cols: map.cols, rows: map.rows, layers: map.layers, items: map.items || [], buildings: map.buildings || [] });
+  return JSON.stringify({ cols: map.cols, rows: map.rows, layers: map.layers, items: map.items || [], buildings: map.buildings || [], ...ambience(map) });
 }
 
 export function validateMap(map) {
@@ -128,6 +143,8 @@ export function validateMap(map) {
     if (!Array.isArray(map.buildings) || map.buildings.length > MAX_BUILDINGS) errors.push(`Construções: no máximo ${MAX_BUILDINGS}.`);
     else if (repairBuildings(map.buildings, cols, rows).dropped) errors.push('Há construção fora do mapa ou menor que 3×3.');
   }
+  if (map.light !== undefined && !LIGHTS.includes(map.light)) errors.push('Luz da cena inválida.');
+  if (map.decor !== undefined && !DECORS.includes(map.decor)) errors.push('Decoração inválida.');
   return { ok: errors.length === 0, errors };
 }
 
@@ -176,6 +193,7 @@ export function repairMap(input, { cols, rows } = {}) {
   const bd = repairBuildings(input?.buildings, c, r);
   map.items = it.items;
   map.buildings = bd.buildings;
+  Object.assign(map, ambience(input));
   if (it.dropped) warnings.push(`${it.dropped} item(ns) fora do mapa ou sem nome foram descartados.`);
   if (bd.dropped) warnings.push(`${bd.dropped} construção(ões) fora do mapa ou pequenas demais foram descartadas.`);
   return { map, warnings };
@@ -190,7 +208,8 @@ export function resizeMap(map, cols, rows) {
   return {
     cols: c, rows: r, layers: { ground: fit(map.layers.ground, 'ground'), objects: fit(map.layers.objects, 'objects') },
     items: (map.items || []).filter((it) => it.x < c && it.y < r),
-    buildings: (map.buildings || []).filter((b) => b.x + b.w <= c && b.y + b.h <= r)
+    buildings: (map.buildings || []).filter((b) => b.x + b.w <= c && b.y + b.h <= r),
+    ...ambience(map)
   };
 }
 

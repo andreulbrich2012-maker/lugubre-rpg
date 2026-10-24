@@ -174,12 +174,10 @@ export default function CampaignRoom() {
           if (p.scene?.id && !sceneIds.includes(p.scene.id)) reload.scenes = true;
           if (p.scene?.id === sid) {
             if (p.map_changed) reload.scene = true;
+            else if (p.items) setScene((cur) => (cur?.tiles ? { ...cur, tiles: { ...cur.tiles, items: p.items } } : cur));
             else setScene((cur) => (cur ? { ...cur, ...p.scene } : cur));
           }
           setScenes((cur) => cur.map((s) => (s.id === p.scene?.id ? { ...s, ...p.scene } : s)));
-          break;
-        case 'scene:items':
-          if (p.sceneId === sid) setScene((cur) => (cur?.tiles ? { ...cur, tiles: { ...cur.tiles, items: p.items } } : cur));
           break;
         case 'initiative': case 'combat':
           if (p.sceneId === sid) setScene((cur) => (cur ? { ...cur, ...p } : cur));
@@ -268,7 +266,7 @@ export default function CampaignRoom() {
   const pickup = useCallback(async (item, characterId) => {
     try {
       const { data } = await api.post(`/campaigns/${id}/scenes/${scene.id}/pickup`, { itemId: item.id, ...(characterId ? { characterId } : {}) });
-      // some na hora para quem pegou; o evento scene:items confirma para todos
+      // some na hora para quem pegou; o evento scene:updated confirma para todos
       setScene((cur) => (cur?.tiles ? { ...cur, tiles: { ...cur.tiles, items: (cur.tiles.items || []).filter((it) => it.id !== item.id) } } : cur));
       notify(data.received?.kind === 'dracmas' ? `+${data.received.dracmas} dracmas na bolsa.` : `${item.name} foi para o inventário.`);
       setSheetReload((n) => n + 1);

@@ -75,8 +75,7 @@ Limites: o polling do feed e o movimento de tokens têm limite próprio (900 req
 | `character:shared` | all | `{ userId, characterId \| null }` (null = deixou de compartilhar) |
 | `character:updated` | all | `{ characterId }` (sem números; quem pode ver recarrega a ficha) |
 | `notes:changed` | author / master / all | `{ noteId, action: 'created'\|'updated'\|'deleted', scope }` → recarregue `GET /notes` |
-| `scene:updated` | all (cena ativa) ou master | `{ scene, changed?: [campos], map_changed?: bool }` — `scene` sem `map_url` (tem `has_map_url`); se `map_changed`, busque `GET /scenes/:sid` |
-| `scene:items` | all (cena ativa) ou master | `{ sceneId, items }` — lista nova de itens pegáveis do mapa (troque `scene.tiles.items`; não precisa recarregar o mapa) |
+| `scene:updated` | all (cena ativa) ou master | `{ scene, changed?: [campos], map_changed?: bool, items? }` — quando alguém pega um item vem `{ scene: {id}, changed: ['items'], items }` (troque só `scene.tiles.items`); `scene` sem `map_url` (tem `has_map_url`); se `map_changed`, busque `GET /scenes/:sid` |
 | `scene:activated` | all | `{ sceneId }` → recarregue cenas e tokens |
 | `scene:deleted` | all/master | `{ sceneId }` |
 | `token:moved` | all (master se oculto) | `{ tokenId, sceneId, x, y }` — coalescido: só a última posição recente fica no feed; anime até ela |
@@ -273,6 +272,7 @@ Campos opcionais (validados em `backend/src/utils/tiles.js`; nada de tabela nova
 - `items` (até 60) — itens pegáveis: `id` (`[A-Za-z0-9_-]{1,40}`, único), `x`/`y` (célula dentro do mapa), `name` (1–60), `description` (≤200), `quantity` (inteiro 1–999, padrão 1), `weight` (0–1000, padrão 0), `category` (`Achados` padrão, `Armas`, `Armaduras`, `Poções`, `Tesouro`, `Livros`, `Ingredientes`, `Outros`), `dracmas` (inteiro; se > 0 o item é dinheiro e vai para a bolsa). Vários itens podem estar na mesma célula (um baú).
 - `buildings` (até 30) — construções com telhado: `id`, `x`, `y`, `w`, `h` (≥3, retângulo inteiro dentro do mapa, incluindo as paredes), `name` (≤60), `roof` (`telha` padrão, `palha`, `ardosia`, `madeira`). O telhado esconde o interior; cada cliente decide quando mostrar (clique, token dentro, mestre com "ver interiores").
 - `light` — ciclo de luz da cena: `dia`, `entardecer` ou `noite` (sem o campo = dia).
+- `decor` — quanta decoração automática (tufos, flores, pedrinhas) o desenho espalha: `nenhuma`, `pouca`, `normal` ou `muita` (sem o campo = normal).
 
 ### 6.3 Pegar item do mapa — `POST /api/campaigns/:id/scenes/:sid/pickup`
 
@@ -291,7 +291,7 @@ Campos opcionais (validados em `backend/src/utils/tiles.js`; nada de tabela nova
 - Combate: só no próprio turno (`409 "Não é o seu turno."`) e **gasta a ação** (`turn_state.action_used`; se já usou → `409 "Você já usou sua ação neste turno."`).
 - Atômico (cena travada com `SELECT … FOR UPDATE`): dois cliques ao mesmo tempo → um leva, o outro recebe `409 "Já pegaram esse item."`.
 - O item vira um item da ficha (mesmo formato do inventário, `id` novo, `defenseBonus: 0`). `dracmas` vão para a bolsa já trocadas nas moedas maiores (ouro 500, platina 100, prata 10, bronze 1).
-- Eventos: `scene:items`, `message:created` (mensagem `message_type: "event"`, ex.: "Kael pegou Poção de cura") e `character:updated`; em combate também `combat`.
+- Eventos: `scene:updated` (com `changed: ['items']` e a lista nova), `message:created` (mensagem `message_type: "event"`, ex.: "Kael pegou Poção de cura") e `character:updated`; em combate também `combat`.
 
 Mapas por IA: o site não chama IA nenhuma. O editor monta o prompt (`frontend/src/lib/tiles/aiPrompt.js`), o mestre cola no ChatGPT/Gemini/Claude e cola a resposta de volta (o parser conserta tamanho, códigos, itens e construções).
 

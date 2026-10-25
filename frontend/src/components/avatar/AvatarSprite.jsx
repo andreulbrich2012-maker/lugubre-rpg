@@ -18,8 +18,9 @@ export default function AvatarSprite({ swingId, appearance, direction = 'down', 
     const sheet = buildSpriteSheet(appearance);
     const anim = moving ? 'walk' : 'idle';
     const n = ANIMS[anim];
+    let swingDir = null;
     const draw = (f, a = anim) => {
-      const r = frameRect(direction, a, f);
+      const r = frameRect(a === 'attack' && swingDir ? swingDir : direction, a, f);
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(styledCopy(sheet.canvas, mapStyle), r.sx, r.sy, r.sw, r.sh, 0, 0, canvas.width, canvas.height);
@@ -49,7 +50,8 @@ export default function AvatarSprite({ swingId, appearance, direction = 'down', 
       draw(f);
     };
     // menos movimento: o golpe ainda aparece (e curto e diz quem atacou), mas so ele anima
-    const off = onSwing(swingId, () => {
+    const off = onSwing(swingId, (dir) => {
+      swingDir = dir;
       swingAt = performance.now();
       if (!raf) raf = requestAnimationFrame(loop);
     });

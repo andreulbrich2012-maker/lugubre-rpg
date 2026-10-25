@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Crosshair, DoorOpen, Eye, EyeOff, Footprints, Hand, Lock, LockOpen, LocateFixed, Minus, MousePointer2, Plus, X } from 'lucide-react';
+import { Crosshair, DoorOpen, Eye, EyeOff, Footprints, Hand, Lock, LockOpen, LocateFixed, MapPin, Minus, MousePointer2, Plus, X } from 'lucide-react';
 import TileMapCanvas from './TileMapCanvas';
 import Crack from '../glass/Crack';
 import { buildingAt, isSolid, PICKUP_RANGE, tokenBuilding, tokenItemDistance } from '../../lib/tiles/format';
@@ -122,6 +122,11 @@ export default function Board({
   activeTokenId,
   effects = {},
   pings = [],
+  // pins com pergunta (ficam ate o autor ou o mestre tirar): [{ id, x, y, name, color, text, userId }]
+  mapPins = [],
+  myUserId,
+  onAddPin,
+  onRemovePin,
   onPing,
   gmCursor,
   onCursor,
@@ -161,6 +166,9 @@ export default function Board({
   const paddedBase = useMemo(() => (isTiles ? padMap(scene.tiles) : null), [isTiles, scene?.tiles]);
   const paddedTiles = useMemo(() => (paddedBase && paddedBase.light !== sceneLight ? { ...paddedBase, light: sceneLight } : paddedBase), [paddedBase, sceneLight]);
   const shakeRef = useRef(null);
+  // marcar: clique no botao do pin, depois no mapa; abre a caixinha da pergunta
+  const [pinMode, setPinMode] = useState(false);
+  const [pinDraft, setPinDraft] = useState(null);
   const tokenEls = useRef({});
   // Animacoes (lib/fx): tremida do mapa e empurrao/piscada/transparencia dos tokens direto no estilo,
   // sem setState a 60 fps.
@@ -598,7 +606,21 @@ export default function Board({
     });
   }
 
+  useEffect(() => {
+    if (!pinMode) return undefined;
+    const esc = (e) => { if (e.key === 'Escape') setPinMode(false); };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [pinMode]);
+
   function onPointerDownBg(event) {
+    if (pinMode && event.button === 0) {
+      event.preventDefault();
+      const p = toMap(event);
+      setPinDraft({ x: p.x, y: p.y, text: '' });
+      setPinMode(false);
+      return;
+    }
     if (event.altKey || event.button === 1) {
       event.preventDefault();
       const p = toMap(event);
@@ -816,6 +838,18 @@ export default function Board({
               <span>Mestre</span>
             </div>
           )}
+          {mapPins.map((p) => (
+            <div key={p.id} className="vtt-pin" style={{ left: p.x, top: p.y, '--pc': p.color || 'var(--color-ember)', transform: `translate(-50%, -100%) scale(${1 / view.z})` }}>
+              <div className="vtt-pin-card">
+                <span className="font-bold">{p.name}</span>
+                {p.text && <span className="block">{p.text}</span>}
+                {(isMaster || p.userId === myUserId) && (
+                  <button type="button" className="vtt-pin-x" onPointerDown={(e) => e.stopPropagation()} onClick={() => onRemovePin?.(p.id)} aria-label={`Tirar o pin de ${p.name}`}><X size={14} /></button>
+                )}
+              </div>
+              <MapPin size={30} className="vtt-pin-icon" aria-hidden="true" />
+            </div>
+          ))}
           {pings.map((p) => (
             <span key={p.id} className="vtt-ping" style={{ left: p.x, top: p.y, '--pc': p.color || 'var(--color-ember)' }} />
           ))}
@@ -971,10 +1005,29 @@ export default function Board({
             <MousePointer2 size={18} />
           </button>
         )}
+        {onAddPin && (
+          <button type="button" className={`btn btn-glass !min-h-10 !w-10 !p-0 ${pinMode ? 'lit' : ''}`} onClick={() => { setPinMode((v) => !v); setPinDraft(null); }} aria-pressed={pinMode} aria-label="Marcar um ponto no mapa" title="Marcar um ponto (com pergunta)">
+            <MapPin size={18} />
+          </button>
+        )}
         <button type="button" className="btn btn-glass !min-h-10 !w-10 !p-0" onClick={() => zoomBy(1.25)} aria-label="Aproximar"><Plus size={18} /></button>
         <button type="button" className="btn btn-glass !min-h-10 !w-10 !p-0" onClick={() => zoomBy(0.8)} aria-label="Afastar"><Minus size={18} /></button>
         <button type="button" className="btn btn-glass !min-h-10 !w-10 !p-0" onClick={fit} aria-label="Centralizar mapa"><LocateFixed size={18} /></button>
       </div>
+      {pinMode && (
+        <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
+          <p className="flex items-center gap-2 border-[3px] border-lead bg-abyss/95 px-4 py-2 font-bold text-ember"><MapPin size={18} /> Clique no mapa onde quer marcar (Esc cancela)</p>
+        </div>
+      )}
+      {pinDraft && (
+        <form className="absolute inset-x-0 bottom-20 z-30 mx-auto flex w-[min(92%,420px)] gap-2 border-[3px] border-lead bg-abyss/95 p-2 shadow-lg"
+          onSubmit={(e) => { e.preventDefault(); onAddPin?.(pinDraft.x, pinDraft.y, pinDraft.text); setPinDraft(null); }}>
+          <input autoFocus maxLength={140} className="field !mt-0 min-w-0 flex-1" placeholder="Pergunta ou aviso (opcional)" value={pinDraft.text}
+            onChange={(e) => setPinDraft((d) => ({ ...d, text: e.target.value }))} onKeyDown={(e) => { if (e.key === 'Escape') setPinDraft(null); }} aria-label="Pergunta do pin" />
+          <button type="submit" className="btn btn-lit">Marcar</button>
+          <button type="button" className="btn btn-glass !w-10 !p-0" onClick={() => setPinDraft(null)} aria-label="Cancelar"><X size={16} /></button>
+        </form>
+      )}
       {targeting && (
         <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
           <p className="flex items-center gap-2 border-[3px] border-lead bg-abyss/95 px-4 py-2 font-bold text-ember"><Crosshair size={18} /> Escolha o alvo no mapa (Esc cancela)</p>

@@ -3,9 +3,20 @@
 // Fica fora do React para nao renderizar a mesa inteira a cada ataque.
 const subs = new Map();
 
-export function swing(tokenId) {
+// from/to (opcionais, em px do mapa): o boneco vira para o alvo durante o golpe.
+export function swing(tokenId, from, to) {
   if (!tokenId) return;
-  for (const fn of subs.get(tokenId) || []) fn();
+  const dir = facing(from, to);
+  for (const fn of subs.get(tokenId) || []) fn(dir);
+}
+
+export function facing(from, to) {
+  if (!from || !to) return null;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (!dx && !dy) return null;
+  if (Math.abs(dx) >= Math.abs(dy)) return dx < 0 ? 'left' : 'right';
+  return dy < 0 ? 'up' : 'down';
 }
 
 export function onSwing(tokenId, fn) {

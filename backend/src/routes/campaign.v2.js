@@ -347,7 +347,7 @@ export function registerCampaignV2Routes(router) {
   }
   router.use('/:id', (req, res, next) => {
     // recursos v2 dependem do Postgres
-    if (/^\/(events|notes|characters|scenes|npcs|tokens|rolls|ping|cursor|maps|action-requests|boats|voyages)(\/|$)/.test(req.path)) requireDatabase();
+    if (/^\/(events|notes|characters|scenes|npcs|tokens|rolls|ping|pin|cursor|maps|action-requests|boats|voyages)(\/|$)/.test(req.path)) requireDatabase();
     next();
   });
   // barcos e viagens pelo mar (campaign.sea.js); funcoes declaradas mais abaixo (hoisting)
@@ -372,6 +372,23 @@ export function registerCampaignV2Routes(router) {
     const payload = { userId: req.user.id, name: req.user.name, color: member?.color || '#d6a65f', x: body.x, y: body.y, sceneId: body.sceneId || null };
     await emitEvent(req.params.id, 'ping', payload, 'all', req.user.id);
     res.status(201).json(payload);
+  });
+
+  // Pin com pergunta: qualquer membro marca um ponto do mapa ("tem algo aqui?") e ele fica ate
+  // o autor ou o mestre tirar. Vive nos eventos da mesa (sem tabela): quem entra depois nao ve.
+  router.post('/:id/pin', async (req, res) => {
+    const { member } = await requireCampaignMember(req.params.id, req.user);
+    const body = z.object({ x: z.coerce.number(), y: z.coerce.number(), sceneId: z.string().uuid(), text: z.string().max(140).optional() }).parse(req.body);
+    const payload = { op: 'add', id: crypto.randomUUID(), userId: req.user.id, name: req.user.name, color: member?.color || '#d6a65f', x: Math.round(body.x), y: Math.round(body.y), sceneId: body.sceneId, text: (body.text || '').trim() };
+    await emitEvent(req.params.id, 'pin', payload, 'all', req.user.id);
+    res.status(201).json(payload);
+  });
+  router.delete('/:id/pin/:pinId', async (req, res) => {
+    await requireCampaignMember(req.params.id, req.user);
+    const body = z.object({ sceneId: z.string().uuid() }).parse(req.query);
+    // o cliente so mostra o X ao autor e ao mestre; aqui basta ser membro (pin nao guarda nada)
+    await emitEvent(req.params.id, 'pin', { op: 'remove', id: req.params.pinId, sceneId: body.sceneId }, 'all', req.user.id);
+    res.status(204).end();
   });
 
   // Cursor do mestre: os jogadores veem onde ele aponta (o cliente manda no maximo ~3x por segundo).

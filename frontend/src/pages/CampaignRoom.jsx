@@ -81,6 +81,8 @@ export default function CampaignRoom() {
   const askContext = useRef(new Map());
   const [effects, setEffects] = useState({});
   const [pings, setPings] = useState([]);
+  // pins com pergunta da cena atual (somem ao trocar de cena)
+  const [mapPins, setMapPins] = useState([]);
   // cursor do mestre visto pelos jogadores; o mestre escolhe se mostra (fica salvo neste navegador)
   const [gmCursor, setGmCursor] = useState(null);
   const [showCursor, setShowCursor] = useState(() => { try { return localStorage.getItem('lugubre:cursor') !== 'off'; } catch { return true; } });
@@ -283,7 +285,7 @@ export default function CampaignRoom() {
               fxAttacks.current.set(p.rollId, atk);
               if (fxAttacks.current.size > 20) fxAttacks.current.delete(fxAttacks.current.keys().next().value);
               if (atk.phase === 'full') fxRef.current?.play(atk); else fxRef.current?.attack(atk);
-              swing(atk.fromId);
+              swing(atk.fromId, atk.from, atk.to);
             }
           }
           if (p.messageId && !p.secret) {
@@ -298,6 +300,11 @@ export default function CampaignRoom() {
           break;
         case 'cursor':
           if (!master) setGmCursor(p.off || p.sceneId !== sid ? null : { x: p.x, y: p.y, name: p.name, at: Date.now() });
+          break;
+        case 'pin':
+          if (p.sceneId !== sid) break;
+          if (p.op === 'remove') setMapPins((cur) => cur.filter((x) => x.id !== p.id));
+          else setMapPins((cur) => (cur.some((x) => x.id === p.id) ? cur : [...cur, p]));
           break;
         case 'ping':
           if (p.sceneId === sid) {
@@ -483,6 +490,19 @@ export default function CampaignRoom() {
     const t = setTimeout(() => setGmCursor(null), 8000);
     return () => clearTimeout(t);
   }, [gmCursor]);
+
+  const addPin = useCallback((x, y, text) => {
+    if (!scene) return;
+    api.post(`/campaigns/${id}/pin`, { x: Math.round(x), y: Math.round(y), sceneId: scene.id, text })
+      .then(({ data: pin }) => pin?.id && setMapPins((cur) => (cur.some((p) => p.id === pin.id) ? cur : [...cur, pin])))
+      .catch(() => null);
+  }, [id, scene]);
+  const removePin = useCallback((pinId) => {
+    if (!scene) return;
+    setMapPins((cur) => cur.filter((p) => p.id !== pinId));
+    api.delete(`/campaigns/${id}/pin/${pinId}?sceneId=${scene.id}`).catch(() => null);
+  }, [id, scene]);
+  useEffect(() => { setMapPins([]); }, [scene?.id]);
 
   const ping = useCallback((x, y) => {
     if (!scene) return;
@@ -754,6 +774,10 @@ export default function CampaignRoom() {
                 effects={effects}
                 pings={pings}
                 onPing={ping}
+                mapPins={mapPins}
+                myUserId={user?.id}
+                onAddPin={addPin}
+                onRemovePin={removePin}
                 gmCursor={gmCursor}
                 onCursor={sendCursor}
                 showCursor={showCursor}

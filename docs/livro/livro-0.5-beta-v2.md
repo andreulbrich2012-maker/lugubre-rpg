@@ -1146,21 +1146,52 @@ Ataques normais e magias podem ser registrados na ficha com nome, fórmula de da
 
 O valor crítico padrão é 20 e o multiplicador padrão é 2.
 
-> **ACERTO DE ATAQUES**
+## O Mestre decide o combate
+
+Lúgubre é um sistema aberto. Em combate, quem decide é o Mestre: as regras abaixo explicam o que cada valor significa, mas não substituem a decisão dele.
+
+**Acertou ou errou:** O Mestre decide se um golpe acerta, olhando a situação, a rolagem, a Defesa do alvo e o que foi descrito pelo jogador.
+
+**Dano:** O Mestre define o dano de cada ataque, magia ou poder, como uma fórmula de dados (por exemplo, 1d6+2). O jogador registra essa fórmula na ficha.
+
+**Rolagem:** O jogador rola o dano pelo sistema digital, que mostra o resultado ao Mestre e à mesa, ou rola na mesa e fala o resultado.
+
+**Crítico:** Quando o ataque permite crítico, vale a regra acima: d20 igual ou maior que o valor crítico multiplica o dano.
+
+> **EXEMPLO**
 >
-> O sistema registra rolagens e dano, mas os materiais atuais não definem uma fórmula completa de acerto contra Defesa, Bloqueio ou Esquiva. Uma proposta para teste está nos Apêndices.
+> O jogador diz que o Elfo ataca o Goblin com a espada. O Mestre decide que o golpe acertou e que a espada causa 1d6+2. O jogador já tem "1d6+2" na ficha, rola pelo sistema e tira 6. O Goblin perde 6 de Vida.
 
 ## Defesa, Bloqueio e Esquiva
 
-**Defesa:** Defesa total = Defesa-base + soma dos bônus de Defesa dos itens.
+São três formas diferentes de não se ferir. O Mestre decide qual delas vale em cada golpe e quanto ela protege.
 
-**Esquiva:** Esquiva = 15 - Agilidade.
+**Defesa (armadura):** É a proteção da armadura que o personagem veste. Defesa total = Defesa-base + soma dos bônus de Defesa dos itens. Quanto cada armadura dá é decidido pelo Mestre; a tabela abaixo é a referência do sistema.
 
-**Bloqueio:** Existe como campo editável, mas ainda não possui fórmula oficial.
+**Bloqueio:** É aparar o golpe com a própria arma ou com o escudo: um corte de espada parado pela sua espada. Funciona como o botão de defender de muitos jogos. Escudos aumentam o Bloqueio.
 
-> **REVISÃO NECESSÁRIA**
+**Esquiva:** É desviar do golpe com o corpo. O Mestre decide quando o personagem pode tentar e como resolver (por exemplo, com um teste de Reflexos ou Acrobacia). A ficha mantém um campo de Esquiva, hoje calculado como 15 − Agilidade, como referência para o Mestre.
+
+**Defesa das criaturas:** O valor chamado Armadura nas fichas das criaturas é a Defesa delas e funciona do mesmo jeito.
+
+### Tabela de referência de armaduras
+
+Valores-base do sistema, inspirados em outros RPGs de fantasia. O Mestre pode mudar qualquer um deles.
+
+| Proteção | Bônus de Defesa | Bônus de Bloqueio | Observação |
+| --- | ---: | ---: | --- |
+| Sem armadura (roupas) | +0 | — | — |
+| Armadura acolchoada | +1 | — | Leve. |
+| Armadura de couro | +2 | — | Leve. |
+| Couro batido | +3 | — | Leve. |
+| Cota de malha | +4 | — | −2 para se esconder e fazer acrobacias. |
+| Peitoral de aço | +5 | — | −2 para se esconder. |
+| Armadura de placas | +6 | — | −5 para se esconder e fazer acrobacias; anda 3 metros a menos. |
+| Escudo | +1 | +2 | Ocupa uma mão. |
+
+> **PARTES SOLTAS**
 >
-> A fórmula atual faz a Esquiva diminuir quando a Agilidade aumenta. Isso pode indicar que o teste deve ser feito abaixo do valor ou que a fórmula precisará ser corrigida durante o beta. Uma proposta para teste está nos Apêndices.
+> Elmo, manoplas e grevas podem dar +1 de Defesa cada, se o Mestre quiser. Armaduras mágicas ou de materiais raros podem passar desses valores.
 
 ## Níveis e progressão
 
@@ -1172,11 +1203,11 @@ Os personagens evoluem do nível 1 ao 20. As classes possuem habilidades registr
 
 ## Combate
 
-O sistema atual permite rolar perícias com d20, rolar dano, registrar ataques e magias, aplicar crítico, calcular Defesa e calcular Esquiva. Esses recursos formam a base digital do combate, mas ainda não constituem um procedimento completo de batalha.
+O combate em Lúgubre é conduzido pelo Mestre. O sistema digital ajuda: rola perícias e dano, registra ataques e magias, aplica crítico, mostra Defesa e Esquiva e anima os golpes na mesa, mas não decide nada sozinho.
 
 ### Iniciativa e ordem de ação
 
-A perícia Iniciativa existe e está ligada à Agilidade, mas não há regra oficial para ordenar participantes ou desempatar resultados. Uma proposta para teste está nos Apêndices.
+Quem age primeiro é decidido pelo Mestre. Ele pode seguir a cena, a narrativa ou pedir um teste de Iniciativa (1d20 + Agilidade + treino) quando quiser sortear a ordem.
 
 ### Rodadas, turnos e ações
 
@@ -2442,7 +2473,7 @@ Regras oficiais para arcos, marcos de nível, passagem de tempo e encerramento d
 
 **Perícias:** Exemplos, dificuldades e ações específicas.
 
-**Combate:** Acerto, iniciativa, ações, movimento, alcance e cobertura.
+**Combate:** Ações por turno, movimento, alcance e cobertura (acerto, dano e iniciativa: decisão do Mestre).
 
 **Condições:** Lista geral e regras.
 
@@ -2460,11 +2491,10 @@ Regras oficiais para arcos, marcos de nível, passagem de tempo e encerramento d
 
 ## Notas de consistência para a equipe
 
-- Confirmar se a Esquiva realmente diminui com Agilidade ou se o teste deve ser feito abaixo do valor.
+- Esquiva: o campo da ficha usa 15 − Agilidade; confirmar se deve continuar assim agora que desviar é decisão do Mestre.
 - Confirmar a fórmula automática de Vida e Mana no sistema digital.
 - Definir o papel de Hemera e sua relação com os Oito Primordiais.
-- Definir se Armadura, Defesa, Bloqueio e Esquiva são valores diferentes e como cada um é usado.
-- Definir dificuldades de testes e regras de acerto de ataques.
+- Definir dificuldades de testes (o acerto de ataques já é decisão do Mestre).
 - Padronizar termos, maiúsculas, acentuação e nomes de habilidades antes da versão 1.0.
 - Golpe Guardião, Raio Sombrio e Bênção de Éter aparecem como habilidades de nível 1, mas não coincidem com as habilidades de nível 1 do Cavaleiro, do Mago e do Sacerdote.
 - Cavaleiro, Atirador e Ladino possuem Mana, mas todas as suas habilidades custam 0.
@@ -2509,6 +2539,8 @@ O Mestre escolhe um número-alvo, chamado DT (Dificuldade do Teste). Você rola 
 
 ## 2. Como acertar um ataque
 
+> **DECIDIDO:** acerto, dano e ordem de ação ficam com o Mestre (ver Capítulo III). Esta proposta continua aqui só como opção para mesas que queiram uma conta fixa.
+
 Hoje o livro não diz quando um ataque acerta. A proposta é simples: o ataque é um teste, e a DT é a Defesa do alvo.
 
 > **ACERTOU SE: 1d20 + FORÇA + LUTA ≥ DEFESA DO ALVO**
@@ -2530,6 +2562,8 @@ Hoje o livro não diz quando um ataque acerta. A proposta é simples: o ataque �
 > Um Orc com Força 3 e Luta +5 ataca com +8. O Goblin tem Defesa 11, então o Orc acerta se tirar 3 ou mais no dado.
 
 ## 3. Como funciona um turno de combate
+
+> **DECIDIDO:** quem age primeiro é decidido pelo Mestre (ver Capítulo III). O resto desta proposta é opcional.
 
 Primeiro, todo mundo rola Iniciativa (1d20 + Agilidade + treino). Quem tirar mais age primeiro. Em empate, age antes quem tem mais Agilidade.
 
@@ -2775,7 +2809,9 @@ o Livro do Jogador de Dungeons &amp; Dragons foi observado somente para compreen
 
 **Conteúdo do sistema digital no livro:** 180 magias (20 por elemento), 53 poderes e técnicas, catálogo de equipamentos com preços e pesos, montarias, serviços e barcos, resumo do bestiário digital e as ferramentas do Mestre na mesa.
 
-**Regras alteradas:** Nenhuma regra oficial alterada; as mudanças sugeridas estão marcadas como propostas.
+**Regras de combate (decididas pelo dono):** acerto, dano e ordem de ação são decisão do Mestre; Defesa é a armadura, Bloqueio é aparar com arma ou escudo, Esquiva é desviar; Armadura das criaturas é a Defesa delas; tabela de referência de armaduras.
+
+**Outras regras alteradas:** Nenhuma; as mudanças sugeridas estão marcadas como propostas.
 
 **Nomes de raças:** Por pedido do dono do sistema, as raças voltaram aos nomes clássicos (Aasimar, Anão, Elfo, Elfo Negro, Genasi, Halfling, Orc e Tiefling) no lugar de Celestiano, Durkar, Sylvar, Nocthar, Primordiano, Lumerin, Gorak e Abissiano.
 

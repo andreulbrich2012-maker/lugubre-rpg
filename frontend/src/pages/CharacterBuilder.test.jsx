@@ -32,15 +32,15 @@ describe('criador de ficha', () => {
   });
 
   it('aponta a etapa de cada campo obrigatório ausente', () => {
-    expect(validateCharacterDraft({ ...validDraft, characterName: '' }, catalog)).toEqual({ step: 1, message: 'Informe o nome do personagem.' });
-    expect(validateCharacterDraft({ ...validDraft, raceId: '' }, catalog)?.step).toBe(3);
-    expect(validateCharacterDraft({ ...validDraft, classId: '' }, catalog)?.step).toBe(4);
-    expect(validateCharacterDraft({ ...validDraft, originId: '' }, catalog)?.step).toBe(5);
+    expect(validateCharacterDraft({ ...validDraft, characterName: '' }, catalog)).toEqual({ step: 0, message: 'Informe o nome do personagem.' });
+    expect(validateCharacterDraft({ ...validDraft, raceId: '' }, catalog)?.step).toBe(1);
+    expect(validateCharacterDraft({ ...validDraft, classId: '' }, catalog)?.step).toBe(2);
+    expect(validateCharacterDraft({ ...validDraft, originId: '' }, catalog)?.step).toBe(2);
   });
 
   it('rejeita referências removidas enquanto preserva os demais dados', () => {
     const result = validateCharacterDraft(validDraft, { ...catalog, races: [] });
-    expect(result).toMatchObject({ step: 3 });
+    expect(result).toMatchObject({ step: 1 });
     expect(result.message).toContain('não está mais disponível');
   });
 

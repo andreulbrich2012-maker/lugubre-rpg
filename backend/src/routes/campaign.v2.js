@@ -384,10 +384,19 @@ export function registerCampaignV2Routes(router) {
     res.status(201).json(payload);
   });
   router.delete('/:id/pin/:pinId', async (req, res) => {
-    await requireCampaignMember(req.params.id, req.user);
+    const { master } = await requireCampaignMember(req.params.id, req.user);
     const body = z.object({ sceneId: z.string().uuid() }).parse(req.query);
-    // o cliente so mostra o X ao autor e ao mestre; aqui basta ser membro (pin nao guarda nada)
-    await emitEvent(req.params.id, 'pin', { op: 'remove', id: req.params.pinId, sceneId: body.sceneId }, 'all', req.user.id);
+    const pinId = z.string().uuid().parse(req.params.pinId);
+    // so o autor ou o mestre tiram: o autor fica no evento que criou o pin
+    const { rows } = await query(
+      `select payload->>'userId' as user_id from campaign_events
+        where campaign_id = $1 and type = 'pin' and payload->>'op' = 'add' and payload->>'id' = $2
+        order by id desc limit 1`,
+      [req.params.id, pinId]
+    );
+    if (!rows[0]) throw httpError('Pin não encontrado.', 404);
+    if (!master && rows[0].user_id !== req.user.id) throw httpError('Só quem marcou ou o mestre pode tirar este pin.', 403);
+    await emitEvent(req.params.id, 'pin', { op: 'remove', id: pinId, sceneId: body.sceneId }, 'all', req.user.id);
     res.status(204).end();
   });
 

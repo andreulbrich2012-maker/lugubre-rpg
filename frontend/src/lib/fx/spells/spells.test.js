@@ -4,6 +4,7 @@ import { RECIPES, parseRecipe, recipeFor } from './recipes.js';
 import { createSpellEffect, renderSpell } from './engine.js';
 import { findSpell, matchSpellName, spellForOptions } from './match.js';
 import { PRIMS } from './prims.js';
+import { BOOK_LINKS } from './bookLinks.js';
 import { SPRITES, SYMBOLS } from './sprites.js';
 import { createFakeContext } from '../fakeCanvas.js';
 import { createPlayer } from '../player.js';
@@ -235,5 +236,16 @@ describe('palco do grimorio cabe magia alta', () => {
   });
   it('clima e raio do ceu nao esticam o palco', () => {
     expect(fitOf('relampago').fit.f).toBe(1);
+  });
+});
+
+describe('magias do livro', () => {
+  it('toda magia do livro aponta para uma magia que existe no grimorio', () => {
+    for (const [name, id] of Object.entries(BOOK_LINKS)) expect(SPELL_BY_ID[id], name).toBeTruthy();
+  });
+  it('nome do livro acha a animacao ligada, com ou sem acento', () => {
+    expect(findSpell({ name: 'Vinhas de Gaia', type: 'magia' }).id).toBe('vinhas-constritoras');
+    expect(matchSpellName('lanca do zenite').id).toBe('raio-solar');
+    expect(matchSpellName('Prisão do Tártaro').id).toBe('prisao-de-forca');
   });
 });

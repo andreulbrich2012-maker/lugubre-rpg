@@ -6,6 +6,7 @@
 // Sem casamento: null, e o classificador antigo (classify.js) escolhe a familia.
 import { SPELLS, SPELL_BY_ID } from './catalog.js';
 import { normalize } from '../text.js';
+import { BOOK_LINKS } from './bookLinks.js';
 
 // Sinonimos e nomes classicos (pt e en) para as magias mais conhecidas.
 export const SYNONYMS = {
@@ -99,11 +100,20 @@ const WEAPON_TYPES = ['poder', 'tecnica', 'arma', 'weapon', 'ataque'];
 
 const PREFIX = /^(magia|feitico|ritual|poder|ataque|dano|spell|uso de)\s*:?\s+/;
 
+// Nomes do livro -> magia do grimorio (so nome exato, antes de qualquer outra regra).
+let book = null;
+function bookIndex() {
+  if (!book) book = new Map(Object.entries(BOOK_LINKS).map(([name, id]) => [normalize(name), SPELL_BY_ID[id]]).filter(([, s]) => s));
+  return book;
+}
+
 export function matchSpellName(name) {
   if (!name) return null;
   index = index || buildIndex();
   const n = normalize(name).replace(PREFIX, '');
   if (!n) return null;
+  const book = bookIndex().get(n);
+  if (book) return book;
   const hit = index.exact.get(n);
   if (hit) return hit;
   const padded = ` ${n} `;

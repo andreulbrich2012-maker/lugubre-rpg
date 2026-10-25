@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Play, Repeat, Wand2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Play, Repeat, Sparkles, Wand2 } from 'lucide-react';
 import FxLayer from '../fx/FxLayer';
+import AdminWeaponMovesPanel from './AdminWeaponMovesPanel';
+import { matchSpellName } from '../../lib/fx/spells/match.js';
+import { SPELLS } from '../../lib/fx/spells/catalog.js';
 import { FAMILIES, GROUPS, RESULTS, ELEMENTS, ELEMENT_KEYS, classify, drawGrass, drawActor, getFamily } from '../../lib/fx';
 
 // Galeria de animacoes: escolhe familia/elemento/resultado e toca entre dois
@@ -34,7 +38,7 @@ function gap(family, range) {
   return family.group === 'corpo' || family.group === 'monstro' ? (family.action === 'breath' || family.action === 'dash' ? 3 : 1) : 4;
 }
 
-export default function AdminAnimationsPage() {
+function AdminFamilyAnimations() {
   const fx = useRef(null);
   const bg = useRef(null);
   const actors = useRef(null);
@@ -51,6 +55,7 @@ export default function AdminAnimationsPage() {
   const [probe, setProbe] = useState('');
   const [probeMonster, setProbeMonster] = useState(false);
   const [probeResult, setProbeResult] = useState(null);
+  const [probeSpell, setProbeSpell] = useState(null);
   const [last, setLast] = useState(null);
 
   const fam = getFamily(family);
@@ -138,6 +143,8 @@ export default function AdminAnimationsPage() {
     if (!probe.trim()) return;
     const c = classify({ name: probe, type: /magia|feiti/i.test(probe) ? 'magia' : undefined }, { monster: probeMonster });
     setProbeResult(c);
+    // Magia do grimorio com o mesmo nome: e ela que toca na mesa.
+    setProbeSpell(probeMonster ? null : matchSpellName(probe));
     setFamily(c.family);
     setElement(c.element || '');
   }
@@ -196,7 +203,12 @@ export default function AdminAnimationsPage() {
           </p>
         )}
 
-        <form onSubmit={runProbe} className="mt-6 pane p-3">
+        <div className="mt-6 pane flex flex-wrap items-center justify-between gap-2 p-3">
+          <p className="text-sm text-mist"><span className="text-bone">Grimório:</span> {SPELLS.length} magias com animação própria (fogo, gelo, ilusão, necromancia, tempo...).</p>
+          <Link to="/grimorio" className="btn btn-glass"><Sparkles size={16} /> Abrir Grimório</Link>
+        </div>
+
+        <form onSubmit={runProbe} className="mt-3 pane p-3">
           <p className="text-sm text-bone">Testar classificação automática</p>
           <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
             <input className="field !mt-0" placeholder="Ex.: Raio Sombrio, Machado grande, Mordida" value={probe} onChange={(e) => setProbe(e.target.value)} />
@@ -206,6 +218,12 @@ export default function AdminAnimationsPage() {
           {probeResult && (
             <p className="mt-2 text-sm text-mist">
               <span className="text-ember">{probeResult.label}</span> · {GROUPS.find((g) => g.id === probeResult.group)?.label} · {probeResult.form} · {probeResult.element || 'físico'}
+            </p>
+          )}
+          {probeSpell && (
+            <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-mist">
+              Grimório: <span className="text-ember">{probeSpell.name}</span> (esta animação vence a família na mesa)
+              <button type="button" className="btn btn-glass !min-h-9 !px-3 text-xs" onClick={() => { fx.current?.clear(); fx.current?.play({ spell: probeSpell.id, result, from: pos.current.from, to: pos.current.to, fromId: 'a', toId: 'b', seed: `galeria-${++counter.current}` }); }}><Play size={14} /> Tocar magia</button>
             </p>
           )}
         </form>
@@ -240,5 +258,22 @@ export default function AdminAnimationsPage() {
         </ul>
       </aside>
     </section>
+  );
+}
+
+// Duas abas: golpes de arma (familia de movimento x arma x golpe) e as familias
+// de efeito originais (inclui magias e ataques de monstro).
+export default function AdminAnimationsPage() {
+  const [tab, setTab] = useState('armas');
+  const tabs = [['armas', 'Golpes de arma'], ['familias', 'Famílias, magias e monstros']];
+  return (
+    <div>
+      <div className="mb-4 flex flex-wrap gap-2" role="tablist">
+        {tabs.map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={tab === id} className={`min-h-11 px-3 py-2 text-sm ${tab === id ? 'lit text-bone' : 'text-mist hover:text-bone'}`} onClick={() => setTab(id)}>{label}</button>
+        ))}
+      </div>
+      {tab === 'armas' ? <AdminWeaponMovesPanel /> : <AdminFamilyAnimations />}
+    </div>
   );
 }

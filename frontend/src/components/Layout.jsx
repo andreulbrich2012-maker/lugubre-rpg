@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { BookMarked, BookOpen, Home, MessageSquareText, Menu, MoreHorizontal, Palette, ScrollText, Settings, Shield, ShoppingBag, Skull, Swords, Users, X } from 'lucide-react';
+import { BookMarked, BookOpen, Sparkles, Home, MessageSquareText, Menu, MoreHorizontal, Palette, ScrollText, Settings, Shield, ShoppingBag, Skull, Swords, Users, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { useAuth } from '../store/authStore';
 import { useMenuTransition } from '../hooks/useMenuTransition';
@@ -22,6 +22,7 @@ export default function Layout({ children }) {
     { to: '/characters', label: 'Personagens' },
     { to: '/campaigns', label: 'Campanhas' },
     { to: '/regras', label: 'Livro' },
+    { to: '/grimorio', label: 'Grimório' },
     user && { to: '/powers', label: 'Biblioteca' },
     user && { to: '/feedback', label: 'Feedback' },
     user && { to: '/monsters', label: 'Monstros' },
@@ -40,6 +41,7 @@ export default function Layout({ children }) {
     { to: '/characters', label: 'Personagens / Fichas', icon: ScrollText },
     { to: '/campaigns', label: 'Campanhas / Mesas', icon: Swords },
     { to: '/regras', label: 'Livro de regras', icon: BookMarked },
+    { to: '/grimorio', label: 'Grimório de magias', icon: Sparkles },
     user && { to: '/dashboard?tab=friends', label: 'Amigos', icon: Users },
     user && { to: '/monsters', label: 'Monstros', icon: Skull },
     inCampaignRoom && { to: `${location.pathname}?tab=diary`, label: 'Diário', icon: ScrollText },

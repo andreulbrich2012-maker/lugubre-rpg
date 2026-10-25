@@ -9,6 +9,7 @@
 import { FAMILIES, FAMILY_BY_ID } from './families.js';
 import { ELEMENTS, elementKey, guessElement } from './elements.js';
 import { normalize, hasWord } from './text.js';
+import { weaponInfo } from './weapons/select.js';
 
 const MAGIC_TYPES = ['magia', 'magias', 'spell', 'spells', 'magic', 'feitico'];
 const MONSTER_KINDS = ['monster', 'monstro', 'npc', 'criatura', 'fera'];
@@ -68,7 +69,7 @@ function fromOverride(animation, fallbackElement) {
   return pack(family, el);
 }
 
-export function classify(power = {}, options = {}) {
+function classifyBase(power = {}, options = {}) {
   const p = typeof power === 'string' ? { name: power } : (power || {});
   const fields = {
     name: textOf(p.name || p.label || p.powerName || ''),
@@ -129,4 +130,31 @@ export function classify(power = {}, options = {}) {
 // Elemento final como chave interna ("Érebo" -> "erebo"); null vira "fisico".
 export function elementOf(cls) {
   return elementKey(cls?.element) || 'fisico';
+}
+
+// Familia antiga equivalente a cada familia de movimento (quando o poder manda
+// { animation: { family: 'pesadas', move: '...' } }).
+const MOVE_FAMILY_LEGACY = {
+  leves: 'corte', pesadas: 'montante', 'uma-mao': 'esmagamento', haste: 'haste', adagas: 'corte', correntes: 'chicotada',
+  desarmado: 'soco', escudo: 'escudo', arco: 'flecha', besta: 'virote', arremesso: 'arremesso'
+};
+
+// Classificacao completa: a familia antiga (forma do efeito) e, para armas, a
+// familia de movimento, a arma (ferramenta desenhada) e o golpe, quando o nome
+// ou o campo animation dizem qual. Sem golpe nomeado, move fica null e o efeito
+// sorteia um pela semente (rollId).
+export function classify(power = {}, options = {}) {
+  const base = classifyBase(power, options);
+  const p = typeof power === 'string' ? { name: power } : (power || {});
+  const anim = p.animation && typeof p.animation === 'object' ? p.animation : null;
+  const forced = Boolean(anim && (anim.move || anim.weapon));
+  if (base.group === 'magia' && !forced) return base;
+  const info = weaponInfo(p, base.family, base.group);
+  if (!info) return base;
+  const animFam = anim?.family ? normalize(anim.family).replace(/ /g, '-') : null;
+  if (animFam && !FAMILY_BY_ID[animFam] && MOVE_FAMILY_LEGACY[info.weaponFamily]) {
+    const fam = FAMILY_BY_ID[MOVE_FAMILY_LEGACY[info.weaponFamily]];
+    return { ...pack(fam, elementKey(anim.element) || elementKey(p.element)), ...info };
+  }
+  return { ...base, ...info };
 }

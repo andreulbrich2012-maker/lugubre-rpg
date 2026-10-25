@@ -32,7 +32,7 @@ function sart(L, ax, ay, rows, o = {}) {
 //         gripChars, extra(L, P, at) }
 function held(id, name, sub, channels, spec) {
   return {
-    id, name, sub, channels,
+    id, name, sub, channels, spec,
     draw(L, P) {
       const v = P.view, h = P.holdArm.hand;
       const vs = { ...spec, ...(spec.views?.[v] || {}) };

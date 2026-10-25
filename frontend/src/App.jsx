@@ -19,6 +19,7 @@ const PowerLibrary = lazy(() => import('./pages/PowerLibrary'));
 const Feedback = lazy(() => import('./pages/Feedback'));
 const Admin = lazy(() => import('./pages/Admin'));
 const Rulebook = lazy(() => import('./pages/Rulebook'));
+const Grimoire = lazy(() => import('./pages/Grimoire'));
 
 function RouteLoading() {
   return <main className="grid min-h-[60vh] place-items-center" aria-label="Carregando página"><span className="spinner" /></main>;
@@ -61,6 +62,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/regras" element={<Rulebook />} />
         <Route path="/regras/:slug" element={<Rulebook />} />
+        <Route path="/grimorio" element={<Grimoire />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

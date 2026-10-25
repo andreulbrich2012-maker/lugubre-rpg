@@ -6,6 +6,7 @@ import { PALETTES, ELEMENTS } from './elements.js';
 import { drawParticles } from './particles.js';
 import { rect, dot, line, disc, ring, arc, glyph, star4, setAlpha, ease, clamp01, lerp } from './draw.js';
 import { noise } from './rng.js';
+import { drawMove } from './weapons/render.js';
 
 const WHITE = '#ffffff';
 
@@ -16,7 +17,11 @@ export function renderEffect(ctx, eff, t) {
   if (eff.reduced) { drawReduced(ctx, eff, t); return frame; }
   const T = animTime(eff, t);
   const { windup, impactAt } = eff.T;
-  if (eff.phase !== 'impact' || t < impactAt) {
+  if (eff.mv) {
+    // Golpe de arma: arma, rastro e corpo continuam depois do contato (recuo).
+    drawMove(ctx, eff, T);
+    if (eff.phase !== 'impact' || t < impactAt) drawParticles(ctx, eff.action, T);
+  } else if (eff.phase !== 'impact' || t < impactAt) {
     if (T < windup) drawAnticipation(ctx, eff, T);
     drawAction(ctx, eff, T);
     drawParticles(ctx, eff.action, T);

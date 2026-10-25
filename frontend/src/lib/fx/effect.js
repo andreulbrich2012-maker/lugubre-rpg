@@ -12,6 +12,9 @@ import { ELEMENTS, PALETTES } from './elements.js';
 import { makeRng } from './rng.js';
 import { burst } from './particles.js';
 import { clamp01, ease } from './draw.js';
+import { resolveSpec, pickMove } from './weapons/select.js';
+import { prepareMove, spawnMove, moveBodies, moveShake } from './weapons/move.js';
+import { elementKey } from './elements.js';
 
 const RESULTS = ['hit', 'crit', 'miss', 'fumble'];
 
@@ -78,8 +81,24 @@ export function createEffect(opts = {}) {
   const side = dir.x >= 0 ? 1 : -1;
   const scale = result === 'crit' ? 1.35 : 1;
 
+  // Golpe de arma (catalogo em weapons/): por campo explicito, pela classificacao
+  // do poder ou, sem golpe nomeado, sorteado pela semente entre os golpes da arma.
+  let spec = null;
+  if (!opts.reduced && opts.moves !== false) {
+    const src = opts.move || opts.weapon || opts.weaponFamily
+      ? { weaponFamily: opts.weaponFamily, weapon: opts.weapon, move: opts.move }
+      : cls.weaponFamily ? { weaponFamily: cls.weaponFamily, weapon: cls.weapon, move: cls.move } : null;
+    if (src) {
+      spec = resolveSpec(src);
+      if (spec && !spec.move) spec.move = pickMove(spec.list, seed, { cells: dist / C, ranged: spec.fam.ranged });
+      if (!spec?.move) spec = null;
+    }
+  }
+  if (spec && elKey === 'fisico' && spec.move.el) elKey = elementKey(spec.move.el) || 'fisico';
+  const el2 = ELEMENTS[elKey];
+
   // Trilha: elemento se houver; senao paleta da familia (fera, veneno) ou aco.
-  const trail = elKey !== 'fisico' ? el.ramp : PALETTES[family.palette] || ELEMENTS.fisico.ramp;
+  const trail = elKey !== 'fisico' ? el2.ramp : PALETTES[family.palette] || ELEMENTS.fisico.ramp;
 
   const rngAim = makeRng(seed, 'aim');
   // Onde a acao termina: no alvo, ao lado (erro) ou perto do proprio atacante (falha).
@@ -95,14 +114,17 @@ export function createEffect(opts = {}) {
     hit = { x: from.x + dir.x * C * 0.7, y: from.y + C * 0.3 };
   }
 
-  const T = buildTimeline(family, { result, dist, cell: C, reduced: opts.reduced });
+  let T = buildTimeline(family, { result, dist, cell: C, reduced: opts.reduced });
+  const fam = spec
+    ? { ...family, action: 'weapon', impact: spec.move.impact || spec.weapon?.impact || spec.fam.impact || family.impact, shake: spec.move.shake ?? spec.fam.shake ?? 1, hitstop: true, lunge: 0 }
+    : family;
   const eff = {
     id: opts.id ?? null,
     seed: String(seed),
-    family,
-    cls: { ...cls, family: family.id },
+    family: fam,
+    cls: spec ? { ...cls, family: family.id, weaponFamily: spec.fam.id, weapon: spec.weapon?.id || null, move: spec.move.id } : { ...cls, family: family.id },
     elKey,
-    el,
+    el: el2,
     trail,
     result,
     down,
@@ -123,9 +145,19 @@ export function createEffect(opts = {}) {
     ground: to.y + C * 0.42,
     fromGround: from.y + C * 0.42,
     particles: [],
-    action: []
+    action: [],
+    mv: null,
+    linked: Boolean(opts.linked)
   };
-  if (!eff.reduced) spawn(eff);
+  if (spec) {
+    eff.mv = prepareMove(eff, spec);
+    T = eff.mv.T;
+    eff.T = T;
+  }
+  if (!eff.reduced) {
+    spawn(eff);
+    if (eff.mv) spawnMove(eff);
+  }
   return eff;
 }
 
@@ -140,7 +172,7 @@ export function animTime(eff, t) {
 // Faixa de tempo que este efeito toca de fato, conforme a fase pedida.
 export function span(eff) {
   const { impactAt, total } = eff.T;
-  if (eff.phase === 'attack') return { start: 0, end: impactAt + 30 };
+  if (eff.phase === 'attack') return { start: 0, end: impactAt + (eff.mv ? eff.T.hitstop + eff.mv.follow + eff.mv.recover : 30) };
   if (eff.phase === 'impact') return { start: impactAt, end: total };
   return { start: 0, end: total };
 }
@@ -215,6 +247,7 @@ export function bodies(eff, t) {
     tgt.x = -perp.x * eff.missSide * d;
     tgt.y = -perp.y * eff.missSide * d;
   }
+  if (eff.mv) moveBodies(eff, t, att, tgt);
   const s = (v) => Math.round(v) * unit; // passo de pixel inteiro: nada de meio pixel
   return {
     attacker: { x: s(att.x), y: s(att.y), flash: att.flash },
@@ -226,6 +259,7 @@ export function bodies(eff, t) {
 export function shakeAt(eff, t) {
   const { family, T, result, unit } = eff;
   if (eff.reduced || !(result === 'hit' || result === 'crit')) return { x: 0, y: 0 };
+  if (eff.mv) { const ms = moveShake(eff, t); if (ms) return ms; }
   const amp = family.shake * (result === 'crit' ? 2 : 1) * (eff.down ? 1.3 : 1);
   if (!amp) return { x: 0, y: 0 };
   const rt = t - T.impactAt;
@@ -255,6 +289,7 @@ function spawn(eff) {
 
   // Acao: rastros que soltam particulas (orbe, sopro, investida, maldicao, terreno).
   const act = family.action;
+  if (act === 'weapon') { /* golpe de arma: particulas da acao em spawnMove */ }
   if (act === 'orb' || act === 'lob' || act === 'wisp') {
     const n = Math.round(10 + T.action / 18);
     for (let i = 0; i < n; i++) {

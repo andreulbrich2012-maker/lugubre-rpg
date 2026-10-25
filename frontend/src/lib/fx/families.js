@@ -20,12 +20,12 @@ const beast = (id, label, extra) => ({ id, label, group: 'monstro', intent: 'ata
 
 export const FAMILIES = [
   // --- corpo a corpo (12) ---
-  melee('corte', 'Corte', { action: 'slash', impact: 'cut', keywords: ['espada', 'sabre', 'cimitarra', 'adaga', 'faca', 'machado', 'machadinha', 'foice', 'katana', 'lamina', 'corte', 'cortar', 'talho', 'fatia', 'gume', 'cutelo'] }),
+  melee('corte', 'Corte', { action: 'slash', impact: 'cut', keywords: ['cortante', 'espada', 'sabre', 'cimitarra', 'adaga', 'faca', 'machado', 'machadinha', 'foice', 'katana', 'lamina', 'corte', 'cortar', 'talho', 'fatia', 'gume', 'cutelo'] }),
   melee('estocada', 'Estocada', { action: 'thrust', impact: 'pierce', actionMs: 80, lunge: 0.45, keywords: ['estocada', 'rapieira', 'florete', 'estoque', 'perfur', 'punhal', 'estocar', 'furar', 'espetar', 'investida certeira'] }),
   melee('esmagamento', 'Esmagamento', { action: 'smash', impact: 'crush', windup: 160, shake: 2, keywords: ['maca', 'martelo', 'clava', 'porrete', 'mangual', 'cajado', 'bordao', 'esmag', 'marreta', 'tacape', 'malho', 'cacete'] }),
   melee('giratorio', 'Golpe giratório', { action: 'spin', impact: 'cut', windup: 140, actionMs: 200, lunge: 0.1, keywords: ['girat', 'redemoinho', 'rodopio', 'giro', 'turbilhao', 'circular', 'ciclone', 'varredura'] }),
   melee('investida', 'Investida', { action: 'dash', impact: 'crush', windup: 150, actionMs: 140, lunge: 1, shake: 2, keywords: ['investida', 'carga', 'avanco', 'arremetida', 'atropel', 'encontrao', 'trombada', 'ombrada'] }),
-  melee('chicotada', 'Chicotada', { action: 'whip', impact: 'cut', windup: 130, actionMs: 170, lunge: 0.1, keywords: ['chicote', 'acoite', 'chicotada', 'laco', 'corrente', 'mangual de corrente', 'flagelo'] }),
+  melee('chicotada', 'Chicotada', { action: 'whip', impact: 'cut', windup: 130, actionMs: 170, lunge: 0.1, keywords: ['tentacul', 'chicote', 'acoite', 'chicotada', 'laco', 'corrente', 'mangual de corrente', 'flagelo'] }),
   melee('soco', 'Soco / manopla', { action: 'punch', impact: 'pow', windup: 90, actionMs: 70, lunge: 0.5, keywords: ['soco', 'punho', 'manopla', 'socar', 'murro', 'chute', 'joelhada', 'cotovelada', 'desarmad', 'briga', 'cabecada'] }),
   melee('garra', 'Garra', { action: 'claw', impact: 'claw', windup: 100, actionMs: 120, keywords: ['garra', 'unha', 'arranh', 'luva de garras'] }),
   melee('escudo', 'Escudo', { intent: 'defesa', action: 'shield', impact: 'bash', windup: 140, actionMs: 110, lunge: 0.3, shake: 2, keywords: ['escudo', 'bloque', 'guard', 'defes', 'aparar', 'broquel', 'egide', 'proteg', 'contra ataque'] }),
@@ -51,9 +51,9 @@ export const FAMILIES = [
   magic('movimento', 'Movimento', { intent: 'movimento', action: 'blink', impact: 'arrive', hitstop: false, shake: 0, actionMs: 180, lunge: 0, keywords: ['teleport', 'salto', 'passo', 'piscar', 'blink', 'voo', 'voar', 'desloca', 'caminhante', 'correr', 'velocidade', 'esquiva', 'recua', 'atravess', 'portal'] }),
 
   // --- ataques de monstro (7) ---
-  beast('mordida', 'Mordida', { action: 'bite', impact: 'bite', windup: 160, actionMs: 110, keywords: ['mordida', 'morde', 'presa', 'dentada', 'abocanha', 'mandibula', 'mastig', 'bicada'] }),
-  beast('garra-fera', 'Garra (monstro)', { action: 'claw', impact: 'claw', keywords: ['garra', 'arranh', 'unha', 'rasg', 'dilacer'] }),
-  beast('investida-fera', 'Investida (monstro)', { action: 'dash', impact: 'crush', windup: 180, actionMs: 150, lunge: 1, shake: 3, keywords: ['investida', 'chifr', 'carga', 'atropel', 'marrada', 'galope', 'avanco', 'chifrada', 'trombada'] }),
+  beast('mordida', 'Mordida', { action: 'bite', impact: 'bite', windup: 160, actionMs: 110, keywords: ['engol', 'devora', 'mordida', 'morde', 'presa', 'dentada', 'abocanha', 'mandibula', 'mastig', 'bicada'] }),
+  beast('garra-fera', 'Garra (monstro)', { action: 'claw', impact: 'claw', keywords: ['pinca', 'garra', 'arranh', 'unha', 'rasg', 'dilacer'] }),
+  beast('investida-fera', 'Investida (monstro)', { action: 'dash', impact: 'crush', windup: 180, actionMs: 150, lunge: 1, shake: 3, keywords: ['pisote', 'investida', 'chifr', 'carga', 'atropel', 'marrada', 'galope', 'avanco', 'chifrada', 'trombada'] }),
   beast('sopro', 'Sopro', { action: 'breath', impact: 'burst', windup: 220, actionMs: 380, lunge: 0.05, shake: 2, palette: null, defaultElement: 'tartaro', keywords: ['sopro', 'bafo', 'baforada', 'halito', 'cusp', 'jato', 'explosao', 'onda', 'rugido', 'grito', 'uivo'] }),
   beast('ferrao', 'Ferrão', { action: 'sting', impact: 'poison', windup: 150, actionMs: 90, lunge: 0.5, palette: 'poison', keywords: ['ferrao', 'picada', 'ferroa', 'cauda', 'veneno', 'agulha', 'espinho', 'peconha', 'toxin'] }),
   beast('pancada', 'Pancada', { action: 'smash', impact: 'crush', windup: 180, shake: 2, palette: null, keywords: ['pancada', 'soco', 'punho', 'clava', 'esmag', 'pisao', 'pisote', 'tapa', 'golpe', 'martelo', 'pata', 'cauda pesada'] }),

@@ -165,5 +165,23 @@ export const BOOK_LINKS = {
   'Queda do Sol': 'supernova',
   'Prisão de Luz': 'prisma',
   'Passo da Aurora': 'piscar',
-  'Onda da Alvorada': 'aurora-ardente'
+  'Onda da Alvorada': 'aurora-ardente',
+
+  // Ataques de monstro do bestiario com cara de magia (o resto vira mordida/garra/etc. em classify.js)
+  'Estilhaço': 'ruptura',
+  'Toque Gelado': 'toque-gelido',
+  'Sussurro': 'sussurro-sepulcral',
+  'Sentença': 'julgamento-celeste',
+  'Pó Sonífero': 'sono',
+  'Luz Final': 'pilar-de-luz',
+  'Lamento': 'requiem',
+  'Esquecimento': 'apagar-memoria',
+  'Canto': 'melodia-hipnotica',
+  'Apagar': 'desfazer',
+  'Teia do Destino': 'teia',
+  'Teia Sombria': 'teia',
+  'Olhar Pétreo': 'petrificar',
+  'Feitiço': 'enfeiticar',
+  'Engrenagem': 'lamina-espectral',
+  'Punho Ardente': 'toque-ardente'
 };

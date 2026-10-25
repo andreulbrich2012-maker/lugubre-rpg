@@ -70,19 +70,19 @@ Dados e testes  ·  Ataques e crítico  ·  Defesa e Esquiva  ·  Combate  ·  C
 
 **CAPÍTULO IV - MAGIAS E PODERES 21**
 
-Elementos  ·  Como ler uma habilidade  ·  Escolas de magia  ·  Lista atual
+Elementos  ·  Como ler uma habilidade  ·  Escolas de magia  ·  Lista atual  ·  Magias por elemento  ·  Poderes e técnicas
 
 **CAPÍTULO V - EQUIPAMENTOS 23**
 
-Inventário  ·  Moedas  ·  Armas  ·  Armaduras  ·  Itens e consumíveis
+Inventário  ·  Moedas  ·  Armas  ·  Armaduras  ·  Itens e consumíveis  ·  Montarias, serviços e barcos
 
 **CAPÍTULO VI - CRIATURAS 25**
 
-Como ler uma criatura  ·  Bestiário  ·  Chefes  ·  Criaturas lendárias
+Como ler uma criatura  ·  Bestiário  ·  Bestiário do sistema digital  ·  Chefes  ·  Criaturas lendárias
 
 **CAPÍTULO VII - GUIA DO MESTRE 28**
 
-O papel do Mestre  ·  Construindo aventuras  ·  Encontros  ·  Recompensas  ·  Campanhas
+O papel do Mestre  ·  Ferramentas do sistema digital  ·  Construindo aventuras  ·  Encontros  ·  Recompensas  ·  Campanhas
 
 **APÊNDICES - REFERÊNCIA E DESENVOLVIMENTO 31**
 
@@ -1230,7 +1230,7 @@ A ficha separa Ataques Normais e Magias. A biblioteca do sistema foi preparada p
 
 > **ESTADO ATUAL**
 >
-> A tabela online de magias e poderes estava vazia no material consultado. O arquivo de estrutura do sistema, porém, contém três entradas iniciais reproduzidas neste capítulo.
+> A biblioteca do sistema digital tem 180 magias (20 por elemento) e 53 poderes e técnicas. Todos estão nas tabelas deste capítulo. Novas entradas continuam sendo adicionadas durante o beta.
 
 ## Elementos
 
@@ -1330,7 +1330,308 @@ Um golpe associado à função protetora do Cavaleiro. Seus efeitos adicionais a
 
 > **BIBLIOTECA EM EXPANSÃO**
 >
-> Três entradas não representam o conteúdo final. Novas magias, poderes, efeitos, descrições e opções de classe deverão ser adicionados durante o beta.
+> As três entradas acima foram as primeiras do sistema. A lista completa vem a seguir.
+
+## Lista de magias por elemento
+
+A biblioteca do sistema digital traz 20 magias para cada um dos nove elementos, do nível 1 ao 20. As tabelas abaixo reproduzem esse conteúdo. Efeitos que dependem de regras ainda não oficiais (condições, testes de resistência, áreas) seguem a descrição de cada magia e a decisão do Mestre.
+
+> **COMO LER AS TABELAS**
+>
+> **Mana:** custo. **Dano/efeito:** fórmula rolada, quando houver. **Classe e nível:** recomendação de quem aprende e quando; o Mestre pode liberar para outras classes.
+
+### Magias de Caos
+
+| Magia | Mana | Dano/efeito | Alcance | Duração | Classe | Nível | Descrição |
+| --- | ---: | --- | --- | --- | --- | ---: | --- |
+| **Centelha Torta** | 2 | 1d6 | Curto | Instantânea | Mago | 1 | Uma pequena descarga de Caos atinge o alvo. |
+| **Estilhaço do Caos** | 2 | 1d8 | Médio | Instantânea | Feiticeiro | 1 | Um fragmento de realidade partida corta o alvo. |
+| **Faísca Errante** | 2 | 1d6+1 | Curto | Instantânea | Mago | 1 | Uma centelha imprevisível salta entre inimigos próximos. |
+| **Véu Mutável** | 2 | — | Pessoal | Cena | Sacerdote | 2 | Uma proteção de Caos envolve o conjurador: +1 de Defesa. |
+| **Dardo Paradoxal** | 3 | 1d8+1 | Médio | Instantânea | Feiticeiro | 3 | Um projétil de Caos viaja até o alvo. |
+| **Remendo Impossível** | 3 | — | Toque | Instantânea | Sacerdote | 3 | A energia de Caos recupera 1d8 de Vida de um aliado. |
+| **Fenda Instável** | 4 | 2d6 | Médio | Instantânea | Feiticeiro | 4 | Uma rachadura no ar explode em energia bruta. |
+| **Bolha Instável** | 4 | 2d6 | Área pequena | Instantânea | Mago | 5 | Uma explosão de Caos atinge todos numa pequena área. |
+| **Distorção** | 5 | — | Curto | 2 turnos | Mago | 6 | O alvo tem dificuldade em agir com precisão enquanto o mundo treme ao seu redor. |
+| **Marca do Acaso** | 4 | — | Médio | 2 turnos | Feiticeiro | 6 | O alvo é marcado por Caos e sofre −2 nos testes. |
+| **Gume Caótico** | 5 | 2d8 | Corpo a corpo | Instantânea | Paladino | 7 | A arma do conjurador se cobre de Caos por um golpe. |
+| **Campo de Entropia** | 6 | — | Área média | 3 turnos | Mago | 9 | Uma zona de Caos dificulta o movimento dos inimigos. |
+| **Tempestade de Fragmentos** | 7 | 3d6+2 | Área média | Instantânea | Feiticeiro | 9 | Estilhaços de realidade chovem sobre uma área. |
+| **Mutação Breve** | 8 | — | Toque | 3 turnos | Feiticeiro | 11 | Altera o corpo do alvo, concedendo ou retirando uma vantagem física à escolha do mestre. |
+| **Raio Fractal** | 8 | 3d8 | Longo | Instantânea | Feiticeiro | 11 | Um feixe concentrado de Caos atravessa a distância. |
+| **Avatar do Desconhecido** | 9 | — | Pessoal | Cena | Paladino | 13 | O conjurador se torna um avatar de Caos: +2 em ataques. |
+| **Ruptura Primordial** | 11 | 4d8 | Longo | Instantânea | Feiticeiro | 15 | Um eco da Primeira Ruptura despedaça o alvo. |
+| **Colapso** | 11 | 4d8 | Área média | Instantânea | Mago | 16 | Caos desaba sobre a área com força total. |
+| **Prisão Paradoxal** | 13 | — | Médio | 3 turnos | Feiticeiro | 18 | O alvo é tomado por Caos e não consegue agir. |
+| **Coração do Caos** | 15 | 6d8 | Área grande | Instantânea | Feiticeiro | 20 | O conjurador libera o desconhecido; tudo ao redor sofre. |
+
+### Magias de Gaia
+
+| Magia | Mana | Dano/efeito | Alcance | Duração | Classe | Nível | Descrição |
+| --- | ---: | --- | --- | --- | --- | ---: | --- |
+| **Casca de Árvore** | 3 | — | Pessoal | Cena | Sacerdote | 1 | A pele endurece como madeira antiga, aumentando a Defesa em 2. |
+| **Pedrinha Viva** | 2 | 1d6 | Curto | Instantânea | Mago | 1 | Uma pequena descarga de Gaia atinge o alvo. |
+| **Vinhas de Gaia** | 2 | 1d4 | Médio | 1 turno | Sacerdote | 1 | Raízes crescem sob o alvo; se falhar em Agilidade, fica imobilizado por 1 turno. |
+| **Armadura de Musgo** | 2 | — | Pessoal | Cena | Sacerdote | 2 | Uma proteção de Gaia envolve o conjurador: +1 de Defesa. |
+| **Lança de Pedra** | 3 | 1d10+2 | Médio | Instantânea | Mago | 3 | Uma estaca de pedra irrompe do chão contra o alvo. |
+| **Seiva Curativa** | 3 | — | Toque | Instantânea | Sacerdote | 3 | A energia de Gaia recupera 1d8 de Vida de um aliado. |
+| **Semente Explosiva** | 3 | 1d8+1 | Médio | Instantânea | Feiticeiro | 3 | Um projétil de Gaia viaja até o alvo. |
+| **Brotar de Espinhos** | 4 | 2d6 | Área pequena | Instantânea | Mago | 5 | Uma explosão de Gaia atinge todos numa pequena área. |
+| **Esporos Curativos** | 4 | 2d6 | Área pequena | Instantânea | Sacerdote | 5 | Esporos dourados recuperam Vida de aliados próximos. |
+| **Marca da Hera** | 4 | — | Médio | 2 turnos | Feiticeiro | 6 | O alvo é marcado por Gaia e sofre −2 nos testes. |
+| **Punho de Rocha** | 5 | 2d8 | Corpo a corpo | Instantânea | Paladino | 7 | A arma do conjurador se cobre de Gaia por um golpe. |
+| **Muralha de Espinhos** | 6 | 1d8 | Médio | 3 turnos | Sacerdote | 8 | Uma barreira de espinhos fere quem a atravessa. |
+| **Pântano Repentino** | 6 | — | Área média | 3 turnos | Mago | 9 | Uma zona de Gaia dificulta o movimento dos inimigos. |
+| **Pele de Urso** | 7 | — | Pessoal | Cena | Paladino | 10 | Força primitiva aumenta Força e Vigor em 1. |
+| **Lança de Raiz** | 8 | 3d8 | Longo | Instantânea | Feiticeiro | 11 | Um feixe concentrado de Gaia atravessa a distância. |
+| **Avatar da Montanha** | 9 | — | Pessoal | Cena | Paladino | 13 | O conjurador se torna um avatar de Gaia: +2 em ataques. |
+| **Terremoto Menor** | 10 | 3d10 | Área grande | Instantânea | Mago | 14 | O chão se abre e derruba inimigos. |
+| **Avalanche** | 11 | 4d8 | Área média | Instantânea | Mago | 16 | Gaia desaba sobre a área com força total. |
+| **Casulo de Âmbar** | 13 | — | Médio | 3 turnos | Feiticeiro | 18 | O alvo é tomado por Gaia e não consegue agir. |
+| **Fúria da Floresta** | 14 | 5d8+5 | Área grande | 2 turnos | Sacerdote | 20 | A floresta desperta e ataca todos os inimigos da área. |
+
+### Magias de Ponto
+
+| Magia | Mana | Dano/efeito | Alcance | Duração | Classe | Nível | Descrição |
+| --- | ---: | --- | --- | --- | --- | ---: | --- |
+| **Gota Afiada** | 2 | 1d6 | Curto | Instantânea | Mago | 1 | Uma pequena descarga de Ponto atinge o alvo. |
+| **Jato de Maré** | 2 | 1d6+1 | Médio | Instantânea | Mago | 1 | Um jato de água salgada empurra o alvo 1 metro. |
+| **Névoa do Abismo** | 3 | — | Área média | 3 turnos | Mago | 2 | Névoa densa dificulta a visão de todos na área. |
+| **Pele de Escamas** | 2 | — | Pessoal | Cena | Sacerdote | 2 | Uma proteção de Ponto envolve o conjurador: +1 de Defesa. |
+| **Bolha de Pressão** | 3 | 1d8+1 | Médio | Instantânea | Feiticeiro | 3 | Um projétil de Ponto viaja até o alvo. |
+| **Água Benta do Mar** | 3 | — | Toque | Instantânea | Sacerdote | 3 | A energia de Ponto recupera 1d8 de Vida de um aliado. |
+| **Lâmina de Água** | 4 | 2d6 | Curto | Instantânea | Feiticeiro | 4 | Água comprimida corta como aço. |
+| **Onda Quebrada** | 4 | 2d6 | Área pequena | Instantânea | Mago | 5 | Uma explosão de Ponto atinge todos numa pequena área. |
+| **Correnteza** | 5 | 1d8 | Médio | Instantânea | Mago | 6 | Uma onda arrasta o alvo e o derruba se falhar em Força. |
+| **Marca da Maré** | 4 | — | Médio | 2 turnos | Feiticeiro | 6 | O alvo é marcado por Ponto e sofre −2 nos testes. |
+| **Respirar nas Profundezas** | 4 | — | Toque | Cena | Sacerdote | 7 | O alvo respira e se move debaixo d'água. |
+| **Tridente de Espuma** | 5 | 2d8 | Corpo a corpo | Instantânea | Paladino | 7 | A arma do conjurador se cobre de Ponto por um golpe. |
+| **Lamaçal das Marés** | 6 | — | Área média | 3 turnos | Mago | 9 | Uma zona de Ponto dificulta o movimento dos inimigos. |
+| **Relâmpago da Tempestade** | 7 | 3d8 | Longo | Instantânea | Feiticeiro | 9 | Um raio cai do céu carregado. |
+| **Feixe Abissal** | 8 | 3d8 | Longo | Instantânea | Feiticeiro | 11 | Um feixe concentrado de Ponto atravessa a distância. |
+| **Avatar das Profundezas** | 9 | — | Pessoal | Cena | Paladino | 13 | O conjurador se torna um avatar de Ponto: +2 em ataques. |
+| **Maremoto** | 11 | 4d8+4 | Área grande | Instantânea | Mago | 15 | Uma onda gigante varre a área. |
+| **Dilúvio** | 11 | 4d8 | Área média | Instantânea | Mago | 16 | Ponto desaba sobre a área com força total. |
+| **Redemoinho Prisão** | 13 | — | Médio | 3 turnos | Feiticeiro | 18 | O alvo é tomado por Ponto e não consegue agir. |
+| **Olho do Ciclone** | 15 | 6d6 | Área grande | 3 turnos | Feiticeiro | 20 | Uma tempestade gira ao redor do conjurador, ferindo quem se aproxima. |
+
+### Magias de Érebo
+
+| Magia | Mana | Dano/efeito | Alcance | Duração | Classe | Nível | Descrição |
+| --- | ---: | --- | --- | --- | --- | ---: | --- |
+| **Dardo Escuro** | 2 | 1d6 | Curto | Instantânea | Mago | 1 | Uma pequena descarga de Érebo atinge o alvo. |
+| **Raio Sombrio** | 3 | 1d10+2 | Médio | Instantânea | Mago | 1 | Um raio de energia sombria atinge o alvo. |
+| **Véu de Penumbra** | 2 | — | Pessoal | Cena | Sacerdote | 2 | Uma proteção de Érebo envolve o conjurador: +1 de Defesa. |
+| **Bola de Breu** | 3 | 1d8+1 | Médio | Instantânea | Feiticeiro | 3 | Um projétil de Érebo viaja até o alvo. |
+| **Passo Sombrio** | 3 | — | Pessoal | Instantânea | Ladino | 3 | O conjurador some numa sombra e reaparece até 6 metros dali. |
+| **Sombra Remendada** | 3 | — | Toque | Instantânea | Sacerdote | 3 | A energia de Érebo recupera 1d8 de Vida de um aliado. |
+| **Silêncio** | 4 | — | Área pequena | 2 turnos | Mago | 4 | Nenhum som existe na área; magias faladas não funcionam. |
+| **Abraço do Vazio** | 5 | 1d8+2 | Curto | Até escapar | Feiticeiro | 5 | Sombras agarram a vítima; ela fica imobilizada até vencer um teste de Força. |
+| **Explosão Silenciosa** | 4 | 2d6 | Área pequena | Instantânea | Mago | 5 | Uma explosão de Érebo atinge todos numa pequena área. |
+| **Marca do Esquecido** | 4 | — | Médio | 2 turnos | Feiticeiro | 6 | O alvo é marcado por Érebo e sofre −2 nos testes. |
+| **Fio da Escuridão** | 5 | 2d8 | Corpo a corpo | Instantânea | Paladino | 7 | A arma do conjurador se cobre de Érebo por um golpe. |
+| **Lâmina de Sombra** | 5 | 2d8 | Corpo a corpo | Instantânea | Ladino | 7 | A arma do conjurador se cobre de escuridão cortante. |
+| **Poço de Trevas** | 6 | — | Área média | 3 turnos | Mago | 9 | Uma zona de Érebo dificulta o movimento dos inimigos. |
+| **Manto da Noite Sem Lua** | 7 | — | Pessoal | Cena | Ladino | 10 | O conjurador fica quase invisível na penumbra. |
+| **Lança do Vazio** | 8 | 3d8 | Longo | Instantânea | Feiticeiro | 11 | Um feixe concentrado de Érebo atravessa a distância. |
+| **Avatar da Sombra** | 9 | — | Pessoal | Cena | Paladino | 13 | O conjurador se torna um avatar de Érebo: +2 em ataques. |
+| **Devorar a Luz** | 10 | 3d10 | Área média | Instantânea | Feiticeiro | 14 | Toda luz da área é engolida e a escuridão fere. |
+| **Eclipse** | 11 | 4d8 | Área média | Instantânea | Mago | 16 | Érebo desaba sobre a área com força total. |
+| **Jaula de Sombras** | 13 | — | Médio | 3 turnos | Feiticeiro | 18 | O alvo é tomado por Érebo e não consegue agir. |
+| **Segredo Proibido** | 14 | 5d10 | Longo | Instantânea | Mago | 19 | Um conhecimento que não deveria existir rasga a mente do alvo. |
+
+### Magias de Nix
+
+| Magia | Mana | Dano/efeito | Alcance | Duração | Classe | Nível | Descrição |
+| --- | ---: | --- | --- | --- | --- | ---: | --- |
+| **Estrela Cadente** | 2 | 1d6 | Curto | Instantânea | Mago | 1 | Uma pequena descarga de Nix atinge o alvo. |
+| **Sussurro do Sono** | 2 | — | Médio | 2 turnos | Mago | 1 | O alvo fica sonolento; perde o movimento no próximo turno se falhar em Vigor. |
+| **Manto Estrelado** | 2 | — | Pessoal | Cena | Sacerdote | 2 | Uma proteção de Nix envolve o conjurador: +1 de Defesa. |
+| **Pesadelo** | 3 | 1d8 | Médio | Instantânea | Feiticeiro | 2 | Uma visão terrível causa dano à Sanidade do alvo. |
+| **Cometa Menor** | 3 | 1d8+1 | Médio | Instantânea | Feiticeiro | 3 | Um projétil de Nix viaja até o alvo. |
+| **Sonho Restaurador** | 3 | — | Toque | Instantânea | Sacerdote | 3 | A energia de Nix recupera 1d8 de Vida de um aliado. |
+| **Poeira Estelar** | 4 | 2d6 | Área pequena | Instantânea | Mago | 4 | Estrelas minúsculas explodem em luz fria. |
+| **Chuva de Estrelas** | 4 | 2d6 | Área pequena | Instantânea | Mago | 5 | Uma explosão de Nix atinge todos numa pequena área. |
+| **Presságio** | 4 | — | Pessoal | 1 turno | Sacerdote | 5 | O conjurador vê um instante do futuro: +5 no próximo teste. |
+| **Marca do Pesadelo** | 4 | — | Médio | 2 turnos | Feiticeiro | 6 | O alvo é marcado por Nix e sofre −2 nos testes. |
+| **Lâmina Lunar** | 5 | 2d8 | Corpo a corpo | Instantânea | Paladino | 7 | A arma do conjurador se cobre de Nix por um golpe. |
+| **Sono Profundo** | 6 | — | Área média | 3 turnos | Mago | 8 | Criaturas na área adormecem até levar dano. |
+| **Bruma dos Sonhos** | 6 | — | Área média | 3 turnos | Mago | 9 | Uma zona de Nix dificulta o movimento dos inimigos. |
+| **Feixe Lunar** | 8 | 3d8 | Longo | Instantânea | Feiticeiro | 11 | Um feixe concentrado de Nix atravessa a distância. |
+| **Lua Negra** | 8 | 3d8 | Longo | Instantânea | Feiticeiro | 11 | Um disco de noite cai sobre o alvo. |
+| **Avatar da Noite** | 9 | — | Pessoal | Cena | Paladino | 13 | O conjurador se torna um avatar de Nix: +2 em ataques. |
+| **Labirinto de Sonhos** | 11 | — | Médio | 3 turnos | Mago | 15 | O alvo fica preso num sonho e não age. |
+| **Queda da Lua** | 11 | 4d8 | Área média | Instantânea | Mago | 16 | Nix desaba sobre a área com força total. |
+| **Transe Profundo** | 13 | — | Médio | 3 turnos | Feiticeiro | 18 | O alvo é tomado por Nix e não consegue agir. |
+| **Noite Eterna** | 15 | 4d10+6 | Área grande | 2 turnos | Feiticeiro | 20 | A noite cobre o campo; inimigos sofrem e perdem Sanidade. |
+
+### Magias de Tártaro
+
+| Magia | Mana | Dano/efeito | Alcance | Duração | Classe | Nível | Descrição |
+| --- | ---: | --- | --- | --- | --- | ---: | --- |
+| **Corrente Maldita** | 2 | 1d8 | Médio | Instantânea | Feiticeiro | 1 | Uma corrente de ferro negro chicoteia o alvo. |
+| **Elo Partido** | 2 | 1d6 | Curto | Instantânea | Mago | 1 | Uma pequena descarga de Tártaro atinge o alvo. |
+| **Couraça de Correntes** | 2 | — | Pessoal | Cena | Sacerdote | 2 | Uma proteção de Tártaro envolve o conjurador: +1 de Defesa. |
+| **Toque Corrompido** | 3 | 1d6+2 | Toque | 2 turnos | Feiticeiro | 2 | A ferida apodrece e causa 1d4 extra no turno seguinte. |
+| **Bola de Enxofre** | 3 | 1d8+1 | Médio | Instantânea | Feiticeiro | 3 | Um projétil de Tártaro viaja até o alvo. |
+| **Pacto de Sangue** | 3 | — | Toque | Instantânea | Sacerdote | 3 | A energia de Tártaro recupera 1d8 de Vida de um aliado. |
+| **Erupção Profana** | 4 | 2d6 | Área pequena | Instantânea | Mago | 5 | Uma explosão de Tártaro atinge todos numa pequena área. |
+| **Grilhões do Abismo** | 5 | — | Médio | 2 turnos | Paladino | 5 | Correntes prendem o alvo ao chão. |
+| **Brasa Infernal** | 5 | 2d8 | Médio | Instantânea | Mago | 6 | Uma brasa do fundo do mundo explode no alvo. |
+| **Marca da Corrupção** | 4 | — | Médio | 2 turnos | Feiticeiro | 6 | O alvo é marcado por Tártaro e sofre −2 nos testes. |
+| **Gume Enferrujado** | 5 | 2d8 | Corpo a corpo | Instantânea | Paladino | 7 | A arma do conjurador se cobre de Tártaro por um golpe. |
+| **Maldição Menor** | 6 | — | Médio | Cena | Feiticeiro | 8 | O alvo sofre −2 em todos os testes. |
+| **Solo Corrompido** | 6 | — | Área média | 3 turnos | Mago | 9 | Uma zona de Tártaro dificulta o movimento dos inimigos. |
+| **Lança Infernal** | 8 | 3d8 | Longo | Instantânea | Feiticeiro | 11 | Um feixe concentrado de Tártaro atravessa a distância. |
+| **Chamar a Fera** | 9 | 3d8 | Curto | Instantânea | Feiticeiro | 12 | Uma criatura deformada surge por um instante e ataca. |
+| **Avatar do Abismo** | 9 | — | Pessoal | Cena | Paladino | 13 | O conjurador se torna um avatar de Tártaro: +2 em ataques. |
+| **Colapso do Selo** | 11 | 4d8 | Área média | Instantânea | Mago | 16 | Tártaro desaba sobre a área com força total. |
+| **Prisão do Tártaro** | 12 | — | Médio | 3 turnos | Paladino | 16 | O alvo é aprisionado numa jaula de correntes. |
+| **Correntes Eternas** | 13 | — | Médio | 3 turnos | Feiticeiro | 18 | O alvo é tomado por Tártaro e não consegue agir. |
+| **Portão Aberto** | 15 | 6d8 | Área grande | Instantânea | Feiticeiro | 20 | As barreiras do Tártaro se rompem por um instante. |
+
+### Magias de Éter
+
+| Magia | Mana | Dano/efeito | Alcance | Duração | Classe | Nível | Descrição |
+| --- | ---: | --- | --- | --- | --- | ---: | --- |
+| **Benção de Éter** | 4 | 1d8+3 | Curto | Instantânea | Sacerdote | 1 | Luz celestial fecha feridas e afasta o desespero. |
+| **Luz Revelada** | 2 | — | Área média | Cena | Sacerdote | 1 | Ilumina a área e revela o que está escondido. |
+| **Pena de Luz** | 2 | 1d6 | Curto | Instantânea | Mago | 1 | Uma pequena descarga de Éter atinge o alvo. |
+| **Halo Protetor** | 2 | — | Pessoal | Cena | Sacerdote | 2 | Uma proteção de Éter envolve o conjurador: +1 de Defesa. |
+| **Lança de Luz** | 3 | 1d10+1 | Longo | Instantânea | Paladino | 3 | Um raio de luz divina atravessa o alvo. |
+| **Orbe Sagrado** | 3 | 1d8+1 | Médio | Instantânea | Feiticeiro | 3 | Um projétil de Éter viaja até o alvo. |
+| **Toque Curativo** | 3 | — | Toque | Instantânea | Sacerdote | 3 | A energia de Éter recupera 1d8 de Vida de um aliado. |
+| **Escudo Celestial** | 4 | — | Toque | 2 turnos | Paladino | 4 | O aliado ganha +3 de Defesa. |
+| **Explosão Sagrada** | 4 | 2d6 | Área pequena | Instantânea | Mago | 5 | Uma explosão de Éter atinge todos numa pequena área. |
+| **Marca da Verdade** | 4 | — | Médio | 2 turnos | Feiticeiro | 6 | O alvo é marcado por Éter e sofre −2 nos testes. |
+| **Purificar** | 5 | — | Toque | Instantânea | Sacerdote | 6 | Remove veneno, maldição menor ou uma condição. |
+| **Gume Radiante** | 5 | 2d8 | Corpo a corpo | Instantânea | Paladino | 7 | A arma do conjurador se cobre de Éter por um golpe. |
+| **Asas de Coragem** | 6 | — | Área pequena | Cena | Sacerdote | 9 | Aliados recuperam 2d6 de Sanidade e não podem ser amedrontados. |
+| **Santuário** | 6 | — | Área média | 3 turnos | Mago | 9 | Uma zona de Éter dificulta o movimento dos inimigos. |
+| **Raio Divino** | 8 | 3d8 | Longo | Instantânea | Feiticeiro | 11 | Um feixe concentrado de Éter atravessa a distância. |
+| **Avatar Celestial** | 9 | — | Pessoal | Cena | Paladino | 13 | O conjurador se torna um avatar de Éter: +2 em ataques. |
+| **Julgamento** | 10 | 4d8 | Médio | Instantânea | Paladino | 14 | Luz desce dos céus sobre um inimigo corrompido. |
+| **Queda dos Céus** | 11 | 4d8 | Área média | Instantânea | Mago | 16 | Éter desaba sobre a área com força total. |
+| **Luz Aprisionadora** | 13 | — | Médio | 3 turnos | Feiticeiro | 18 | O alvo é tomado por Éter e não consegue agir. |
+| **Renascer** | 16 | — | Toque | Instantânea | Sacerdote | 20 | Traz de volta um aliado caído há menos de 1 minuto com 1 de Vida. |
+
+### Magias de Ananque
+
+| Magia | Mana | Dano/efeito | Alcance | Duração | Classe | Nível | Descrição |
+| --- | ---: | --- | --- | --- | --- | ---: | --- |
+| **Fio do Destino** | 2 | — | Médio | 1 turno | Mago | 1 | Puxa um fio do destino: o alvo rola o próximo teste duas vezes e fica com o pior. |
+| **Tique Cortante** | 2 | 1d6 | Curto | Instantânea | Mago | 1 | Uma pequena descarga de Ananque atinge o alvo. |
+| **Couraça de Engrenagens** | 2 | — | Pessoal | Cena | Sacerdote | 2 | Uma proteção de Ananque envolve o conjurador: +1 de Defesa. |
+| **Segundo Exato** | 3 | 1d8 | Curto | Instantânea | Atirador | 2 | Um golpe no instante perfeito ignora 2 de Defesa. |
+| **Ponteiro Arremessado** | 3 | 1d8+1 | Médio | Instantânea | Feiticeiro | 3 | Um projétil de Ananque viaja até o alvo. |
+| **Remendo do Tempo** | 3 | — | Toque | Instantânea | Sacerdote | 3 | A energia de Ananque recupera 1d8 de Vida de um aliado. |
+| **Engrenagem Cortante** | 4 | 2d6 | Médio | Instantânea | Mago | 4 | Engrenagens de luz âmbar giram e cortam. |
+| **Badalada** | 4 | 2d6 | Área pequena | Instantânea | Mago | 5 | Uma explosão de Ananque atinge todos numa pequena área. |
+| **Acelerar** | 5 | — | Toque | 2 turnos | Mago | 6 | O aliado ganha movimento extra igual ao dobro do normal. |
+| **Marca do Prazo** | 4 | — | Médio | 2 turnos | Feiticeiro | 6 | O alvo é marcado por Ananque e sofre −2 nos testes. |
+| **Gume do Instante** | 5 | 2d8 | Corpo a corpo | Instantânea | Paladino | 7 | A arma do conjurador se cobre de Ananque por um golpe. |
+| **Retardar** | 5 | — | Médio | 2 turnos | Mago | 7 | O alvo só pode mover ou agir, não os dois. |
+| **Areia Lenta** | 6 | — | Área média | 3 turnos | Mago | 9 | Uma zona de Ananque dificulta o movimento dos inimigos. |
+| **Profecia** | 7 | — | Pessoal | Cena | Sacerdote | 10 | O mestre revela uma verdade sobre o futuro próximo. |
+| **Linha do Destino** | 8 | 3d8 | Longo | Instantânea | Feiticeiro | 11 | Um feixe concentrado de Ananque atravessa a distância. |
+| **Avatar da Ordem** | 9 | — | Pessoal | Cena | Paladino | 13 | O conjurador se torna um avatar de Ananque: +2 em ataques. |
+| **Volta no Tempo** | 12 | — | Toque | Instantânea | Mago | 15 | Desfaz o último dano sofrido pelo alvo nesta rodada. |
+| **Fim do Ciclo** | 11 | 4d8 | Área média | Instantânea | Mago | 16 | Ananque desaba sobre a área com força total. |
+| **Tempo Parado** | 13 | — | Médio | 3 turnos | Feiticeiro | 18 | O alvo é tomado por Ananque e não consegue agir. |
+| **Inevitável** | 15 | 5d10 | Longo | Instantânea | Mago | 20 | O golpe já aconteceu antes de ser lançado: não pode ser desviado. |
+
+### Magias de Hemera
+
+| Magia | Mana | Dano/efeito | Alcance | Duração | Classe | Nível | Descrição |
+| --- | ---: | --- | --- | --- | --- | ---: | --- |
+| **Clarão do Dia** | 2 | 1d6 | Área pequena | 1 turno | Sacerdote | 1 | Um clarão cega inimigos próximos por um instante. |
+| **Faísca Solar** | 2 | 1d6 | Curto | Instantânea | Mago | 1 | Uma pequena descarga de Hemera atinge o alvo. |
+| **Escudo da Aurora** | 2 | — | Pessoal | Cena | Sacerdote | 2 | Uma proteção de Hemera envolve o conjurador: +1 de Defesa. |
+| **Toque do Sol** | 3 | 1d8+1 | Toque | Instantânea | Paladino | 2 | Calor solar queima o alvo. |
+| **Calor Restaurador** | 3 | — | Toque | Instantânea | Sacerdote | 3 | A energia de Hemera recupera 1d8 de Vida de um aliado. |
+| **Orbe do Meio-Dia** | 3 | 1d8+1 | Médio | Instantânea | Feiticeiro | 3 | Um projétil de Hemera viaja até o alvo. |
+| **Passo da Aurora** | 3 | — | Pessoal | Instantânea | Ladino | 4 | O conjurador se desloca 6 metros envolto em Hemera. |
+| **Amanhecer** | 4 | 2d6 | Área pequena | Instantânea | Sacerdote | 5 | Aliados recuperam Vida e criaturas da noite sofrem dano. |
+| **Explosão de Luz** | 4 | 2d6 | Área pequena | Instantânea | Mago | 5 | Uma explosão de Hemera atinge todos numa pequena área. |
+| **Marca do Sol** | 4 | — | Médio | 2 turnos | Feiticeiro | 6 | O alvo é marcado por Hemera e sofre −2 nos testes. |
+| **Gume Dourado** | 5 | 2d8 | Corpo a corpo | Instantânea | Paladino | 7 | A arma do conjurador se cobre de Hemera por um golpe. |
+| **Raio Solar** | 6 | 3d6 | Longo | Instantânea | Paladino | 8 | Um feixe de sol atravessa a escuridão. |
+| **Areia Escaldante** | 6 | — | Área média | 3 turnos | Mago | 9 | Uma zona de Hemera dificulta o movimento dos inimigos. |
+| **Coroa de Luz** | 8 | — | Pessoal | Cena | Paladino | 11 | Uma auréola ilumina 10 metros e afasta sombras mágicas. |
+| **Lança do Zênite** | 8 | 3d8 | Longo | Instantânea | Feiticeiro | 11 | Um feixe concentrado de Hemera atravessa a distância. |
+| **Onda da Alvorada** | 8 | 2d10 | Curto | Instantânea | Sacerdote | 12 | Uma onda de Hemera fere inimigos e cura aliados próximos em 1d6. |
+| **Avatar do Dia** | 9 | — | Pessoal | Cena | Paladino | 13 | O conjurador se torna um avatar de Hemera: +2 em ataques. |
+| **Meio-Dia** | 12 | 4d8+4 | Área média | Instantânea | Sacerdote | 16 | O sol do meio-dia cai sobre a área. |
+| **Queda do Sol** | 11 | 4d8 | Área média | Instantânea | Mago | 16 | Hemera desaba sobre a área com força total. |
+| **Prisão de Luz** | 13 | — | Médio | 3 turnos | Feiticeiro | 18 | O alvo é tomado por Hemera e não consegue agir. |
+
+## Poderes e técnicas
+
+Poderes não usam elemento e, na maioria, não gastam Mana. Servem às classes marciais e aos ataques básicos com armas.
+
+### Técnicas de classe
+
+| Técnica | Mana | Dano/efeito | Alcance | Requisito | Classe | Nível | Descrição |
+| --- | ---: | --- | --- | --- | --- | ---: | --- |
+| **Tiro Certeiro** | 0 | 1d8+2 | Longo | Arco ou besta | Atirador | 1 | Mira com calma e acerta um ponto vital. |
+| **Arremesso Preciso** | 0 | 1d6+1 | Médio | Arma de arremesso | Atirador | 2 | Lança a arma com precisão; ela cai perto do alvo. |
+| **Tiro Imobilizador** | 0 | 1d6 | Longo | Arco ou besta | Atirador | 4 | Prende o pé do alvo no chão. |
+| **Chuva de Flechas** | 0 | 1d6 | Área média | Arco | Atirador | 5 | Dispara várias flechas para o alto sobre uma área. |
+| **Flecha Perfurante** | 0 | 2d6 | Longo | Arco longo ou besta | Atirador | 7 | Atravessa o primeiro alvo e atinge o de trás. |
+| **Olho de Falcão** | 0 | — | Pessoal | Arma à distância | Atirador | 9 | Crítico em 18+ com armas à distância. |
+| **Golpe Guardião** | 0 | 1d8+1 | Corpo a corpo | Escudo equipado | Cavaleiro | 1 | Uma técnica defensiva que transforma bloqueio em contra-ataque. |
+| **Investida** | 0 | 1d8+2 | Corpo a corpo | Mover em linha reta antes do ataque | Cavaleiro | 1 | Avança e golpeia com o peso do corpo. |
+| **Corte Giratório** | 0 | 1d8 | Corpo a corpo | Espada ou machado | Cavaleiro | 4 | Atinge todos os inimigos adjacentes. |
+| **Muralha de Aço** | 0 | — | Pessoal | Escudo equipado | Cavaleiro | 5 | Até o próximo turno, a Defesa sobe 4. |
+| **Contra-ataque** | 0 | 1d6 | Corpo a corpo | Ter sido atacado e errado | Cavaleiro | 6 | Quando um inimigo erra, revida na hora. |
+| **Golpe Esmagador** | 0 | 2d8 | Corpo a corpo | Arma de duas mãos | Cavaleiro | 8 | Um golpe pesado que derruba o alvo se falhar em Força. |
+| **Foice Ceifadora** | 0 | 2d6 | Corpo a corpo | Foice ou gadanha | Feiticeiro | 5 | Varre em meia-lua todos à frente. |
+| **Ataque Furtivo** | 0 | 2d6 | Corpo a corpo | Alvo distraído ou flanqueado | Ladino | 1 | Golpe preciso num ponto fraco. |
+| **Lâmina Dupla** | 0 | 1d6 | Corpo a corpo | Duas armas leves | Ladino | 3 | Ataca duas vezes com armas leves; a segunda sem bônus. |
+| **Desarmar** | 0 | — | Corpo a corpo | Chicote ou arma leve | Ladino | 4 | Arranca a arma do alvo se ele falhar em Agilidade. |
+| **Golpe Venenoso** | 0 | 1d6 | Corpo a corpo | Veneno aplicado na arma | Ladino | 6 | O alvo sofre 1d4 por turno durante 3 turnos. |
+| **Sombra Mortal** | 0 | 3d6 | Corpo a corpo | Estar escondido | Ladino | 10 | Sai das sombras com um golpe devastador. |
+| **Golpe Arcano** | 0 | 1d6+2 | Corpo a corpo | Cajado | Mago | 1 | O cajado descarrega energia ao tocar o alvo. |
+| **Golpe Sagrado** | 0 | 1d8+3 | Corpo a corpo | Arma corpo a corpo | Paladino | 1 | A arma brilha com fé e fere criaturas corrompidas. |
+| **Soco de Ferro** | 0 | 1d6+1 | Corpo a corpo | Manoplas | Paladino | 2 | Dois socos rápidos com as manoplas. |
+| **Juramento** | 0 | — | Pessoal | — | Paladino | 3 | Escolhe um inimigo: +2 para acertá-lo até o fim da cena. |
+| **Martelo do Juízo** | 0 | 2d8+2 | Corpo a corpo | Martelo ou maça | Paladino | 9 | Um golpe que faz o chão tremer. |
+| **Bastão Giratório** | 0 | 1d6 | Corpo a corpo | Cajado ou bordão | Sacerdote | 3 | Golpeia e afasta o alvo 2 metros. |
+
+### Ataques básicos com armas
+
+| Ataque | Dano | Alcance | Requisito | Descrição |
+| --- | --- | --- | --- | --- |
+| **Adaga** | 1d4 | Corpo a corpo | Adaga equipado(a) | Ataque básico com adaga. Leve; pode ser arremessada. |
+| **Alabarda** | 1d10 | Corpo a corpo | Alabarda equipado(a) | Ataque básico com alabarda. Duas mãos; alcança 3 metros. |
+| **Arco curto** | 1d6 | Médio | Arco curto equipado(a) | Ataque básico com arco curto. Duas mãos. |
+| **Arco longo** | 1d8 | Longo | Arco longo equipado(a) | Ataque básico com arco longo. Duas mãos. |
+| **Azagaia** | 1d6 | Médio | Azagaia equipado(a) | Ataque básico com azagaia. Arremesso. |
+| **Besta** | 1d10 | Longo | Besta equipado(a) | Ataque básico com besta. Recarregar gasta o movimento. |
+| **Besta leve** | 1d8 | Longo | Besta leve equipado(a) | Ataque básico com besta leve. Recarregar gasta o movimento. |
+| **Bordão** | 1d6 | Corpo a corpo | Bordão equipado(a) | Ataque básico com bordão. Duas mãos. |
+| **Cajado** | 1d6 | Corpo a corpo | Cajado equipado(a) | Ataque básico com cajado. Duas mãos; foco de magia. |
+| **Chicote** | 1d4 | Curto | Chicote equipado(a) | Ataque básico com chicote. Alcança 3 metros; pode desarmar. |
+| **Dardos** | 1d4 | Curto | Dardos equipado(a) | Ataque básico com dardos. Arremesso. |
+| **Escudo** | 1d4 | Corpo a corpo | Escudo equipado(a) | Ataque básico com escudo. +2 de Defesa quando equipado. |
+| **Espada curta** | 1d6 | Corpo a corpo | Espada curta equipado(a) | Ataque básico com espada curta. Leve. |
+| **Espada longa** | 1d8 | Corpo a corpo | Espada longa equipado(a) | Ataque básico com espada longa. |
+| **Faca de caça** | 1d4+1 | Corpo a corpo | Faca de caça equipado(a) | Ataque básico com faca de caça. Leve. |
+| **Foice** | 1d8 | Corpo a corpo | Foice equipado(a) | Ataque básico com foice. Duas mãos. |
+| **Funda** | 1d4 | Médio | Funda equipado(a) | Ataque básico com funda. |
+| **Gadanha** | 2d4+1 | Corpo a corpo | Gadanha equipado(a) | Ataque básico com gadanha. Duas mãos. |
+| **Garras de ferro** | 1d6 | Corpo a corpo | Garras de ferro equipado(a) | Ataque básico com garras de ferro. Leve. |
+| **Lança** | 1d8 | Corpo a corpo | Lança equipado(a) | Ataque básico com lança. Alcança 3 metros. |
+| **Machadinha** | 1d6 | Corpo a corpo | Machadinha equipado(a) | Ataque básico com machadinha. Pode ser arremessada. |
+| **Machado de guerra** | 1d10 | Corpo a corpo | Machado de guerra equipado(a) | Ataque básico com machado de guerra. Duas mãos. |
+| **Mangual** | 1d8+1 | Corpo a corpo | Mangual equipado(a) | Ataque básico com mangual. Ignora 1 de Defesa de escudos. |
+| **Manoplas** | 1d4+1 | Corpo a corpo | Manoplas equipado(a) | Ataque básico com manoplas. Desarmado. |
+| **Martelo de guerra** | 1d10 | Corpo a corpo | Martelo de guerra equipado(a) | Ataque básico com martelo de guerra. Duas mãos; impacto. |
+| **Maça** | 1d8 | Corpo a corpo | Maça equipado(a) | Ataque básico com maça. Impacto. |
+| **Montante** | 2d6 | Corpo a corpo | Montante equipado(a) | Ataque básico com montante. Duas mãos. |
+| **Rapieira** | 1d8 | Corpo a corpo | Rapieira equipado(a) | Ataque básico com rapieira. Crítico 19+. |
+| **Sabre** | 1d6+1 | Corpo a corpo | Sabre equipado(a) | Ataque básico com sabre. Leve. |
+
 
 **CAPÍTULO V**
 
@@ -1380,27 +1681,245 @@ A economia usa Dracmas como unidade de referência. As moedas são convertidas c
 
 ## Armas
 
-> **CATÁLOGO EM DESENVOLVIMENTO**
+> **PREÇOS DE REFERÊNCIA**
 >
-> A ficha permite registrar ataques e armas, mas não foi fornecida uma lista oficial de preços, danos, propriedades ou requisitos. Um catálogo inicial proposto está nos Apêndices.
+> Estes são os preços-base do sistema digital (os do apêndice de equipamentos foram mantidos). Na mesa, o Mestre pode multiplicar os preços de uma campanha, de um lugar ou de um mercador (por exemplo, ×1,5 numa cidade cara).
+
+### Armas
+
+| Item | Preço (Dracmas) | Peso (kg) | Descrição |
+| --- | ---: | ---: | --- |
+| **Adaga** | 15 | 0.5 | 1d4. Leve; pode ser arremessada. |
+| **Faca de caça** | 10 | 0.4 | 1d4. Leve. |
+| **Espada curta** | 40 | 1 | 1d6. Leve. |
+| **Espada longa** | 100 | 1.5 | 1d8. |
+| **Montante** | 250 | 3 | 2d6. Duas mãos. |
+| **Sabre** | 90 | 1.2 | 1d8. Leve. |
+| **Rapieira** | 120 | 1 | 1d8. Precisa de destreza. |
+| **Machadinha** | 20 | 1 | 1d6. Pode ser arremessada. |
+| **Machado de guerra** | 120 | 3 | 1d10. Duas mãos. |
+| **Maça** | 50 | 2 | 1d6. Esmagamento. |
+| **Martelo de guerra** | 110 | 2.5 | 1d8. Esmagamento. |
+| **Mangual** | 90 | 2 | 1d8. Ignora parte do escudo. |
+| **Lança** | 60 | 2 | 1d8. Alcança 3 metros. |
+| **Alabarda** | 160 | 3 | 1d10. Duas mãos; alcance. |
+| **Foice** | 25 | 1 | 1d6. Ferramenta de lavoura. |
+| **Gadanha** | 45 | 2.5 | 2d4. Duas mãos. |
+| **Chicote** | 15 | 1 | 1d4. Alcance 3 metros. |
+| **Cajado** | 10 | 2 | 1d6. Duas mãos. |
+| **Bordão** | 8 | 2 | 1d6. Bastão de viagem. |
+| **Manoplas** | 30 | 1 | 1d4. Soco reforçado. |
+| **Garras de ferro** | 45 | 0.8 | 1d6. Leve. |
+| **Arco curto** | 60 | 1 | 1d6. Distância média. |
+| **Arco longo** | 150 | 1.5 | 1d8. Distância longa. |
+| **Besta leve** | 120 | 2.5 | 1d8. Distância longa. |
+| **Besta** | 200 | 3 | 1d10. Distância longa; recarregar gasta o movimento. |
+| **Funda** | 2 | 0.1 | 1d4. Distância média. |
+| **Dardos (5)** | 10 | 0.5 | 1d4 cada. Arremesso. |
+| **Azagaia** | 12 | 1 | 1d6. Lança de arremesso. |
+| **Flechas (20)** | 5 | 0.5 | — |
+| **Virotes (20)** | 8 | 0.7 | — |
+| **Aljava** | 6 | 0.5 | — |
+
 
 ## Armaduras
 
-> **CATÁLOGO EM DESENVOLVIMENTO**
->
-> Itens podem conceder bônus de Defesa, porém ainda não existe uma lista oficial de armaduras, categorias ou penalidades. Um catálogo inicial proposto está nos Apêndices.
+### Armaduras
+
+| Item | Preço (Dracmas) | Peso (kg) | Descrição |
+| --- | ---: | ---: | --- |
+| **Armadura acolchoada** | 25 | 4 | +1 na Defesa. |
+| **Armadura de couro** | 50 | 5 | +2 na Defesa. |
+| **Couro batido** | 120 | 6 | +3 na Defesa. |
+| **Cota de malha** | 300 | 12 | +4 na Defesa; −2 para se esconder e fazer acrobacias. |
+| **Peitoral de aço** | 600 | 8 | +5 na Defesa; −2 para se esconder. |
+| **Armadura de placas** | 1500 | 20 | +6 na Defesa; −5 para se esconder e fazer acrobacias; anda 3 metros a menos. |
+| **Escudo** | 80 | 3 | +1 na Defesa e +2 no Bloqueio. |
+| **Elmo** | 40 | 2 | — |
+| **Elmo fechado** | 90 | 3 | — |
+| **Manoplas de placas** | 60 | 1 | — |
+| **Grevas** | 50 | 2 | — |
+
 
 ## Itens gerais
 
-> **CATÁLOGO EM DESENVOLVIMENTO**
->
-> Ferramentas, itens de viagem, relíquias e objetos comuns poderão ser inseridos nesta seção.
+### Ferramentas
+
+| Item | Preço (Dracmas) | Peso (kg) | Descrição |
+| --- | ---: | ---: | --- |
+| **Kit de curativo** | 30 | 1 | — |
+| **Kit de herbalismo** | 40 | 1.5 | — |
+| **Kit de alquimia** | 120 | 4 | — |
+| **Ferramentas de ladrão** | 60 | 0.5 | — |
+| **Ferramentas de ferreiro** | 80 | 4 | — |
+| **Ferramentas de carpinteiro** | 30 | 3 | — |
+| **Picareta** | 15 | 4 | — |
+| **Pá** | 8 | 2 | — |
+| **Martelo** | 4 | 1 | — |
+| **Vara de pesca** | 5 | 1 | — |
+| **Rede de pesca** | 12 | 3 | — |
+| **Kit de escrita** | 20 | 0.5 | — |
+| **Lupa** | 50 | 0.1 | — |
+| **Cadeado** | 10 | 0.5 | — |
+| **Alaúde** | 60 | 2 | — |
+| **Flauta** | 10 | 0.3 | — |
+
+### Aventura
+
+| Item | Preço (Dracmas) | Peso (kg) | Descrição |
+| --- | ---: | ---: | --- |
+| **Mochila** | 12 | 1 | — |
+| **Corda de cânhamo (15 m)** | 8 | 2 | — |
+| **Tocha** | 1 | 0.5 | — |
+| **Lanterna** | 15 | 1 | — |
+| **Óleo de lanterna** | 1 | 0.5 | — |
+| **Vela** | 1 | 0.1 | — |
+| **Cantil** | 5 | 1 | — |
+| **Saco de dormir** | 8 | 3 | — |
+| **Tenda (2 pessoas)** | 25 | 5 | — |
+| **Pederneira** | 2 | 0.1 | — |
+| **Arpéu** | 10 | 2 | — |
+| **Corrente (3 m)** | 30 | 4 | — |
+| **Pé de cabra** | 6 | 2 | — |
+| **Mapa regional** | 40 | 0.1 | — |
+| **Bússola** | 80 | 0.2 | — |
+| **Luneta** | 250 | 0.5 | — |
+| **Espelho de bolso** | 15 | 0.3 | — |
+| **Algemas** | 20 | 1 | — |
+| **Baú pequeno** | 15 | 5 | — |
+| **Balde** | 2 | 1 | — |
+
+### Roupas
+
+| Item | Preço (Dracmas) | Peso (kg) | Descrição |
+| --- | ---: | ---: | --- |
+| **Roupa comum** | 5 | 1 | — |
+| **Roupa de viagem** | 12 | 2 | — |
+| **Roupa nobre** | 90 | 2 | — |
+| **Capa** | 10 | 1 | — |
+| **Capa reforçada** | 35 | 1.5 | — |
+| **Botas** | 10 | 1 | — |
+| **Luvas de couro** | 12 | 0.3 | — |
+
+### Joias e tesouro
+
+| Item | Preço (Dracmas) | Peso (kg) | Descrição |
+| --- | ---: | ---: | --- |
+| **Anel de prata** | 40 | 0.02 | — |
+| **Anel de ouro** | 120 | 0.02 | — |
+| **Colar de ouro** | 250 | 0.1 | — |
+| **Pérola** | 100 | 0.02 | — |
+| **Ametista** | 120 | 0.02 | — |
+| **Topázio** | 200 | 0.02 | — |
+| **Esmeralda** | 450 | 0.02 | — |
+| **Safira** | 450 | 0.02 | — |
+| **Rubi** | 500 | 0.02 | — |
+| **Diamante** | 1000 | 0.02 | — |
+| **Lingote de prata** | 100 | 1 | — |
+| **Lingote de ouro** | 500 | 1 | — |
+
+### Magia e pergaminhos
+
+| Item | Preço (Dracmas) | Peso (kg) | Descrição |
+| --- | ---: | ---: | --- |
+| **Pergaminho de magia simples** | 80 | 0.1 | — |
+| **Pergaminho de magia forte** | 250 | 0.1 | — |
+| **Grimório em branco** | 50 | 1.5 | — |
+| **Tinta arcana** | 40 | 0.2 | — |
+| **Foco mágico** | 95 | 0.5 | — |
+| **Cristal arcano** | 180 | 0.5 | — |
+| **Varinha simples** | 200 | 0.2 | — |
+| **Amuleto de proteção** | 210 | 0.1 | — |
+| **Componente raro** | 150 | 0.1 | — |
+
 
 ## Consumíveis
 
-> **CATÁLOGO EM DESENVOLVIMENTO**
->
-> Poções, alimentos, componentes, pergaminhos e outros consumíveis ainda não possuem regras oficiais neste material. Um catálogo inicial proposto está nos Apêndices.
+### Poções
+
+| Item | Preço (Dracmas) | Peso (kg) | Descrição |
+| --- | ---: | ---: | --- |
+| **Poção de cura** | 60 | 0.3 | Recupera 1d8 + 2 de Vida. |
+| **Poção de cura maior** | 180 | 0.4 | Recupera 3d8 + 4 de Vida. |
+| **Tônico de clareza** | 80 | 0.3 | Recupera 1d6 de Sanidade. |
+| **Antídoto** | 50 | 0.3 | Cura envenenamento. |
+| **Elixir de mana** | 90 | 0.3 | Recupera 1d8 de Mana. |
+| **Óleo de fogo** | 40 | 0.5 | Arremessado: 1d6 de fogo. |
+| **Frasco de ácido** | 45 | 0.5 | Arremessado: 2d4 de ácido. |
+| **Água benta** | 25 | 0.5 | — |
+| **Veneno** | 140 | 0.1 | Uma dose para lâmina. |
+| **Ervas medicinais** | 5 | 0.05 | — |
+| **Ervas raras** | 25 | 0.05 | — |
+
+### Comida e bebida
+
+| Item | Preço (Dracmas) | Peso (kg) | Descrição |
+| --- | ---: | ---: | --- |
+| **Pão** | 1 | 0.3 | — |
+| **Queijo** | 3 | 0.5 | — |
+| **Maçã** | 1 | 0.2 | — |
+| **Carne seca** | 3 | 0.3 | — |
+| **Peixe fresco** | 2 | 0.5 | — |
+| **Linguiça** | 2 | 0.3 | — |
+| **Torta** | 4 | 0.5 | — |
+| **Ração de viagem (1 dia)** | 2 | 0.5 | — |
+| **Refeição simples** | 3 | 0.4 | — |
+| **Refeição boa** | 8 | 0.5 | — |
+| **Banquete** | 25 | 1 | — |
+| **Caneca de cerveja** | 2 | 0.5 | — |
+| **Hidromel** | 4 | 0.5 | — |
+| **Vinho comum (garrafa)** | 6 | 1 | — |
+| **Vinho fino (garrafa)** | 30 | 1 | — |
+| **Pote de mel** | 5 | 0.5 | — |
+
+## Montarias, serviços e barcos
+
+O sistema digital permite comprar e também alugar. O aluguel é cobrado por dia de jogo; o Mestre decide quando o prazo vence.
+
+### Montarias e animais
+
+| Item | Preço (Dracmas) | Aluguel por dia | Descrição |
+| --- | ---: | ---: | --- |
+| **Cavalo de montaria** | 350 | 15 | Anda o dobro numa viagem. |
+| **Cavalo de guerra** | 1200 | 50 | — |
+| **Pônei** | 150 | 8 | — |
+| **Mula** | 120 | 6 | Carrega até 80 kg. |
+| **Burro** | 80 | 5 | — |
+| **Carroça** | 150 | 8 | — |
+| **Carruagem** | 800 | 40 | — |
+| **Cão de guarda** | 60 | — | — |
+| **Sela** | 40 | — | — |
+| **Alforjes** | 10 | — | — |
+| **Ração animal (1 dia)** | 3 | — | — |
+
+### Hospedagem e serviços
+
+| Item | Preço (Dracmas) | Aluguel por dia | Descrição |
+| --- | ---: | ---: | --- |
+| **Cama no salão (noite)** | 3 | 3 | — |
+| **Quarto comum (noite)** | 10 | 10 | — |
+| **Quarto confortável (noite)** | 25 | 25 | — |
+| **Suíte nobre (noite)** | 80 | 80 | — |
+| **Baia no estábulo (noite)** | 5 | 5 | — |
+| **Banho quente** | 2 | — | — |
+| **Guia local (dia)** | 20 | 20 | — |
+| **Reparo de arma** | 20 | — | — |
+| **Reparo de armadura** | 40 | — | — |
+| **Bênção** | 45 | — | — |
+| **Identificar item mágico** | 100 | — | — |
+
+### Barcos
+
+| Item | Preço (Dracmas) | Aluguel por dia | Descrição |
+| --- | ---: | ---: | --- |
+| **Bote** | 150 | 5 | Até 4 pessoas, a remo. |
+| **Barco de pesca** | 600 | 20 | Até 6 pessoas; pesca e costa. |
+| **Veleiro** | 3000 | 80 | Até 12 pessoas; viagens no mar. |
+| **Galé** | 12000 | 300 | Remos e vela; precisa de tripulação. |
+| **Navio** | 40000 | 900 | Grande, com porão de carga. |
+| **Remo** | 3 | — | — |
+| **Âncora pequena** | 40 | — | — |
+
 
 ## Modelo para novas entradas
 
@@ -1502,7 +2021,88 @@ Cópia imperfeita de uma pessoa, criada pelas sombras de Érebo. Possui corpo, r
 
 > **BESTIÁRIO EM EXPANSÃO**
 >
-> A quantidade atual de criaturas é pequena. Novos monstros, variações, ataques, descrições e recompensas deverão ser incorporados ao longo do beta.
+> As três criaturas acima foram as primeiras do sistema. Novos monstros, variações e recompensas continuam sendo incorporados ao longo do beta.
+
+## Bestiário do sistema digital
+
+O sistema digital tem 334 criaturas, com ataques cadastrados, organizadas pelos oito elementos primordiais e por dificuldade. O bestiário completo, com todas as fichas, fica no site; abaixo estão o resumo e um exemplo de cada elemento.
+
+| Elemento | Baixa | Média | Alta | Mortal | Lendária | Total |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Caos | 9 | 11 | 11 | 8 | 4 | 43 |
+| Gaia | 9 | 10 | 11 | 8 | 4 | 42 |
+| Ponto | 8 | 11 | 11 | 8 | 4 | 42 |
+| Érebo | 8 | 11 | 10 | 9 | 4 | 42 |
+| Nix | 9 | 10 | 11 | 8 | 4 | 42 |
+| Tártaro | 8 | 11 | 9 | 8 | 5 | 41 |
+| Éter | 8 | 10 | 11 | 8 | 4 | 41 |
+| Ananque | 8 | 11 | 9 | 9 | 4 | 41 |
+
+### Quimera Pequena da Fenda
+
+> **CAOS  •  DIFICULDADE MÉDIA  •  VIDA 31 (24-38)  •  ARMADURA 11**
+
+Nível 5. Criatura de Caos.
+
+**Ataques:** Estilhaço (2d8+2); Rajada de Caos (2d6+2).
+
+### Lobo de Musgo da Mata
+
+> **GAIA  •  DIFICULDADE MÉDIA  •  VIDA 31 (24-38)  •  ARMADURA 11**
+
+Nível 5. Criatura de Gaia.
+
+**Ataques:** Investida (2d6+2); Mordida (2d8+2).
+
+### Afogado
+
+> **PONTO  •  DIFICULDADE MÉDIA  •  VIDA 16 (12-20)  •  ARMADURA 11**
+
+Marinheiro que voltou das profundezas.
+
+**Ataques:** Agarrar (1d6); Golpe encharcado (1d8).
+
+### Sombra Faminta
+
+> **ÉREBO  •  DIFICULDADE MÉDIA  •  VIDA 14 (10-18)  •  ARMADURA 13**
+
+Sombra que se alimenta de luz. Habilidades: Apagar: Apaga tochas próximas.
+
+**Ataques:** Toque gelado (1d8).
+
+### Fada do Sono Lunar
+
+> **NIX  •  DIFICULDADE MÉDIA  •  VIDA 31 (24-38)  •  ARMADURA 11**
+
+Nível 5. Criatura de Nix.
+
+**Ataques:** Feitiço (2d8+2); Rajada de Nix (2d6+2).
+
+### Cão Acorrentado
+
+> **TÁRTARO  •  DIFICULDADE MÉDIA  •  VIDA 18 (14-22)  •  ARMADURA 12**
+
+Cão do Tártaro preso a correntes quebradas.
+
+**Ataques:** Corrente (1d6); Mordida infernal (1d8+2).
+
+### Guardião de Pedra Radiante
+
+> **ÉTER  •  DIFICULDADE MÉDIA  •  VIDA 31 (24-38)  •  ARMADURA 11**
+
+Nível 5. Criatura de Éter.
+
+**Ataques:** Golpe Pesado (2d6+2); Punho (2d8+2).
+
+### Autômato do Relógio
+
+> **ANANQUE  •  DIFICULDADE MÉDIA  •  VIDA 20 (16-24)  •  ARMADURA 15**
+
+Engrenagens que seguem ordens antigas. Habilidades: Ritmo: Age duas vezes a cada 3 turnos.
+
+**Ataques:** Engrenagem (1d8+1).
+
+
 
 ## Chefes
 
@@ -1587,6 +2187,30 @@ O sistema digital possui campanhas com Mestre, jogadores, código de convite, li
 **Chat e mensagens:** Comunicação dentro da campanha.
 
 **Diário:** Registro de eventos, pistas e decisões.
+
+## Ferramentas do Mestre no sistema digital
+
+Além de chat, diário e fichas, a mesa digital dá ao Mestre controle direto sobre o jogo. Nenhuma dessas ferramentas impõe regra: elas existem para o Mestre aplicar as decisões da mesa.
+
+**Mapa da mesa:** Mapas em pixel art de até 1000 × 1000 casas, com construções, interiores, itens no chão e tokens. O Mestre pode gerar o mapa a partir de um pedido em texto ou de uma foto de mapa desenhado.
+
+**Visão do jogador:** O jogador vê a mesa em 16:9. O Mestre escolhe entre dez tamanhos de visão, que limitam o quanto o jogador pode afastar a câmera.
+
+**Relógio do mundo:** A hora avança de 15 em 15 minutos e a luz do mapa muda aos poucos entre dia e noite.
+
+**Mapa-item:** O Mestre decide quem recebe o mapa de um lugar. O jogador abre uma imagem do mapa com pontos numerados; clicar num ponto mostra o que ele é.
+
+**Pedidos de ação:** Para cada ação (pegar item, passar por porta, atacar), o Mestre escolhe se ela é livre, se precisa de pedido ou se está travada. Pedidos chegam como cartões para aprovar ou negar, e uma chave pausa a mesa inteira.
+
+**Pin com pergunta:** Qualquer participante marca um ponto do mapa com uma pergunta ou aviso. O pin fica até o autor ou o Mestre tirá-lo. O Mestre também pode mostrar o próprio cursor aos jogadores.
+
+**Painel rápido:** Vida, Mana e Sanidade de todos numa só tela, com botões para somar e tirar. O Mestre também edita qualquer ficha, dá e tira itens e acrescenta ataques e magias.
+
+**Mercadores:** NPCs que compram, vendem e alugam, cada um com o seu ramo (barcos, comida, armas…). O Mestre muda preços por item e multiplica os preços de uma campanha, de um lugar, de uma área do mapa ou de um mercador. NPCs podem ficar parados ou andar numa área escolhida.
+
+**Barcos e viagens:** Portos, mapa do mar, convés e porão. O Mestre embarca os jogadores, acompanha a viagem e decide quando o barco chega. Monstros marinhos podem aparecer no caminho.
+
+**Animações:** Golpes de arma, magias e acertos aparecem animados na mesa para todos. O Grimório (página do site) mostra a animação de cada magia; ele é um catálogo visual e não cria regras.
 
 ## Construindo aventuras
 
@@ -1695,6 +2319,73 @@ Regras oficiais para arcos, marcos de nível, passagem de tempo e encerramento d
 
 **Dracmas:** Bronze + Prata×10 + Platina×100 + Ouro×500.
 
+## Ficha de personagem para imprimir
+
+**Jogador:** ________________  **Personagem:** ________________  **Nível:** ____
+
+**Raça:** ________________  **Origem:** ________________  **Classe:** ________________
+
+| Atributo | Valor |
+| --- | ---: |
+| Força | |
+| Agilidade | |
+| Presença | |
+| Intelecto | |
+| Vigor | |
+
+| Recurso | Atual | Máximo |
+| --- | ---: | ---: |
+| Vida | | |
+| Mana | | |
+| Sanidade | | |
+
+**Defesa:** ____  **Bloqueio:** ____  **Esquiva (15 − Agilidade):** ____
+
+| Perícia | Atributo | Treino (0/5/10/15) | Outros |
+| --- | --- | ---: | ---: |
+| Acrobacia | AGI | | |
+| Adestramento | PRE | | |
+| Artes | PRE | | |
+| Atletismo | FOR | | |
+| Atualidades | INT | | |
+| Ciências | INT | | |
+| Crime | AGI | | |
+| Criação | INT | | |
+| Diplomacia | PRE | | |
+| Enganação | PRE | | |
+| Fortitude | VIG | | |
+| Furtividade | AGI | | |
+| Iniciativa | AGI | | |
+| Intimidação | PRE | | |
+| Intuição | PRE | | |
+| Investigação | INT | | |
+| Luta | FOR | | |
+| Medicina | INT | | |
+| Negociação | INT | | |
+| Ocultismo | INT | | |
+| Percepção | PRE | | |
+| Pilotagem | AGI | | |
+| Pontaria | AGI | | |
+| Profissão | INT | | |
+| Reflexos | AGI | | |
+| Religião | PRE | | |
+| Sobrevivência | INT | | |
+| Tática | INT | | |
+| Tecnologia | INT | | |
+| Vontade | PRE | | |
+
+| Ataque ou magia | Dano | Crítico | Alcance | Mana |
+| --- | --- | --- | --- | ---: |
+| | | | | |
+| | | | | |
+| | | | | |
+
+**Inventário (item, quantidade, peso):** ______________________________________________
+
+**Dracmas:** Bronze ____  Prata ____  Platina ____  Ouro ____
+
+**História, aparência e anotações:** ______________________________________________
+
 ## Glossário
 
 **Atributo:** Valor geral que representa capacidades do personagem.
@@ -1722,6 +2413,14 @@ Regras oficiais para arcos, marcos de nível, passagem de tempo e encerramento d
 **Crítico:** Resultado do d20 igual ou superior ao valor crítico; multiplica o dano.
 
 **Dracma:** Unidade de referência da economia; 1 Bronze vale 1 Dracma.
+
+**Mapa-item:** Mapa de um lugar entregue pelo Mestre a um personagem, aberto como imagem com pontos clicáveis.
+
+**Mercador:** NPC que compra, vende ou aluga itens de um ramo específico.
+
+**Pedido de ação:** Cartão enviado ao Mestre quando uma ação precisa da aprovação dele.
+
+**Pin:** Marca com pergunta ou aviso deixada num ponto do mapa da mesa.
 
 **Primeira Ruptura:** Conflito entre os Primordiais que marcou o mundo e criou as terras corrompidas.
 
@@ -2073,6 +2772,8 @@ o Livro do Jogador de Dungeons &amp; Dragons foi observado somente para compreen
 **Versão atual:** 0.5 Beta.
 
 **Conteúdo adicionado:** Apêndice de propostas (dificuldades, acerto, turno, condições, descanso, morte, Sanidade, progressão, habilidades de nível 1, manobras, traços raciais, novas origens, equipamentos, encontros e cenário); novos termos no glossário; novas notas de consistência.
+
+**Conteúdo do sistema digital no livro:** 180 magias (20 por elemento), 53 poderes e técnicas, catálogo de equipamentos com preços e pesos, montarias, serviços e barcos, resumo do bestiário digital e as ferramentas do Mestre na mesa.
 
 **Regras alteradas:** Nenhuma regra oficial alterada; as mudanças sugeridas estão marcadas como propostas.
 

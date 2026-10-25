@@ -85,8 +85,23 @@ export function sectionHash(section) {
     .digest('hex');
 }
 
+// Secoes que mudaram de nome no livro: a linha antiga ganha o slug novo (sem apagar nada),
+// senao o site mostraria as duas (ex.: "Sylvar" e "Elfo"). Edicao do admin continua protegida.
+export const SLUG_RENAMES = {
+  sylvar: 'elfo', nocthar: 'elfo-negro', durkar: 'anao', lumerin: 'halfling',
+  gorak: 'orc', celestiano: 'aasimar', abissiano: 'tiefling', primordiano: 'genasi'
+};
+
 export async function seedRules(pool, markdown, { force = false } = {}) {
   const sections = parseRulebook(markdown);
+  const wanted = new Set(sections.map((s) => s.slug));
+  for (const [from, to] of Object.entries(SLUG_RENAMES)) {
+    if (!wanted.has(to)) continue;
+    await pool.query(
+      `update rule_sections set slug = $2 where slug = $1 and not exists (select 1 from rule_sections where slug = $2)`,
+      [from, to]
+    );
+  }
   const existing = new Map((await pool.query(
     `select s.*, p.slug as parent_slug from rule_sections s left join rule_sections p on p.id = s.parent_id`
   )).rows.map((row) => [row.slug, row]));

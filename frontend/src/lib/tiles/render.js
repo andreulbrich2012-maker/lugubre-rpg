@@ -3,7 +3,7 @@
 // celulas sem canvas gigante. Objetos animados vem do atlas de sprites a cada quadro.
 import { SIZE, TILES, getTile, tileImages } from './catalog.js';
 import { roofPixels } from './roofs.js';
-import { renderRegion, terrainFrames, isAnimatedObject, LIGHT_TINT, NIGHT_LIGHT } from './compose.js';
+import { renderRegion, terrainFrames, isAnimatedObject, LIGHT_TINT, NIGHT_LIGHT, MOON_LIFT, lightReach } from './compose.js';
 import { resolveLight } from './daylight.js';
 import { applyStyle, styleHex } from './styles.js';
 import { chunkLayout, chunkRect, visibleChunks, pickLod, diffLayers, dirtyChunks } from './chunks.js';
@@ -271,11 +271,11 @@ export class MapRenderer {
       const orow = O?.[yy] || '';
       for (let xx = x; xx < x + w; xx++) {
         const gt = getTile(grow[xx]);
-        if (gt?.light) lights.push([xx, yy, gt.light]);
-        else if (grow[xx] === 'J') lights.push([xx, yy, NIGHT_LIGHT]);
+        if (gt?.light) lights.push([xx, yy, gt.light, lightReach(grow[xx], 'ground')]);
+        else if (grow[xx] === 'J') lights.push([xx, yy, NIGHT_LIGHT, lightReach('J')]);
         const ot = getTile(orow[xx]);
         if (!ot) continue;
-        if (ot.light) lights.push([xx, yy, ot.light]);
+        if (ot.light) lights.push([xx, yy, ot.light, lightReach(orow[xx], 'objects')]);
         if (isAnimatedObject(ot)) animated.push([xx, yy, ot]);
       }
     }
@@ -363,6 +363,15 @@ function looseRenderer(map) {
 // budgetMs: tempo maximo renderizando pedacos novos nesta chamada (sempre faz pelo menos um);
 // o que faltar aparece na miniatura e volta { pending: true } para chamar de novo logo.
 // Devolve { pending, animated } (animated: tem agua/fogo/luz na vista e vale redesenhar a 4 fps).
+// Camada de luz da noite: um canvas so, reaproveitado entre quadros (cresce quando precisa).
+let lightCanvas = null;
+function lightLayer(w, h) {
+  if (!lightCanvas) lightCanvas = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(w, h) : document.createElement('canvas');
+  if (lightCanvas.width < w) lightCanvas.width = w;
+  if (lightCanvas.height < h) lightCanvas.height = h;
+  return lightCanvas;
+}
+
 export function drawMap(ctx, map, {
   cellSize = 48, time = 0, showGrid = false, roofs = false, beautify = true,
   view, offset, renderer, budgetMs = 40, animate = true, buildingBlocks = false
@@ -434,41 +443,85 @@ export function drawMap(ctx, map, {
     }
   }
 
-  // ciclo de luz: o ceu multiplica a cor; as fontes de luz somam brilho (mais forte a noite)
+  // ciclo de luz. De dia: as fontes so somam um brilho leve. Entardecer e noite: mapa de luz
+  // (mesma ideia do applyNightLight do compose.js): uma camada com a cor do ceu onde cada luz
+  // "recorta" a escuridao, multiplicada sobre o mapa; perto da fogueira volta a cor de verdade.
   const sky = resolveLight(map.light);
   const tintHex = sky.tintHex;
-  if (tintHex) {
+  const vx = X(vx0); const vy = Y(vy0); const vw = X(vx1) - vx; const vh = Y(vy1) - vy;
+  const reach = 6;
+  const near = lod === 'overview' ? [] : visibleChunks(L, { x0: vx0 - reach, y0: vy0 - reach, x1: vx1 + reach, y1: vy1 + reach });
+  const lightsNear = [];
+  for (const [i, j] of near) {
+    for (const lt of R.chunkMeta(i, j).lights) {
+      const [x, y] = lt;
+      if (!tintHex && map.layers.ground[y][x] === 'J') continue;
+      if (x < vx0 - reach || y < vy0 - reach || x >= vx1 + reach || y >= vy1 + reach) continue;
+      lightsNear.push(lt);
+    }
+  }
+  if (lightsNear.length && animate) animated = true;
+  const flickOf = (x, y) => 0.88 + 0.12 * Math.sin(time / 180 + cellHash(x, y));
+  if (tintHex && vw > 0 && vh > 0) {
+    // camada de luz em meia resolucao (fica mais macia e custa 1/4)
+    const q = 0.5;
+    const lw = Math.max(1, Math.ceil(vw * q)); const lh = Math.max(1, Math.ceil(vh * q));
+    const lm = lightLayer(lw, lh);
+    const lc = lm.getContext('2d');
+    lc.globalCompositeOperation = 'source-over';
+    lc.fillStyle = tintHex;
+    lc.fillRect(0, 0, lw, lh);
+    // source-over: a luz substitui o ceu (somar laranja ao azul deixaria verde)
+    lc.globalCompositeOperation = 'source-over';
+    const a = Math.min(1, 0.8 * sky.glow);
+    for (const [x, y, color, rc = 2.8] of lightsNear) {
+      const [cr, cg, cb] = hexToRgb(color);
+      const wr = Math.round(255 * 0.25 + cr * 0.75); const wg = Math.round(255 * 0.25 + cg * 0.75); const wb = Math.round(255 * 0.25 + cb * 0.75);
+      const k = a * flickOf(x, y);
+      const cx = ((x + 0.5) * s - ox - vx) * q;
+      const cy = ((y + 0.5) * s - oy - vy) * q;
+      const r = rc * s * q * (0.96 + 0.04 * flickOf(y, x));
+      const g = lc.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, `rgba(${wr},${wg},${wb},${k.toFixed(3)})`);
+      g.addColorStop(0.35, `rgba(${wr},${wg},${wb},${(Math.min(1, k * 0.8)).toFixed(3)})`);
+      g.addColorStop(0.7, `rgba(${wr},${wg},${wb},${(k * 0.35).toFixed(3)})`);
+      g.addColorStop(1, `rgba(${wr},${wg},${wb},0)`);
+      lc.fillStyle = g;
+      lc.fillRect(cx - r, cy - r, r * 2, r * 2);
+    }
     ctx.save();
     ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = tintHex;
-    ctx.fillRect(X(vx0), Y(vy0), X(vx1) - X(vx0), Y(vy1) - Y(vy0));
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(lm, 0, 0, lw, lh, vx, vy, vw, vh);
+    if (sky.glow > 1) {
+      // luar: 'screen' clareia so o mais escuro (mesma conta do applyNightLight)
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = `rgb(${MOON_LIFT.join(',')})`;
+      ctx.fillRect(vx, vy, vw, vh);
+    }
     ctx.restore();
   }
-  if (lod !== 'overview') {
-    // luzes dos pedacos da vista e dos vizinhos (o brilho passa da borda)
-    const reach = 3;
-    const near = visibleChunks(L, { x0: vx0 - reach, y0: vy0 - reach, x1: vx1 + reach, y1: vy1 + reach });
-    const strength = sky.glow;
-    const r = s * sky.radius;
-    let saved = false;
-    for (const [i, j] of near) {
-      for (const [x, y, color] of R.chunkMeta(i, j).lights) {
-        if (!tintHex && map.layers.ground[y][x] === 'J') continue;
-        if (x < vx0 - reach || y < vy0 - reach || x >= vx1 + reach || y >= vy1 + reach) continue;
-        if (!saved) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; saved = true; }
-        if (animate) animated = true;
-        const flick = 0.85 + 0.15 * Math.sin(time / 180 + cellHash(x, y));
-        const cx = (x + 0.5) * s - ox;
-        const cy = (y + 0.5) * s - oy;
-        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-        const [cr, cg, cb] = hexToRgb(color);
-        g.addColorStop(0, `rgba(${cr},${cg},${cb},${Math.min(0.9, 0.3 * strength * flick).toFixed(3)})`);
-        g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
-        ctx.fillStyle = g;
-        ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
-      }
+  if (lightsNear.length) {
+    // halo somado (de noite curto e quente; de dia so um toque)
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const h = tintHex ? 0.22 * sky.glow : 0.12;
+    for (const [x, y, color, rc = 2.8] of lightsNear) {
+      // fogo grande aquece em volta (soma laranja); luz pequena so brilha perto
+      const [cr, cg, cb] = hexToRgb(color);
+      const big = rc >= 4;
+      const cx = (x + 0.5) * s - ox;
+      const cy = (y + 0.5) * s - oy;
+      const r = s * rc * (tintHex ? (big ? 0.75 : 0.55) : 0.6);
+      const hk = h * (tintHex && big ? 1.5 : 1) * flickOf(x, y);
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      g.addColorStop(0, `rgba(${cr},${cg},${cb},${Math.min(1, hk).toFixed(3)})`);
+      g.addColorStop(0.5, `rgba(${cr},${cg},${cb},${(hk * 0.35).toFixed(3)})`);
+      g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
     }
-    if (saved) ctx.restore();
+    ctx.restore();
   }
 
   if (roofs) {

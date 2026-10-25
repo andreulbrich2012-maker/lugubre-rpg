@@ -32,6 +32,8 @@ const sheetOwner = z.enum(['mestre', 'jogador']).optional();
 export const tableRulesSchema = z.object({
   ...flags,
   act: z.boolean().optional(),
+  // mapa so para caminhar: o mestre narra o resto (sem atacar, pegar itens ou comerciar pelo mapa)
+  walkOnly: z.boolean().optional(),
   actions: actionsSchema.optional(),
   sheet: z.object({ stats: sheetOwner, powers: sheetOwner }).optional(),
   turn: z.string().uuid().nullable().optional(),
@@ -94,6 +96,7 @@ export function normalizeRules(raw) {
   const r = raw && typeof raw === 'object' ? raw : {};
   return {
     act: r.act !== false,
+    walkOnly: r.walkOnly === true,
     actions: generalActions(r),
     turn: r.turn || null,
     inventory: normalizeInventory(r.inventory),
@@ -129,10 +132,12 @@ export function inventoryLimits(rules, userId) {
 export function playerRights(rules, userId) {
   const r = normalizeRules(rules);
   const own = r.players[userId]?.actions || {};
-  const mode = (a) => (r.act ? own[a] ?? r.actions[a] : 'travado');
+  const walk = new Set(r.walkOnly ? WALK_ONLY_OFF : []);
+  const mode = (a) => (!r.act || walk.has(a) ? 'travado' : own[a] ?? r.actions[a]);
   const move = mode('move');
   return {
     paused: !r.act,
+    walkOnly: r.walkOnly,
     move,
     attack: mode('attack'),
     pickup: mode('pickup'),
@@ -143,7 +148,11 @@ export function playerRights(rules, userId) {
   };
 }
 
+// No modo so caminhar estas acoes ficam com o mestre (portas continuam: entrar e andar)
+export const WALK_ONLY_OFF = ['attack', 'pickup', 'trade'];
+
 export const RIGHT_MESSAGES = {
+  walk: 'O mestre deixou o mapa só para caminhar: peça a ele.',
   paused: 'O mestre pausou a mesa: espere ele liberar.',
   move: 'O mestre travou o movimento agora.',
   attack: 'O mestre travou poderes e ataques agora.',
@@ -158,7 +167,7 @@ export function assertRight(rules, userId, right, { turnTokenIds = [], inCombat 
   const rights = playerRights(rules, userId);
   const key = right === 'powers' ? 'attack' : right;
   if (key && rights[key] === 'travado') {
-    const why = rights.paused ? 'paused' : key === 'doors' && rights.move === 'travado' ? 'move' : key;
+    const why = rights.paused ? 'paused' : rights.walkOnly && WALK_ONLY_OFF.includes(key) ? 'walk' : key === 'doors' && rights.move === 'travado' ? 'move' : key;
     throw httpError(RIGHT_MESSAGES[why], 403);
   }
   if (!inCombat && rights.turn && !turnTokenIds.includes(rights.turn)) throw httpError('Agora é a vez de outro personagem.', 409);

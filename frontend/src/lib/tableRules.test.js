@@ -11,6 +11,13 @@ describe('regras da mesa (espelho do servidor)', () => {
     expect(normalizeRules({}).act).toBe(true);
   });
 
+  it('mapa so para caminhar: anda e entra, o resto fica com o mestre (vale ate com excecao livre)', () => {
+    const r = playerRights({ walkOnly: true, actions: { attack: 'livre', pickup: 'pedir' }, players: { [U]: { actions: { trade: 'livre' } } } }, U);
+    expect(r).toMatchObject({ walkOnly: true, move: 'livre', doors: 'livre', attack: 'travado', pickup: 'travado', trade: 'travado' });
+    expect(rightBlock(r, 'pickup')).toBe('O mestre deixou o mapa só para caminhar: peça a ele.');
+    expect(normalizeRules({}).walkOnly).toBe(false);
+  });
+
   it('pausa geral trava tudo e mover travado trava portas', () => {
     expect(playerRights({ act: false }, U)).toMatchObject({ paused: true, move: 'travado', attack: 'travado', pickup: 'travado', doors: 'travado' });
     expect(rightBlock(playerRights({ act: false }, U), 'pickup')).toBe('O mestre pausou a mesa: espere ele liberar.');

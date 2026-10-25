@@ -14,6 +14,7 @@ import { rasterize, cellHash } from './render.js';
 import { wallVariant, wallPixels, FACE_SHADOW } from './walls.js';
 import { riverStone, sparkle, FOAM_HEX } from './water.js';
 import { applyStyle } from './styles.js';
+import { resolveLight } from './daylight.js';
 import { isFence, fenceMask, fenceSprite } from './fences.js';
 
 // ---------- terrenos que se misturam (resto e "construido": borda reta) ----------
@@ -829,18 +830,85 @@ export function terrainFrames(map) {
 
 // ---------- ciclo de luz ----------
 // Multiplicacao pela cor do ceu + brilho somado das fontes de luz (tocha, fogo, janela, cristal).
-export const LIGHT_TINT = { dia: null, entardecer: '#f2b890', noite: '#6874b4' };
+export const LIGHT_TINT = { dia: null, entardecer: '#f2b890', noite: '#7482c0' };
 export const NIGHT_LIGHT = '#ffc46a';
+// 'screen' do luar (cor x opacidade ja aplicadas): mesmo valor no canvas do drawMap
+export const MOON_LIFT = [6, 8, 16];
+// Alcance da luz em celulas (a noite): fogueira e forja iluminam a praca, tocha e lampiao a rua,
+// janela so a calcada; chao que brilha (lava, cristal, acido) e muita celula junta: alcance curto.
+const LIGHT_REACH = { 'È': 6.5, F: 5, 'Ü': 4, 6: 3.5, '}': 3.5, 'Í': 3.6, i: 3.2, '/': 3.2, '{': 3, O: 3.2, '`': 3, k: 2.6, N: 2.4, 'Ä': 2.6, 'É': 2.6, 5: 2.4, J: 1.7 };
+export function lightReach(code, layer) {
+  return LIGHT_REACH[code] ?? (layer === 'ground' ? 1.5 : 2.8);
+}
 export function lightSources(map) {
   const out = [];
   for (const layer of ['ground', 'objects']) {
     map.layers[layer].forEach((row, y) => [...row].forEach((ch, x) => {
       const t = getTile(ch);
-      if (t?.light) out.push([x, y, t.light]);
-      else if (ch === 'J') out.push([x, y, NIGHT_LIGHT]); // janela acesa a noite
+      if (t?.light) out.push([x, y, t.light, lightReach(ch, layer)]);
+      else if (ch === 'J') out.push([x, y, NIGHT_LIGHT, lightReach('J')]); // janela acesa a noite
     }));
   }
   return out;
+}
+
+// Noite e entardecer como mapa de luz: a escuridao (cor do ceu) e "recortada" onde ha luz, entao
+// perto da fogueira aparece a cor de verdade do chao (quente), e nao um borrao somado por cima.
+// Depois um brilho fraco somado da o halo. Mesma conta que o drawMap faz no canvas.
+export function applyNightLight(img, map, tint, glow) {
+  const [tr, tg, tb] = tint;
+  const n = img.w * img.h;
+  const lm = new Float32Array(n * 3);
+  for (let p = 0; p < n; p++) { lm[p * 3] = tr; lm[p * 3 + 1] = tg; lm[p * 3 + 2] = tb; }
+  const halo = [];
+  for (const [lx, ly, color, reach] of lightSources(map)) {
+    const [cr, cg, cb] = hexRgb(color);
+    const cx = (lx + 0.5) * SIZE;
+    const cy = (ly + 0.5) * SIZE;
+    const R = SIZE * reach;
+    const a = Math.min(1, 0.8 * glow);
+    // cor que a luz deixa: a da chama clareada (somar ao azul daria verde; aqui a luz substitui o ceu)
+    const wr = 255 * 0.25 + cr * 0.75; const wg = 255 * 0.25 + cg * 0.75; const wb = 255 * 0.25 + cb * 0.75;
+    for (let y = Math.max(0, Math.floor(cy - R)); y < Math.min(img.h, cy + R); y++) {
+      for (let x = Math.max(0, Math.floor(cx - R)); x < Math.min(img.w, cx + R); x++) {
+        const f = 1 - Math.hypot(x - cx, y - cy) / R;
+        if (f <= 0) continue;
+        const k = Math.min(1, a * 1.7 * Math.pow(f, 1.2));
+        const q = (y * img.w + x) * 3;
+        lm[q] += (wr - lm[q]) * k; lm[q + 1] += (wg - lm[q + 1]) * k; lm[q + 2] += (wb - lm[q + 2]) * k;
+      }
+    }
+    // fogo grande aquece em volta (soma laranja), luz pequena so brilha perto
+    halo.push([cx, cy, R * (reach >= 4 ? 0.75 : 0.55), cr, cg, cb, reach >= 4 ? 1.5 : 1]);
+  }
+  for (let p = 0; p < n; p++) {
+    const i = p * 4;
+    img.data[i] = (img.data[i] * Math.min(255, lm[p * 3])) / 255;
+    img.data[i + 1] = (img.data[i + 1] * Math.min(255, lm[p * 3 + 1])) / 255;
+    img.data[i + 2] = (img.data[i + 2] * Math.min(255, lm[p * 3 + 2])) / 255;
+  }
+  // luar: clareia so o mais escuro (tela com azul fundo), o mapa continua legivel sem perder a noite
+  if (glow > 1) {
+    const [mr, mg, mb] = MOON_LIFT;
+    for (let p = 0; p < n; p++) {
+      const i = p * 4;
+      img.data[i] += ((255 - img.data[i]) * mr) / 255;
+      img.data[i + 1] += ((255 - img.data[i + 1]) * mg) / 255;
+      img.data[i + 2] += ((255 - img.data[i + 2]) * mb) / 255;
+    }
+  }
+  const h = 0.22 * glow;
+  for (const [cx, cy, R, cr, cg, cb, boost] of halo) {
+    for (let y = Math.max(0, Math.floor(cy - R)); y < Math.min(img.h, cy + R); y++) {
+      for (let x = Math.max(0, Math.floor(cx - R)); x < Math.min(img.w, cx + R); x++) {
+        const f = 1 - Math.hypot(x - cx, y - cy) / R;
+        if (f <= 0) continue;
+        const i = (y * img.w + x) * 4;
+        const k = f * Math.sqrt(f) * h * boost;
+        img.data[i] += cr * k; img.data[i + 1] += cg * k; img.data[i + 2] += cb * k;
+      }
+    }
+  }
 }
 
 // Pura: imagem final como a mesa mostra (usada no preview em PNG e nos testes).
@@ -858,29 +926,8 @@ export function renderScene(map, { beautify = true, decor = map.decor || 'normal
     stamp(img, r.data, r.width, r.height, b.x * SIZE, b.y * SIZE);
   }
   applyStyle(img, style);
-  const tintHex = LIGHT_TINT[light];
-  if (tintHex) {
-    const [r, g, b] = hexRgb(tintHex);
-    for (let i = 0; i < img.data.length; i += 4) {
-      img.data[i] = (img.data[i] * r) / 255; img.data[i + 1] = (img.data[i + 1] * g) / 255; img.data[i + 2] = (img.data[i + 2] * b) / 255;
-    }
-    const strength = light === 'noite' ? 0.7 : 0.35;
-    for (const [lx, ly, color] of lightSources(map)) {
-      const [cr, cg, cb] = hexRgb(color);
-      const cx = (lx + 0.5) * SIZE;
-      const cy = (ly + 0.5) * SIZE;
-      const R = SIZE * 2.6;
-      for (let y = Math.max(0, Math.floor(cy - R)); y < Math.min(img.h, cy + R); y++) {
-        for (let x = Math.max(0, Math.floor(cx - R)); x < Math.min(img.w, cx + R); x++) {
-          const f = 1 - Math.hypot(x - cx, y - cy) / R;
-          if (f <= 0) continue;
-          const i = (y * img.w + x) * 4;
-          const k = f * f * strength;
-          img.data[i] += cr * k; img.data[i + 1] += cg * k; img.data[i + 2] += cb * k;
-        }
-      }
-    }
-  }
+  const sky = resolveLight(light);
+  if (sky.tint) applyNightLight(img, map, sky.tint, sky.glow);
   return img;
 }
 

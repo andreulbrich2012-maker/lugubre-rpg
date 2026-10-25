@@ -2,10 +2,10 @@
 // entre madrugada, amanhecer, dia, entardecer e noite. resolveLight le tanto os nomes antigos
 // ('dia' | 'entardecer' | 'noite') quanto a luz calculada 'ceu:rrggbb:brilho:n'.
 // mesmas cores do LIGHT_TINT do compose.js (sem importar: evita ciclo compose -> render -> daylight)
-const LIGHT_TINT = { dia: null, entardecer: '#f2b890', noite: '#6874b4' };
+const LIGHT_TINT = { dia: null, entardecer: '#f2b890', noite: '#7482c0' };
 
 const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-const NIGHT = hex(LIGHT_TINT.noite || '#6874b4');
+const NIGHT = hex(LIGHT_TINT.noite || '#7482c0');
 const DUSK = hex(LIGHT_TINT.entardecer || '#f2b890');
 const DAWN = [228, 190, 196];
 const DAY = [255, 255, 255];

@@ -601,21 +601,21 @@ A raça define a distribuição inicial dos cinco atributos e ajuda a construir 
 >
 > As descrições abaixo dão identidade aos catorze povos jogáveis de Lúgubre. Elas ainda não acrescentam habilidades mecânicas, idiomas ou deslocamentos; uma proposta de traços raciais está nos Apêndices.
 >
-> **NOMES PRÓPRIOS DE LÚGUBRE**
+> **NOMES DAS RAÇAS**
 >
-> Os povos inspirados na fantasia clássica receberam nomes próprios do cenário: Sylvar, Nocthar, Durkar, Lumerin, Gorak, Celestiano, Abissiano e Primordiano. Humano, Kenku, Minotauro, Centauro, Sátiro e Tritão mantêm seus nomes.
+> Lúgubre usa os nomes clássicos da fantasia para os seus catorze povos: Aasimar, Anão, Centauro, Elfo, Elfo Negro, Genasi, Halfling, Humano, Kenku, Minotauro, Orc, Sátiro, Tiefling e Tritão.
 
-### Abissiano
-
-> **FOR 2  •  AGI 2  •  PRE 1  •  INT 3  •  VIG 2**
-
-Abissianos carregam marcas de uma herança ligada às profundezas: chifres, cauda, olhos sem pupila ou pele de tonalidades raras. Muitos reinos atribuem essa linhagem a um contato antigo com Tártaro, e por isso eles enfrentam desconfiança em diversos lugares. Essas marcas não definem moralidade nem lealdade; seu intelecto aguçado costuma nascer justamente da necessidade de observar antes de confiar.
-
-### Celestiano
+### Aasimar
 
 > **FOR 2  •  AGI 2  •  PRE 3  •  INT 2  •  VIG 1**
 
-Celestianos apresentam sinais de uma linhagem tocada por Éter: olhos luminosos, marcas douradas na pele ou uma presença difícil de ignorar. São tratados como um povo próprio, com comunidades e tradições ainda em desenvolvimento no cenário. A ligação com a luz não determina sua fé, seu caráter ou seu destino, e muitos carregam essa expectativa como um fardo.
+Aasimares apresentam sinais de uma linhagem tocada por Éter: olhos luminosos, marcas douradas na pele ou uma presença difícil de ignorar. São tratados como um povo próprio, com comunidades e tradições ainda em desenvolvimento no cenário. A ligação com a luz não determina sua fé, seu caráter ou seu destino, e muitos carregam essa expectativa como um fardo.
+
+### Anão
+
+> **FOR 3  •  AGI 1  •  PRE 2  •  INT 2  •  VIG 2**
+
+Anões são um povo compacto e robusto, ligado a montanhas, fortalezas e minas escavadas nas cicatrizes da Primeira Ruptura. Seus costumes austeros valorizam trabalho cuidadoso, memória dos ancestrais e obras feitas para atravessar gerações. Suportam jornadas, ofícios e conflitos que derrubariam indivíduos menos resistentes.
 
 ### Centauro
 
@@ -623,17 +623,29 @@ Celestianos apresentam sinais de uma linhagem tocada por Éter: olhos luminosos,
 
 Centauros possuem torso humanoide e corpo equino, combinando alcance, resistência e velocidade natural. São frequentemente ligados a planícies, estradas antigas e comunidades que valorizam movimento, memória oral e liberdade.
 
-### Durkar
+### Elfo
 
-> **FOR 3  •  AGI 1  •  PRE 2  •  INT 2  •  VIG 2**
+> **FOR 1  •  AGI 2  •  PRE 2  •  INT 3  •  VIG 2**
 
-Durkar são um povo compacto e robusto, ligado a montanhas, fortalezas e minas escavadas nas cicatrizes da Primeira Ruptura. Seus costumes austeros valorizam trabalho cuidadoso, memória dos ancestrais e obras feitas para atravessar gerações. Suportam jornadas, ofícios e conflitos que derrubariam indivíduos menos resistentes.
+Elfos são longevos, atentos e ligados a florestas antigas, ciclos naturais e formas de conhecimento preservadas fora das grandes cidades. Inclinados ao estudo da magia, da história e dos fenômenos sutis, percebem a passagem do tempo de outra maneira, o que altera sua forma de avaliar decisões, alianças e promessas feitas por povos de vida mais curta.
 
-### Gorak
+### Elfo Negro
 
-> **FOR 3  •  AGI 2  •  PRE 2  •  INT 1  •  VIG 2**
+> **FOR 1  •  AGI 3  •  PRE 2  •  INT 2  •  VIG 2**
 
-Goraks são fortes, resistentes e conhecidos por modos diretos. Muitos crescem em comunidades que valorizam coragem, lealdade e proteção do grupo, onde a ação vale mais do que longas discussões. A ideia de que todo gorak é violento nasce mais do preconceito entre povos do que de uma verdade sobre eles, e muitos indivíduos rompem completamente com essa expectativa.
+Elfos Negros adaptaram-se à noite, às sombras e a regiões de pouca luz, onde visão, silêncio e reação rápida determinam a sobrevivência. Muitos reinos interpretam sua aparência por meio de Érebo ou Nix, mas essa ligação nem sempre é verdadeira. Sua existência não os torna sombrios por natureza: culturas, crenças e alianças dos elfos negros variam tanto quanto as de qualquer outro povo.
+
+### Genasi
+
+> **FOR 2  •  AGI 2  •  PRE 2  •  INT 2  •  VIG 2**
+
+Genasi carregam no corpo manifestações das essências que moldaram Lúgubre: pele marcada por pedra, névoa, brasas, sombras ou reflexos de luz. Seus traços podem ser discretos ou extraordinários, e a distribuição equilibrada de atributos indica que nenhum Primordial domina obrigatoriamente sua natureza, o que permite que assumam funções muito diferentes dentro de um grupo.
+
+### Halfling
+
+> **FOR 2  •  AGI 1  •  PRE 3  •  INT 2  •  VIG 2**
+
+Halflings são pequenos em estatura e grandes na capacidade de formar vínculos, preservar tradições e sobreviver pela cooperação. Muitos possuem sinais luminosos discretos, como olhos claros ou marcas que brilham sob certas condições. Sua presença elevada reflete sociabilidade, percepção e firmeza emocional, qualidades que tornam suas comunidades difíceis de quebrar.
 
 ### Humano
 
@@ -647,41 +659,29 @@ Humanos são encontrados em praticamente todos os reinos e assumem incontáveis 
 
 Kenkus são humanoides de traços corvídeos, rápidos, atentos e habilidosos em imitação, observação e movimento. A aparência e a cultura podem variar entre comunidades urbanas, nômades ou ligadas a antigas rotas de mensageiros.
 
-### Lumerin
-
-> **FOR 2  •  AGI 1  •  PRE 3  •  INT 2  •  VIG 2**
-
-Lumerins são pequenos em estatura e grandes na capacidade de formar vínculos, preservar tradições e sobreviver pela cooperação. Muitos possuem sinais luminosos discretos, como olhos claros ou marcas que brilham sob certas condições. Sua presença elevada reflete sociabilidade, percepção e firmeza emocional, qualidades que tornam suas comunidades difíceis de quebrar.
-
 ### Minotauro
 
 > **FOR 3  •  AGI 2  •  PRE 2  •  INT 1  •  VIG 2**
 
 Minotauros possuem corpo poderoso e cabeça bovina, sendo capazes de impor respeito antes mesmo de falar. Algumas comunidades valorizam disciplina e honra; outras se organizam em clãs, labirintos, fortalezas ou grupos mercenários.
 
-### Nocthar
+### Orc
 
-> **FOR 1  •  AGI 3  •  PRE 2  •  INT 2  •  VIG 2**
+> **FOR 3  •  AGI 2  •  PRE 2  •  INT 1  •  VIG 2**
 
-Nocthar adaptaram-se à noite, às sombras e a regiões de pouca luz, onde visão, silêncio e reação rápida determinam a sobrevivência. Muitos reinos interpretam sua aparência por meio de Érebo ou Nix, mas essa ligação nem sempre é verdadeira. Sua existência não os torna sombrios por natureza: culturas, crenças e alianças nocthar variam tanto quanto as de qualquer outro povo.
-
-### Primordiano
-
-> **FOR 2  •  AGI 2  •  PRE 2  •  INT 2  •  VIG 2**
-
-Primordianos carregam no corpo manifestações das essências que moldaram Lúgubre: pele marcada por pedra, névoa, brasas, sombras ou reflexos de luz. Seus traços podem ser discretos ou extraordinários, e a distribuição equilibrada de atributos indica que nenhum Primordial domina obrigatoriamente sua natureza, o que permite que assumam funções muito diferentes dentro de um grupo.
-
-### Sylvar
-
-> **FOR 1  •  AGI 2  •  PRE 2  •  INT 3  •  VIG 2**
-
-Sylvares são longevos, atentos e ligados a florestas antigas, ciclos naturais e formas de conhecimento preservadas fora das grandes cidades. Inclinados ao estudo da magia, da história e dos fenômenos sutis, percebem a passagem do tempo de outra maneira, o que altera sua forma de avaliar decisões, alianças e promessas feitas por povos de vida mais curta.
+Orcs são fortes, resistentes e conhecidos por modos diretos. Muitos crescem em comunidades que valorizam coragem, lealdade e proteção do grupo, onde a ação vale mais do que longas discussões. A ideia de que todo orc é violento nasce mais do preconceito entre povos do que de uma verdade sobre eles, e muitos indivíduos rompem completamente com essa expectativa.
 
 ### Sátiro
 
 > **FOR 2  •  AGI 3  •  PRE 2  •  INT 2  •  VIG 1**
 
 Sátiros possuem traços caprinos, grande mobilidade e culturas frequentemente associadas a música, celebração, liberdade e provocação. Sob a aparência despreocupada, muitos são observadores habilidosos e difíceis de aprisionar.
+
+### Tiefling
+
+> **FOR 2  •  AGI 2  •  PRE 1  •  INT 3  •  VIG 2**
+
+Tieflings carregam marcas de uma herança ligada às profundezas: chifres, cauda, olhos sem pupila ou pele de tonalidades raras. Muitos reinos atribuem essa linhagem a um contato antigo com Tártaro, e por isso eles enfrentam desconfiança em diversos lugares. Essas marcas não definem moralidade nem lealdade; seu intelecto aguçado costuma nascer justamente da necessidade de observar antes de confiar.
 
 ### Tritão
 
@@ -1769,7 +1769,7 @@ Regras oficiais para arcos, marcos de nível, passagem de tempo e encerramento d
 - Padronizar termos, maiúsculas, acentuação e nomes de habilidades antes da versão 1.0.
 - Golpe Guardião, Raio Sombrio e Bênção de Éter aparecem como habilidades de nível 1, mas não coincidem com as habilidades de nível 1 do Cavaleiro, do Mago e do Sacerdote.
 - Cavaleiro, Atirador e Ladino possuem Mana, mas todas as suas habilidades custam 0.
-- Quatro pares de raças continuam com atributos idênticos: Humano e Primordiano, Gorak e Minotauro, Sylvar e Tritão, Kenku e Sátiro.
+- Quatro pares de raças continuam com atributos idênticos: Humano e Genasi, Orc e Minotauro, Elfo e Tritão, Kenku e Sátiro.
 - Órfão Determinado e Sobrevivente de Guerra concedem as mesmas perícias.
 - Reflexo Sombrio causa 1d2, mas também copia o último ataque recebido; o texto precisa definir qual regra vale.
 - Os drops do Guardião de Cinzas não têm chance nem valor.
@@ -1828,7 +1828,7 @@ Hoje o livro não diz quando um ataque acerta. A proposta é simples: o ataque �
 
 > **EXEMPLO**
 >
-> Um Gorak com Força 3 e Luta +5 ataca com +8. O Goblin tem Defesa 11, então o Gorak acerta se tirar 3 ou mais no dado.
+> Um Orc com Força 3 e Luta +5 ataca com +8. O Goblin tem Defesa 11, então o Orc acerta se tirar 3 ou mais no dado.
 
 ## 3. Como funciona um turno de combate
 
@@ -1946,33 +1946,33 @@ Cavaleiro, Atirador e Ladino têm Mana, mas nenhuma habilidade deles gasta Mana.
 
 ## 10. Um traço especial para cada raça
 
-Algumas raças têm atributos exatamente iguais (Humano e Primordiano, Gorak e Minotauro, Sylvar e Tritão, Kenku e Sátiro). Um traço próprio deixa cada raça única sem mudar os números.
+Algumas raças têm atributos exatamente iguais (Humano e Genasi, Orc e Minotauro, Elfo e Tritão, Kenku e Sátiro). Um traço próprio deixa cada raça única sem mudar os números.
 
-**Abissiano:** Resiste melhor a maldições e corrupção (+5) e enxerga na penumbra.
+**Aasimar:** Uma vez por dia, cura 1d6 + Presença de Vida com um toque.
 
-**Celestiano:** Uma vez por dia, cura 1d6 + Presença de Vida com um toque.
+**Anão:** Resiste melhor a veneno e cansaço (+5) e carrega mais peso.
 
 **Centauro:** Anda 12 metros por movimento e é ótimo para correr e carregar peso, mas ruim para escalar.
 
-**Durkar:** Resiste melhor a veneno e cansaço (+5) e carrega mais peso.
+**Elfo:** +5 em Ocultismo e precisa de só 4 horas de descanso.
 
-**Gorak:** Uma vez por dia, quando cair a 0 de Vida, fica de pé com 1.
+**Elfo Negro:** Enxerga no escuro, mas tem −2 em Percepção sob sol forte.
+
+**Genasi:** Escolhe um Primordial e sofre 2 de dano a menos de magias daquele elemento.
+
+**Halfling:** Tem coragem: +5 contra medo e perda de Sanidade.
 
 **Humano:** Ganha +5 em uma perícia à escolha.
 
 **Kenku:** Imita qualquer voz ou som que já ouviu.
 
-**Lumerin:** Tem coragem: +5 contra medo e perda de Sanidade.
-
 **Minotauro:** Depois de correr em linha reta, o ataque causa +1d6 de dano. Nunca se perde em labirintos.
 
-**Nocthar:** Enxerga no escuro, mas tem −2 em Percepção sob sol forte.
-
-**Primordiano:** Escolhe um Primordial e sofre 2 de dano a menos de magias daquele elemento.
+**Orc:** Uma vez por dia, quando cair a 0 de Vida, fica de pé com 1.
 
 **Sátiro:** +5 em Acrobacia ou Artes.
 
-**Sylvar:** +5 em Ocultismo e precisa de só 4 horas de descanso.
+**Tiefling:** Resiste melhor a maldições e corrupção (+5) e enxerga na penumbra.
 
 **Tritão:** Respira debaixo d’água e nada muito bem.
 
@@ -2066,7 +2066,7 @@ Ideias de novos monstros, um para cada Primordial:
 
 Conteúdo do projeto: “Bem-vindo a Lúgubre.pdf”, “Manual do Lúgubre RPG” e “Guias dos níveis”.
 
-o Livro do Jogador de Dungeons &amp; Dragons foi observado somente para compreender organização em partes, páginas em colunas, hierarquia de títulos, introduções, entradas de raça e classe e quadros de consulta. Nenhum texto, regra ou arte desse livro foi copiado para Lúgubre. Os nomes de raças herdados da fantasia clássica foram substituídos por nomes próprios de Lúgubre.
+o Livro do Jogador de Dungeons &amp; Dragons foi observado somente para compreender organização em partes, páginas em colunas, hierarquia de títulos, introduções, entradas de raça e classe e quadros de consulta. Nenhum texto, regra ou arte desse livro foi copiado para Lúgubre. As raças usam os nomes clássicos da fantasia, mas descrições, atributos e cenário são próprios de Lúgubre.
 
 ## Registro de mudanças
 
@@ -2076,7 +2076,7 @@ o Livro do Jogador de Dungeons &amp; Dragons foi observado somente para compreen
 
 **Regras alteradas:** Nenhuma regra oficial alterada; as mudanças sugeridas estão marcadas como propostas.
 
-**Conteúdo removido:** Entradas duplicadas de raças: Aasimar, Anão, Elfo, Elfo Negro, Genasi, Halfling, Orc e Tiefling, agora representadas por Celestiano, Durkar, Sylvar, Nocthar, Primordiano, Lumerin, Gorak e Abissiano.
+**Nomes de raças:** Por pedido do dono do sistema, as raças voltaram aos nomes clássicos (Aasimar, Anão, Elfo, Elfo Negro, Genasi, Halfling, Orc e Tiefling) no lugar de Celestiano, Durkar, Sylvar, Nocthar, Primordiano, Lumerin, Gorak e Abissiano.
 
 **Problemas conhecidos:** Ver Notas de consistência.
 

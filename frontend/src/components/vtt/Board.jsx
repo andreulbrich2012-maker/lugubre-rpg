@@ -9,6 +9,7 @@ import { getTile } from '../../lib/tiles/catalog';
 import { chunkLayout, pickLod } from '../../lib/tiles/chunks';
 import AvatarSprite from '../avatar/AvatarSprite';
 import FxLayer from '../fx/FxLayer';
+import { tokenFxStyle } from '../../lib/fx/sync.js';
 import ItemIcon from '../icons/ItemIcon';
 import ContainerContents from './ContainerContents';
 import MonsterSprite from '../monsters/MonsterSprite';
@@ -161,15 +162,16 @@ export default function Board({
   const paddedTiles = useMemo(() => (paddedBase && paddedBase.light !== sceneLight ? { ...paddedBase, light: sceneLight } : paddedBase), [paddedBase, sceneLight]);
   const shakeRef = useRef(null);
   const tokenEls = useRef({});
-  // Animacoes (lib/fx): tremida do mapa e empurrao/piscada dos tokens direto no estilo,
+  // Animacoes (lib/fx): tremida do mapa e empurrao/piscada/transparencia dos tokens direto no estilo,
   // sem setState a 60 fps.
   const onFxFrame = useCallback(({ shake, tokens: moves }) => {
     if (shakeRef.current) shakeRef.current.style.transform = shake && (shake.x || shake.y) ? `translate(${shake.x}px, ${shake.y}px)` : '';
     for (const [id, el] of Object.entries(tokenEls.current)) {
       if (!el) continue;
-      const m = moves?.[id];
-      el.style.translate = m && (m.x || m.y) ? `${m.x}px ${m.y}px` : '';
-      el.style.filter = m && m.flash > 0.5 ? 'brightness(3) saturate(0)' : '';
+      // empurrao, piscada e transparencia (alpha da receita: some/reaparece no teleporte etc.)
+      const st = tokenFxStyle(moves?.[id]);
+      el.style.translate = st.translate;
+      el.style.filter = st.filter;
     }
   }, []);
   const [view, setView] = useState({ x: 0, y: 0, z: 1 });

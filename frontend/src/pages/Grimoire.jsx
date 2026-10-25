@@ -6,6 +6,7 @@ import SpellStage from '../components/fx/SpellStage';
 import { SPELLS, SCHOOLS, SCHOOL_BY_ID, DOMAINS, TIERS, tierLabel } from '../lib/fx/spells/catalog.js';
 import { ELEMENT_KEYS, ELEMENTS } from '../lib/fx/elements.js';
 import { normalize } from '../lib/fx/text.js';
+import { grimoireIconPower } from '../lib/spellicons/grimorio.js';
 
 // Grimorio: catalogo visual de magias com animacao propria. Nao e regra do jogo:
 // o livro ainda nao define escolas. Qualquer poder com o mesmo nome (ou com
@@ -20,9 +21,11 @@ const RESULTS = [
 ];
 const TIER_STYLE = { 1: 'text-mist', 2: 'text-bone', 3: 'text-ember', 4: 'text-amber-200' };
 
-// Registro "parecido com poder" para o icone automatico (spellicons).
+// Registro "parecido com poder" para o icone automatico (spellicons), com escola,
+// nivel e indice entre irmas: cada magia ganha moldura/brasao da escola.
+const ICON_POWER = new Map(SPELLS.map((s) => [s.id, grimoireIconPower(s)]));
 function iconPower(spell) {
-  return { name: spell.name, type: 'magia', element: spell.element, range: spell.range, description: `${spell.desc} ${spell.target}` };
+  return ICON_POWER.get(spell.id) || grimoireIconPower(spell);
 }
 
 const SEARCH_INDEX = SPELLS.map((s) => ({ s, text: normalize(`${s.name} ${s.desc} ${SCHOOL_BY_ID[s.school].label} ${SCHOOL_BY_ID[s.school].title} ${s.element}`) }));

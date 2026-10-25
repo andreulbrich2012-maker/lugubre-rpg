@@ -525,7 +525,7 @@ function drawActorSide(ctx, eff, T) {
     for (let k = 3; k >= 1; k--) {
       const gk = weaponGeom(eff, T - k * 26);
       if (!gk.pose.show) continue;
-      drawWeapon(ctx, mv.held, gk.pivot.x, gk.pivot.y, gk.th, { mirror: eff.side < 0, solid: ramp[k === 1 ? 3 : 2], alpha: 0.55 - k * 0.13 });
+      drawWeapon(ctx, mv.fist ? 'punho' : mv.held, gk.pivot.x, gk.pivot.y, gk.th, { mirror: eff.side < 0, solid: ramp[k === 1 ? 3 : 2], alpha: 0.55 - k * 0.13 });
     }
   }
 
@@ -539,7 +539,10 @@ function drawActorSide(ctx, eff, T) {
     else {
       const th = g.th;
       const glowing = pose.seg?.glow && tint == null ? PALETTES.gold : tint;
-      drawWeapon(ctx, mv.held, g.pivot.x, g.pivot.y, th, { mirror: eff.side < 0, tint: glowing, alpha });
+      // soco: na guarda e na volta e a manopla normal; andando, o punho grande
+      const fistOn = mv.fist && pose.seg;
+      if (fistOn) fistLines(ctx, eff, T, g, ramp);
+      drawWeapon(ctx, fistOn ? 'punho' : mv.held, g.pivot.x, g.pivot.y, th, { mirror: eff.side < 0, tint: glowing, alpha });
       if (pose.seg?.crank) {
         // Manivela girando ao lado da besta.
         const a = T * 0.03;
@@ -597,6 +600,58 @@ function drawActorSide(ctx, eff, T) {
   drawProjectiles(ctx, eff, T);
 }
 
+// Soco: linhas de velocidade atras do punho quando ele anda rapido (direcao do
+// movimento real do punho, serve para direto, gancho e giro).
+function fistLines(ctx, eff, T, g, ramp) {
+  const prev = weaponGeom(eff, T - 24);
+  const vx = g.tip.x - prev.tip.x;
+  const vy = g.tip.y - prev.tip.y;
+  const v = Math.hypot(vx, vy);
+  if (v < 2.5) return;
+  const dx = vx / v;
+  const dy = vy / v;
+  const nx = -dy;
+  const ny = dx;
+  const L = Math.min(eff.C * 0.6, v * 1.6);
+  const cx = (g.pivot.x + g.tip.x) / 2;
+  const cy = (g.pivot.y + g.tip.y) / 2;
+  for (const [o, f, c] of [[-4, 0.7, ramp[2]], [-1, 1, WHITE], [2, 0.85, ramp[3]], [5, 0.55, ramp[2]]]) {
+    const sx = cx - dx * 4 + nx * o;
+    const sy = cy - dy * 4 + ny * o;
+    line(ctx, sx - dx * L * f, sy - dy * L * f, sx, sy, c, 1);
+  }
+}
+
+// Soco que acerta: estouro branco em estrela, dois aneis abrindo e tracos curtos
+// saindo (o "POW" dos quadrinhos, sem texto).
+function fistImpact(ctx, eff, x, y, d) {
+  const C = eff.C;
+  const s = eff.scale || 1;
+  if (d < 50) {
+    disc(ctx, x, y, Math.round((3 + d / 18) * s), WHITE);
+    star4(ctx, x, y, Math.round(C * 0.55 * s), WHITE, 2);
+  }
+  const k1 = clamp01(d / 160);
+  setAlpha(ctx, 1 - k1);
+  ring(ctx, x, y, Math.max(2, C * 0.7 * s * ease.outCubic(k1)), WHITE, k1 < 0.4 ? 2 : 1);
+  const k2 = clamp01((d - 40) / 140);
+  if (d >= 40) {
+    setAlpha(ctx, 1 - k2);
+    ring(ctx, x, y, Math.max(2, C * 0.5 * s * ease.outCubic(k2)), PALETTES.impact[3], 1);
+  }
+  if (d < 120) {
+    const k = d / 120;
+    setAlpha(ctx, 1 - k);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + 0.5;
+      const r0 = C * (0.35 + 0.4 * ease.out(k)) * s;
+      const r1 = r0 + C * 0.25 * s;
+      line(ctx, x + Math.cos(a) * r0, y + Math.sin(a) * r0, x + Math.cos(a) * r1, y + Math.sin(a) * r1, i % 2 ? PALETTES.impact[3] : WHITE, 1);
+    }
+  }
+  setAlpha(ctx, 1);
+}
+
 function drawAfter(ctx, eff, T, ia, post) {
   const mv = eff.mv;
   const C = eff.C;
@@ -606,10 +661,13 @@ function drawAfter(ctx, eff, T, ia, post) {
   const lands = eff.result === 'hit' || eff.result === 'crit';
   for (const h of mv.hits) {
     const d = T - h.t;
-    if (d < 0 || d > 90) continue;
+    if (d < 0 || d > (mv.fist ? 180 : 90)) continue;
+    if (d > 90 && !(lands && h.on)) continue;
     const x = eff.hit.x + eff.perp.x * h.off;
     const y = eff.hit.y + eff.perp.y * h.off;
     if (lands && h.on) {
+      if (mv.fist) fistImpact(ctx, eff, x, y, d);
+      if (d > 90) continue;
       if (d < 35) disc(ctx, x, y, 2 * eff.scale, WHITE);
       star4(ctx, x, y, Math.round(C * 0.4 * eff.scale * (1 - d / 90)), d < 45 ? WHITE : ramp[3]);
     } else if (d < 80) {
@@ -626,6 +684,7 @@ function drawAfter(ctx, eff, T, ia, post) {
       const land = { x: eff.from.x - eff.dir.x * C * 0.9, y: eff.fromGround - 1 };
       if (!mv.rope && mv.proj !== 'arrow') flyingWeapon(ctx, eff, mv.held, hand, land, ia, 380, eff.side < 0);
     } else if (post && lands) {
+      if (mv.fist) fistImpact(ctx, eff, eff.hit.x, eff.hit.y, ia);
       if (mv.quake || mv.segs.some((s) => s.quake && s.hit)) groundShock(ctx, eff, ia);
       if (mv.react === 'daze') dazeStars(ctx, eff, ia);
       if (mv.react === 'disarm') flyingWeapon(ctx, eff, 'adaga', { x: eff.to.x, y: eff.to.y }, { x: eff.to.x + eff.dir.x * C * 1.1, y: eff.ground - 1 }, ia, 420, eff.side > 0);

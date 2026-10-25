@@ -8,6 +8,7 @@ import { frameLayer } from './frames.js';
 import { symbolGrid } from './symbols.js';
 import { weaponGrid, MANEUVER_BADGES, MANEUVER_COLORS } from './weapons.js';
 import { classifyPower, iconKey } from './classify.js';
+import { schoolPalette } from './schools.js';
 
 export { N as ICON_SIZE };
 
@@ -39,12 +40,79 @@ export function renderIconLayer(infoOrPower) {
     composite(base, fg);
     composite(base, badgeLayer(info.maneuver || info.form, P));
   } else {
-    stamp(fg, symbolGrid(info.form, info.variant), 4, 4, P);
+    const S = info.school ? schoolPalette(info.school) : null;
+    const nth = S ? info.nth || 0 : 0;
+    let grid = symbolGrid(info.form, info.variant);
+    // irmas (mesma escola, nivel, forma e elemento) espelham o simbolo
+    if (nth % 2 === 1) grid = grid.map((r) => r.split('').reverse().join(''));
+    if (S) recolorFrame(base, P, S);
+    stamp(fg, grid, 4, 4, P);
+    if (S && nth >= 2) stamp(fg, ACCENTS[(Math.floor(nth / 2) - 1) % ACCENTS.length].grid, ...ACCENTS[(Math.floor(nth / 2) - 1) % ACCENTS.length].at, P);
     outline(fg, interior);
     composite(base, fg);
+    if (S) {
+      tierPips(base, info.tier || 1);
+      emblem(base, S);
+    }
   }
   return base;
 }
+
+// ---- grimorio: escola, nivel e irmas (so quando info.school existe) ----
+const LAST = N - 1;
+const ringOf = (x, y) => Math.min(x, y, LAST - x, LAST - y);
+const same = (a, b) => a && b && a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+
+// Troca o material da moldura do elemento pelo da escola (o resto da decoracao fica).
+function recolorFrame(L, P, S) {
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const k = ringOf(x, y);
+    if (k > 2) continue;
+    const c = L.px[y * N + x];
+    if (!c) continue;
+    if (same(c, P.outline)) { L.px[y * N + x] = S.outline; continue; }
+    const i = P.frame.findIndex((f) => same(f, c));
+    if (i >= 0) L.px[y * N + x] = S.frame[i];
+  }
+}
+
+// Nivel 1-4: pinos dourados centrados na base da moldura.
+const PIN = [[255, 226, 120], [176, 120, 40]];
+function tierPips(L, tier) {
+  const n = Math.max(1, Math.min(4, tier));
+  const x0 = Math.round(12 - n * 1.5);
+  for (let i = 0; i < n; i++) {
+    const x = x0 + i * 3;
+    L.px[(LAST - 2) * N + x] = PIN[0];
+    L.px[(LAST - 2) * N + x + 1] = PIN[1];
+    L.px[(LAST - 1) * N + x] = PIN[1];
+    L.px[(LAST - 1) * N + x + 1] = PIN[1];
+  }
+}
+
+// Brasao 5x5 da escola num medalhao 7x7 no canto de cima a direita.
+function emblem(L, S) {
+  const ox = N - 8;
+  const oy = 0;
+  for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) {
+    const edge = x === 0 || y === 0 || x === 6 || y === 6;
+    const corner = (x === 0 || x === 6) && (y === 0 || y === 6);
+    if (corner) continue;
+    L.px[(oy + y) * N + ox + x] = edge ? S.outline : S.frame[1];
+  }
+  S.glyph.forEach((row, y) => [...row].forEach((ch, x) => {
+    if (ch === '.') return;
+    L.px[(oy + 1 + y) * N + ox + 1 + x] = ch === '#' ? S.frame[4] : S.frame[2];
+  }));
+}
+
+// Faisca/gota de apoio para a 3a, 5a... irma (cantos livres do miolo).
+const ACCENTS = [
+  { grid: ['.B.', 'BWB', '.B.'], at: [4, 16] },
+  { grid: ['.B.', 'BWB', '.B.'], at: [4, 4] },
+  { grid: ['B.B', '.W.', 'B.B'], at: [16, 16] },
+  { grid: ['.W.', 'WBW', '.W.'], at: [4, 16] }
+];
 
 export function renderIconPixels(infoOrPower) {
   const info = infoOrPower && infoOrPower.kind ? infoOrPower : classifyPower(infoOrPower);

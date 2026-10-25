@@ -7,7 +7,7 @@ export { createEffect, buildTimeline, animTime, phaseAt, bodies, shakeAt, normal
 export { renderEffect } from './render.js';
 export { createPlayer } from './player.js';
 export { drawGrass, drawActor } from './stage.js';
-export { fxFromRoll, fxFromHit, tokenCenter, rollResult } from './sync.js';
+export { fxFromRoll, fxFromHit, tokenCenter, rollResult, tokenFxStyle } from './sync.js';
 // Golpes de arma: familias de movimento, armas (ferramentas) e golpes. Ver docs/GOLPES.md.
 export { WEAPON_FAMILIES, WEAPONS, FAMILY_OF as WEAPON_FAMILY_OF, WEAPON_OF } from './weapons/catalog.js';
 export { movesOf, weaponsOf, pickMove, weaponInfo } from './weapons/select.js';

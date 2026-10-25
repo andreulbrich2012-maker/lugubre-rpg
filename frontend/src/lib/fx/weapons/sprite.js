@@ -9,6 +9,18 @@ import { rect, setAlpha } from '../draw.js';
 
 const HELD_BY_ID = Object.fromEntries(HELD.map((h) => [h.id, h]));
 
+// Sprites so de golpe (nao existem na mao do avatar). 'punho': a manopla fechada
+// vista de lado, maior (6x6), usada enquanto o soco anda -- os nos dos dedos e os
+// cravos ficam na ponta, virados para o alvo. Mesmas cores das manoplas.
+const MANOPLAS = HELD_BY_ID.manoplas;
+const EXTRA = {
+  punho: {
+    id: 'punho',
+    channels: MANOPLAS?.channels || [],
+    spec: { rows: ['.C44C.', '344443', '432234', '332233', '.2112.', '.baab.'], grip: [2, 4] }
+  }
+};
+
 // Cores fixas da legenda do held.js (mesmos tons, sem o compositor do avatar).
 const FIXED = {
   w: ['#ece4d2', 4], W: ['#ece4d2', 3], z: ['#ece4d2', 1], k: ['#2e2a35', 1], K: ['#2e2a35', 0],
@@ -23,7 +35,7 @@ const STEPS = 32;
 const baseCache = new Map();
 export function weaponPixels(heldId) {
   if (baseCache.has(heldId)) return baseCache.get(heldId);
-  const h = HELD_BY_ID[heldId] || HELD_BY_ID.espada;
+  const h = EXTRA[heldId] || HELD_BY_ID[heldId] || HELD_BY_ID.espada;
   const spec = h.spec || {};
   const rows = typeof spec.rows === 'function' ? spec.rows({ f: 0, view: 'down', walk: false, phase: 0 }) : spec.rows || ['.4.', '.4.', '.c.'];
   const [gc, gr] = spec.grip || [0, rows.length - 1];

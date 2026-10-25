@@ -48,6 +48,8 @@ Os ataques com arma não usam mais um único traço por família: cada arma tem 
 
 **Sincronização.** O evento `roll` toca o golpe até o contato. O `token:hit` do mesmo `rollId` assume o resto: recuo do atacante, arma voltando e impacto (`eff.linked`). Se o impacto chegar depois do contato, o ataque termina sozinho a recuperação e o impacto mostra só os efeitos no alvo. `onImpact` agora também informa `move` e `weapon`.
 
+**Socos (desarmado e manoplas).** Na guarda e na volta, a mão usa a manopla normal. Enquanto o golpe anda, ela vira o sprite `punho` (6×6, nós dos dedos e cravos virados para o alvo, em `weapons/sprite.js`). Atrás dele saem linhas de velocidade na direção real do movimento, o que vale para direto, gancho e giro. Cada soco que acerta, inclusive os intermediários de combos e rajadas, gera um estouro branco em estrela, dois anéis abrindo e traços curtos saindo. Garras de ferro continuam com o impacto de garra.
+
 **Galeria.** Admin → Animações → aba **Golpes de arma**: família × arma × golpe (base e exclusivos) × elemento × resultado × distância, com os botões Tocar, Repetir e "Sortear pelo rollId", que mostra qual golpe a mesa escolheria. A aba "Famílias, magias e monstros" é a galeria antiga.
 
 **Folhas.** `node src/lib/fx/weapons/preview.mjs <pasta> tudo` gera a folha geral. Use `familia <id>` para uma família, ou `golpe <arma> <golpe> [resultado] [elemento] [quadros]` para um golpe quadro a quadro. Para refazer o documento, rode `node src/lib/fx/weapons/docs.mjs ../docs/GOLPES.md`.
@@ -84,7 +86,7 @@ Guarde `atk` por `rollId` (um `Map` com cerca de 20 entradas basta) para usar no
 
 ```jsx
 <FxLayer ref={fxRef} width={width} height={height} cell={cell}
-  onFrame={({ shake, tokens }) => { /* tremer o mapa; tokens[id] = { x, y, flash } */ }}
+  onFrame={({ shake, tokens }) => { /* tremer o mapa; tokens[id] = { x, y, flash, alpha }; ver tokenFxStyle */ }}
   onImpact={(info) => { /* { id, seed, result, down, family, element, toId, fromId } */ }} />
 
 fxRef.current.play({ kind: 'corte', from: { x, y }, to: { x, y }, element: 'Érebo', result: 'hit', seed: rollId })
@@ -159,4 +161,28 @@ Cada receita é uma linha de passos separados por `;`. Cada passo chama uma prim
 
 Tudo é determinístico pelo `rollId`: cada passo sorteia de novo, a cada quadro, com a mesma semente. Assim, todos os clientes veem os mesmos pixels.
 
-Os tokens recebem, além de `x`, `y` e `flash`, o campo `alpha` (0 a 1) em `onFrame`, que é usado por invisibilidade e teleporte. Hoje o Board ignora esse campo; só o palco do Grimório o aplica.
+### Transparência dos tokens
+
+Os tokens recebem, além de `x`, `y` e `flash`, o campo `alpha` (0 a 1) em `onFrame`. Ele vem das receitas com `body vanish` (invisibilidade, forma gasosa, banir, metamorfose, ilusões) e `body blink` (teleporte, piscar, passo sombrio, porta dimensional): o token some e, no teleporte, reaparece no destino esmaecido até ficar sólido.
+
+O Board aplica isso quadro a quadro direto no estilo do botão do token, sem estado do React, com `tokenFxStyle(m)` (`lib/fx/sync.js`). Ele devolve `{ translate, filter }`, e a transparência vai como `filter: opacity()`, que soma com a opacidade de classe do token oculto do mestre. No último quadro, tudo volta para strings vazias.
+
+A animação só cuida do visual. Se a magia deixa alguém invisível depois que ela termina, isso é estado de jogo: o mestre marca o token como oculto (`hidden`). O efeito não muda regra nenhuma.
+
+### Palco do Grimório e magias altas
+
+O palco tem 7×3 células, e colunas de luz, olhos gigantes, dragões e meteoros passam disso. Antes de tocar, `SpellStage` mede a caixa da magia com `spellBounds` (`lib/fx/spells/bounds.js`). Essa função toca a magia num contexto falso e conta só as linhas que ficam na tela em pelo menos 12% dos quadros, então faísca voando ou meteoro caindo de longe não esticam a caixa. Clima, chuva de objetos, raio do céu e tinta de tela são fundo e não entram na conta.
+
+Depois, `fitStage` decide o ajuste. Primeiro estica o palco para cima, até 2× a altura, sem mudar o tamanho dos pixels. Se ainda faltar espaço, afasta a câmera: o mundo virtual fica até 2,5× maior e é mostrado no mesmo tamanho, com o céu extra em cima e o chão embaixo. Só o eixo vertical decide, e chuva larga pode sair pelos lados, como na mesa. O resultado fica em cache por magia e resultado.
+
+Mais da metade das magias (246 de 442) não muda o palco. As mais altas (sol nascente, milagre, chamado ao primordial, olho de Ananque, dragão ancestral, chuva de meteoros) estão cobertas pelos testes `palco do grimorio cabe magia alta` em `spells/spells.test.js`.
+
+### Ícones das magias do Grimório
+
+O ícone automático (`lib/spellicons`) junta a forma da magia (símbolo) e o elemento (fundo, cor e decoração). No Grimório, `grimoireIconPower(spell)` (`lib/spellicons/grimorio.js`) acrescenta mais três informações:
+
+- **Escola:** a moldura troca o material pela cor da escola, e um brasão 5×5 aparece num medalhão no canto superior direito (`lib/spellicons/schools.js`, 34 escolas).
+- **Nível:** de 1 a 4 pinos dourados na base da moldura.
+- **Irmãs:** quando duas magias da mesma escola e do mesmo nível ainda caem na mesma forma e no mesmo elemento, a segunda espelha o símbolo, a terceira ganha uma faísca, e assim por diante.
+
+Com isso, as 442 magias têm 442 ícones com pixels distintos (o teste exige pelo menos 400). Poderes fora do Grimório não mandam `school` e ficam exatamente como antes, com a mesma chave de cache.

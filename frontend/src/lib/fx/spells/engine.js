@@ -256,6 +256,8 @@ export function spellBodies(e, t) {
         const k = kind === 'hop' ? ease.inOut(u) : 1;
         who.x += (dest.x - e.from.x) * k;
         who.y += (dest.y - e.from.y) * k - (kind === 'hop' ? Math.sin(Math.PI * u) * C * 1.2 : 0);
+        // teleporte: reaparece no destino esmaecido e volta a ficar solido
+        if (kind === 'blink' && inside) who.alpha = Math.min(who.alpha, 0.25 + 0.75 * ease.out(clamp01(u / 0.6)));
         break;
       }
       case 'swap': {

@@ -86,3 +86,19 @@ export function fxFromHit(hit, { tokens = [], cell = 70, attack = null } = {}) {
     down: Boolean(hit.down)
   };
 }
+
+// Estilo de um token durante o efeito (quadro a quadro, direto no elemento, sem
+// setState): empurrao (translate), piscada branca e transparencia (alpha da receita:
+// invisibilidade, teleporte, forma gasosa, ilusao...). A transparencia vai como
+// filter: opacity() para somar com a opacidade de classe (token oculto do mestre).
+// Sem efeito ativo devolve strings vazias, que limpam o estilo inline.
+// Invisibilidade que dura depois da animacao e estado de jogo (token.hidden), nao daqui.
+export function tokenFxStyle(m) {
+  if (!m) return { translate: '', filter: '' };
+  const translate = m.x || m.y ? `${m.x}px ${m.y}px` : '';
+  const parts = [];
+  if (m.flash > 0.5) parts.push('brightness(3) saturate(0)');
+  const a = m.alpha == null ? 1 : Math.max(0, Math.min(1, m.alpha));
+  if (a < 0.999) parts.push(`opacity(${Math.round(a * 100) / 100})`);
+  return { translate, filter: parts.join(' ') };
+}

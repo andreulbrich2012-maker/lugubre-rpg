@@ -1511,7 +1511,8 @@ def('weather', {
     const kind = o.kind || 'rain';
     const x0 = Math.min(e.from.x, e.hit.x) - e.C * 6;
     const x1 = Math.max(e.from.x, e.hit.x) + e.C * 6;
-    const y0 = Math.min(e.from.y, e.hit.y) - e.C * 5;
+    // ceu alto (9 celulas): no palco do grimorio esticado a borda de cima nao aparece
+    const y0 = Math.min(e.from.y, e.hit.y) - e.C * 9;
     const y1 = Math.max(e.ground, e.fromGround) + e.C * 2;
     const Wd = x1 - x0;
     const Hd = y1 - y0;
@@ -1522,7 +1523,8 @@ def('weather', {
       setAlpha(ctx, 1);
       if (kind !== 'sun') return;
     }
-    const n = o.n ?? 70;
+    // mesma densidade de antes perto do chao (o ceu cresceu 4 celulas)
+    const n = Math.round((o.n ?? 70) * Hd / Math.max(1, Hd - e.C * 4));
     const rr = k.R;
     setAlpha(ctx, a);
     for (let i = 0; i < n; i++) {

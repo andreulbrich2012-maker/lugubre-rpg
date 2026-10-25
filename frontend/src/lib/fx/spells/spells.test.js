@@ -173,3 +173,67 @@ describe('ligacao poder -> magia', () => {
     expect(hits[0].family).toBe('grimorio');
   });
 });
+
+// ---- pendencias: transparencia dos tokens e palco que cabe magia alta ----
+import { tokenFxStyle } from '../sync.js';
+import { spellBounds, fitStage } from './bounds.js';
+
+describe('alpha dos tokens (invisibilidade, teleporte)', () => {
+  it('tokenFxStyle traduz alpha em filter: opacity() e limpa no fim', () => {
+    expect(tokenFxStyle(null)).toEqual({ translate: '', filter: '' });
+    expect(tokenFxStyle({ x: 0, y: 0, flash: 0, alpha: 1 })).toEqual({ translate: '', filter: '' });
+    expect(tokenFxStyle({ x: 4, y: -2, flash: 0, alpha: 0.3 })).toEqual({ translate: '4px -2px', filter: 'opacity(0.3)' });
+    expect(tokenFxStyle({ x: 0, y: 0, flash: 1, alpha: 0 }).filter).toBe('brightness(3) saturate(0) opacity(0)');
+  });
+  it('invisibilidade some com o conjurador e devolve no fim (player -> onFrame)', () => {
+    const player = createPlayer({ unit: 4, cell: 64 });
+    const ctx = createFakeContext(0, 0, { record: false });
+    player.play({ spell: 'invisibilidade', from: A, to: B, fromId: 'c1', toId: 't1', seed: 'inv' }, 0);
+    let min = 1;
+    let last = null;
+    for (let t = 0; t < 6000; t += 16) {
+      const fr = player.step(ctx, t);
+      if (fr.tokens.c1) min = Math.min(min, fr.tokens.c1.alpha);
+      if (!fr.active) { last = fr; break; }
+      last = fr;
+    }
+    expect(min).toBeLessThan(0.2);
+    expect(last.active).toBe(false);
+    expect(tokenFxStyle(last.tokens.c1).filter).toBe('');
+  });
+  it('teleporte reaparece esmaecido e termina solido', () => {
+    const { out } = frames('teleporte', {}, 60);
+    const alphas = out.map((f) => f.fr.attacker.alpha);
+    expect(Math.min(...alphas)).toBeLessThan(0.5);
+    expect(alphas[alphas.length - 1]).toBe(1);
+  });
+});
+
+describe('palco do grimorio cabe magia alta', () => {
+  const CELL = 48;
+  const U = 3;
+  const W = CELL * 7;
+  const H = CELL * 3;
+  const FROM = { x: 1.5 * CELL, y: 1.7 * CELL };
+  const TO = { x: 5.5 * CELL, y: 1.7 * CELL };
+  const fitOf = (id) => {
+    const b = spellBounds({ spell: id, unit: U, cell: CELL, from: FROM, to: TO, seed: 'palco' });
+    return { b, fit: fitStage(W, H, b) };
+  };
+  it('magia baixa nao mexe no palco', () => {
+    expect(fitOf('fagulha').fit).toMatchObject({ f: 1, g: 1 });
+  });
+  it('colunas, olho gigante, dragao e meteoro cabem no mundo virtual', () => {
+    for (const id of ['sol-nascente', 'milagre', 'chamado-ao-primordial', 'olho-de-ananque', 'invocar-dragao-ancestral', 'chuva-de-meteoros']) {
+      const { b, fit } = fitOf(id);
+      expect(fit.g * fit.f, id).toBeGreaterThan(1);
+      // a caixa medida, deslocada para dentro do mundo virtual, comeca abaixo do topo
+      expect(b.y0 + fit.oy, id).toBeGreaterThanOrEqual(0);
+      expect(fit.g).toBeLessThanOrEqual(2);
+      expect(fit.f).toBeLessThanOrEqual(2.5);
+    }
+  });
+  it('clima e raio do ceu nao esticam o palco', () => {
+    expect(fitOf('relampago').fit.f).toBe(1);
+  });
+});

@@ -251,7 +251,14 @@ export function classifyPower(power) {
     return { kind: 'tecnica', form: maneuver, maneuver, weapon, element, variant: '' };
   }
   const form = classifySpell(f);
-  return { kind: 'magia', form, maneuver: null, weapon: null, element, variant: variantOf(form, f, element) };
+  const out = { kind: 'magia', form, maneuver: null, weapon: null, element, variant: variantOf(form, f, element) };
+  // Grimorio: escola, nivel e indice entre irmas mudam a moldura (ver schools.js)
+  if (power && typeof power === 'object' && power.school) {
+    out.school = String(power.school);
+    out.tier = Number(power.tier) || 1;
+    out.nth = Number(power.nth) || 0;
+  }
+  return out;
 }
 
 // Forma de entrega (magia) ou manobra (tecnica). Reaproveitavel pela animacao.
@@ -261,5 +268,6 @@ export function spellForm(power) {
 
 // Chave estavel para cache: tudo que muda pixels e so isso.
 export function iconKey(info) {
-  return [info.kind, info.form, info.element || '-', info.weapon || '-', info.variant || '-'].join('|');
+  const base = [info.kind, info.form, info.element || '-', info.weapon || '-', info.variant || '-'].join('|');
+  return info.school ? `${base}|${info.school}|${info.tier || 1}|${info.nth || 0}` : base;
 }

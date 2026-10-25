@@ -41,7 +41,9 @@ export function prepareMove(eff, spec) {
   const held = weapon?.held || 'espada';
   const rope = weapon?.rope || fam.rope ? (weapon?.rope === 'chain' ? 'chain' : 'whip') : null;
   // Corda/corrente: o "comprimento" da arma e o alcance da tira (o giro chega no alvo).
-  const len = rope ? (weapon?.reach || fam.reach || 1) * C * 0.85 : weaponLength(held);
+  // Soco (manoplas): durante o golpe o punho vira o sprite grande 'punho' (sprite.js).
+  const fist = !rope && held === 'manoplas';
+  const len = rope ? (weapon?.reach || fam.reach || 1) * C * 0.85 : weaponLength(fist ? 'punho' : held);
   const ranged = Boolean(fam.ranged);
   const reachCells = weapon?.reach || fam.reach || 1;
   const reachPx = rope ? reachCells * C : Math.max(C * 0.85, C * 0.28 + len * 0.9);
@@ -125,7 +127,7 @@ export function prepareMove(eff, spec) {
   const el = eff.el;
   const sparks = eff.elKey !== 'fisico' ? el.ramp : SPARKS[weapon?.sparks] || SPARKS.aco;
   return {
-    fam, weapon, move, held, len, rope, ranged, body, approach, segs, hits, projectiles, contact, follow, recover,
+    fam, weapon, move, held, len, rope, fist, ranged, body, approach, segs, hits, projectiles, contact, follow, recover,
     trailStyle, sparks, T, quake: Boolean(weapon?.quake), proj: weapon?.proj || fam.proj || null,
     react: result === 'miss' || result === 'fumble' ? 'none' : move.react || 'push'
   };

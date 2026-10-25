@@ -125,3 +125,37 @@ describe('render', () => {
     for (const g of Object.values(MANEUVER_BADGES)) g.forEach((r) => expect(r).toHaveLength(7));
   });
 });
+
+// ---- grimorio: escola + nivel + irmas deixam cada icone diferente ----
+import { createHash } from 'node:crypto';
+import { SPELLS } from '../fx/spells/catalog.js';
+import { grimoireIconPower } from './grimorio.js';
+import { SCHOOL_STYLE } from './schools.js';
+
+describe('icones do grimorio por escola', () => {
+  const hashOf = (p) => createHash('md5').update(renderIconPixels(p).data).digest('hex');
+  it('toda escola tem moldura e brasao 5x5', () => {
+    const ids = new Set(SPELLS.map((s) => s.school));
+    for (const id of ids) {
+      expect(SCHOOL_STYLE[id], id).toBeTruthy();
+      expect(SCHOOL_STYLE[id].glyph.length).toBe(5);
+      for (const r of SCHOOL_STYLE[id].glyph) expect(r.length).toBe(5);
+    }
+  });
+  it('quase todas as 442 magias tem pixels distintos (>= 400)', () => {
+    const hashes = new Set(SPELLS.map((s) => hashOf(grimoireIconPower(s))));
+    expect(hashes.size).toBeGreaterThanOrEqual(400);
+  });
+  it('mesma forma+elemento em escolas diferentes nao repete o icone', () => {
+    const base = { name: 'Bola de Fogo', type: 'magia', element: 'Tártaro', description: 'Explode numa área.' };
+    const a = hashOf({ ...base, school: 'fogo', tier: 2 });
+    const b = hashOf({ ...base, school: 'caos', tier: 2 });
+    const c = hashOf({ ...base, school: 'fogo', tier: 3 });
+    expect(new Set([a, b, c]).size).toBe(3);
+  });
+  it('poder fora do grimorio (sem escola) continua igual', () => {
+    const p = { name: 'Raio Sombrio', type: 'magia', element: 'Érebo', damage_formula: '1d10+2', range: 'Médio' };
+    expect(classifyPower(p).school).toBeUndefined();
+    expect(iconKey(classifyPower(p))).toBe('magia|raio|erebo|-|-');
+  });
+});

@@ -12,17 +12,17 @@ export const APPEARANCE_VERSION = 1;
 // Tracos visuais tirados do livro (docs/livro): so os padroes, tudo e editavel.
 export const RACES = [
   { id: 'humano', name: 'Humano', skins: ['clara', 'pessego', 'oliva', 'bronze', 'canela', 'castanha', 'ebano', 'porcelana'], traits: {} },
-  { id: 'abissiano', name: 'Abissiano', skins: ['rubro-abissal', 'carmim', 'lilas-noite', 'cinza-cinza'], eyes: 'sem-pupila', traits: { horns: 'curvos', hornColor: 'carvao', tail: 'abissal', ears: 'pontuda' } },
-  { id: 'celestiano', name: 'Celestiano', skins: ['porcelana', 'clara', 'dourada', 'bronze'], eyes: 'luminoso', eyeColor: 'dourado', traits: { marks: 'douradas', markColor: 'ouro', halo: 'aureola' } },
+  { id: 'abissiano', name: 'Tiefling', skins: ['rubro-abissal', 'carmim', 'lilas-noite', 'cinza-cinza'], eyes: 'sem-pupila', traits: { horns: 'curvos', hornColor: 'carvao', tail: 'abissal', ears: 'pontuda' } },
+  { id: 'celestiano', name: 'Aasimar', skins: ['porcelana', 'clara', 'dourada', 'bronze'], eyes: 'luminoso', eyeColor: 'dourado', traits: { marks: 'douradas', markColor: 'ouro', halo: 'aureola' } },
   { id: 'centauro', name: 'Centauro', skins: ['bronze', 'oliva', 'canela', 'clara'], traits: { legs: 'cavalo', coat: 'castanho', tail: 'equina' } },
-  { id: 'durkar', name: 'Durkar', skins: ['pessego', 'clara', 'oliva', 'canela'], height: 'baixa', body: 'forte', beard: 'ana', traits: {} },
-  { id: 'gorak', name: 'Gorak', skins: ['verde-gorak', 'musgo', 'cinza-cinza', 'pedra'], body: 'forte', traits: { face: 'presas', ears: 'curta-pontuda' } },
+  { id: 'durkar', name: 'Anão', skins: ['pessego', 'clara', 'oliva', 'canela'], height: 'baixa', body: 'forte', beard: 'ana', traits: {} },
+  { id: 'gorak', name: 'Orc', skins: ['verde-gorak', 'musgo', 'cinza-cinza', 'pedra'], body: 'forte', traits: { face: 'presas', ears: 'curta-pontuda' } },
   { id: 'kenku', name: 'Kenku', skins: ['pena-negra', 'pena-parda', 'cinza-cinza'], hair: 'careca', eyeColor: 'ambar', traits: { face: 'bico', crest: 'penas', ears: 'nenhuma', legs: 'garras', tail: 'penas', hornColor: 'ocre' } },
-  { id: 'lumerin', name: 'Lumerin', skins: ['porcelana', 'clara', 'pessego', 'azul-palido'], height: 'baixa', body: 'esbelto', eyes: 'luminoso', eyeColor: 'lunar', traits: { marks: 'sardas-luz', markColor: 'prata', ears: 'pontuda' } },
+  { id: 'lumerin', name: 'Halfling', skins: ['porcelana', 'clara', 'pessego', 'azul-palido'], height: 'baixa', body: 'esbelto', eyes: 'luminoso', eyeColor: 'lunar', traits: { marks: 'sardas-luz', markColor: 'prata', ears: 'pontuda' } },
   { id: 'minotauro', name: 'Minotauro', skins: ['pelagem', 'castanha', 'ebano', 'pedra'], body: 'forte', traits: { horns: 'bovinos', hornColor: 'osso', face: 'focinho', ears: 'bovina', tail: 'bovina' } },
-  { id: 'nocthar', name: 'Nocthar', skins: ['lilas-noite', 'azul-profundo', 'cinza-cinza', 'ebano'], eyes: 'luminoso', eyeColor: 'lunar', traits: { ears: 'longa', marks: 'sombras', markColor: 'ameixa' } },
-  { id: 'primordiano', name: 'Primordiano', skins: ['pedra', 'cinza-cinza', 'bronze', 'azul-profundo'], traits: { marks: 'brasas', markColor: 'abobora' } },
-  { id: 'sylvar', name: 'Sylvar', skins: ['porcelana', 'clara', 'oliva', 'bronze'], body: 'esbelto', traits: { ears: 'longa' } },
+  { id: 'nocthar', name: 'Elfo Negro', skins: ['lilas-noite', 'azul-profundo', 'cinza-cinza', 'ebano'], eyes: 'luminoso', eyeColor: 'lunar', traits: { ears: 'longa', marks: 'sombras', markColor: 'ameixa' } },
+  { id: 'primordiano', name: 'Genasi', skins: ['pedra', 'cinza-cinza', 'bronze', 'azul-profundo'], traits: { marks: 'brasas', markColor: 'abobora' } },
+  { id: 'sylvar', name: 'Elfo', skins: ['porcelana', 'clara', 'oliva', 'bronze'], body: 'esbelto', traits: { ears: 'longa' } },
   { id: 'satiro', name: 'Sátiro', skins: ['pessego', 'oliva', 'canela', 'bronze'], traits: { horns: 'carneiro', hornColor: 'camurca', legs: 'cascos', coat: 'castanho', ears: 'caprina', tail: 'caprina' } },
   { id: 'tritao', name: 'Tritão', skins: ['marinha', 'azul-palido', 'azul-profundo', 'jade'], eyeColor: 'azul', traits: { ears: 'barbatana', face: 'guelras', marks: 'escamas', markColor: 'petroleo', crest: 'barbatana', hornColor: 'jade' } }
 ];

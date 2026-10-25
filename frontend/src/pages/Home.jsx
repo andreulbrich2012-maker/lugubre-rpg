@@ -157,7 +157,7 @@ function FichaDemo() {
   return (
     <div className="w-full max-w-xs">
       <p className="font-display text-2xl text-bone">Kael Vorn</p>
-      <p className="text-sm text-mist">Nocthar · Alquimista · nível 3</p>
+      <p className="text-sm text-mist">Elfo Negro · Alquimista · nível 3</p>
       <dl className="mt-4 grid grid-cols-5 gap-1 text-center">
         {attrs.map(([name, value]) => (
           <div key={name} className="border-2 border-lead bg-black/40 py-2">
@@ -220,17 +220,17 @@ function DadoDemo() {
           <div key={hit} className={`relative h-24 w-24 overflow-hidden rounded-full border-4 border-lead bg-[radial-gradient(circle_at_35%_30%,#6b5596,#3a2a5e_60%,#000)] ${hit > 1 ? 'hit-shake' : ''}`}>
             <Crack on={hit > 0} seed={hit} />
           </div>
-          <figcaption className="font-display text-lg text-bone">Gorak</figcaption>
+          <figcaption className="font-display text-lg text-bone">Orc</figcaption>
         </figure>
       </div>
       <p className="min-h-[3rem] text-center text-sm text-mist" aria-live="polite">
         {rolling && 'Rolando…'}
-        {!rolling && value == null && 'Toque no d20 para atacar o Gorak.'}
+        {!rolling && value == null && 'Toque no d20 para atacar o Orc.'}
         {!rolling && value != null && (
           <>
             <span className="tabular text-bone">d20 {value} + Agilidade 4 + treino 5 = <strong className="text-ember">{total}</strong></span>
             <br />
-            {value >= 8 ? 'O Gorak tomou dano.' : 'O mestre disse que errou.'}
+            {value >= 8 ? 'O Orc tomou dano.' : 'O mestre disse que errou.'}
           </>
         )}
       </p>
@@ -243,7 +243,7 @@ function MesaDemo() {
   const [tokens, setTokens] = useState([
     { id: 'kael', label: 'K', name: 'Kael', x: 0.18, y: 0.55, color: '#a4781a' },
     { id: 'lys', label: 'L', name: 'Lys', x: 0.32, y: 0.72, color: '#2a7c86' },
-    { id: 'gorak', label: 'G', name: 'Gorak', x: 0.74, y: 0.22, color: '#7a1630' }
+    { id: 'gorak', label: 'O', name: 'Orc', x: 0.74, y: 0.22, color: '#7a1630' }
   ]);
   const drag = useRef(null);
 

@@ -455,7 +455,12 @@ values
   ('Genasi', '', '{}'),
   ('Kenku', '', '{"agilidade":1,"vigor":-1}'),
   ('Orc', '', '{"forca":1,"intelecto":-1}'),
-  ('Aasimar', '', '{"vigor":-1,"presenca":1}')
+  ('Aasimar', '', '{"vigor":-1,"presenca":1}'),
+  -- as 4 que faltavam no livro 0.5 (atributos do livro: base 2 + ajuste)
+  ('Centauro', '', '{"intelecto":-1,"vigor":1}'),
+  ('Minotauro', '', '{"forca":1,"intelecto":-1}'),
+  ('Sátiro', '', '{"agilidade":1,"vigor":-1}'),
+  ('Tritão', '', '{"forca":-1,"intelecto":1}')
 on conflict ((lower(name))) do update set
   image = excluded.image,
   attribute_modifiers = excluded.attribute_modifiers,

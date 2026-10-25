@@ -7,8 +7,9 @@
 export const W = 24;
 export const H = 32;
 export const DIRECTIONS = ['down', 'left', 'right', 'up'];
-export const ANIMS = { idle: 2, walk: 4 };
-export const FRAME_MS = { idle: 520, walk: 150 };
+export const ANIMS = { idle: 2, walk: 4, attack: 3 };
+// attack: preparo (braco alto), golpe (braco esticado para a frente), volta
+export const FRAME_MS = { idle: 520, walk: 150, attack: 110 };
 
 export const BUILDS = [
   { id: 'esbelto', name: 'Esbelto' },
@@ -186,12 +187,7 @@ export function pose(dir = 'down', anim = 'idle', f = 0, build = 'medio', height
     }
   }
   // Partes da mao (para luvas/aneis) seguem a caixa da mao.
-  for (const a of P.arms) {
-    const { x, y, w, h } = a.hand;
-    const spans = [];
-    for (let yy = y; yy < y + h; yy++) spans.push([yy, x, x + w - 1]);
-    a.handPart = makePart(a.name + 'Hand', spans, a.tag, { back: a.back });
-  }
+  handParts(P);
   for (const l of P.legs) {
     const { x, y, w, h } = l.foot;
     const spans = [];
@@ -200,5 +196,59 @@ export function pose(dir = 'down', anim = 'idle', f = 0, build = 'medio', height
   }
   // Mao que segura o item: direita do personagem (esquerda da tela) de frente.
   P.holdArm = view === 'side' ? P.arms[1] : view === 'down' ? P.arms[0] : P.arms[1];
+  if (anim === 'attack') attackArm(P, f, torsoY);
   return P;
+}
+
+function handParts(P) {
+  for (const a of P.arms) {
+    const { x, y, w, h } = a.hand;
+    const spans = [];
+    for (let yy = y; yy < y + h; yy++) spans.push([yy, x, x + w - 1]);
+    a.handPart = makePart(a.name + 'Hand', spans, a.tag, { back: a.back });
+  }
+}
+
+// Golpe: so o braco que segura a arma muda (a arma desenhada em held.js segue a mao).
+// f0 preparo: braco sobe acima do ombro; f1 golpe: braco estica para onde o boneco olha;
+// f2 volta: meio caminho. O corpo inclina 1px para a frente no golpe.
+function attackArm(P, f, torsoY) {
+  const a = P.holdArm;
+  const view = P.view;
+  const sy = torsoY + 1; // ombro
+  const spans = [];
+  let hand;
+  if (view === 'side') {
+    // olha para a esquerda da tela (o lado direito e espelhado na folha)
+    if (f === 0) { for (let i = 0; i < 6; i++) spans.push([sy - i, 12 + Math.round(i / 3), 13 + Math.round(i / 3)]); hand = { x: 14, y: sy - 7, w: 2, h: 2 }; }
+    else if (f === 1) { spans.push([sy + 1, 4, 11], [sy + 2, 4, 11]); hand = { x: 2, y: sy + 1, w: 2, h: 2 }; }
+    else { for (let i = 0; i < 5; i++) spans.push([sy + 1 + i, 10 - i, 11 - i]); hand = { x: 5, y: sy + 5, w: 2, h: 2 }; }
+  } else {
+    const ax = Math.min(a.hand.x, 22);
+    const out = ax < 12 ? -1 : 1; // para fora do corpo
+    if (f === 0) { for (let i = 0; i < 7; i++) spans.push([sy - i, ax, ax + 1]); hand = { x: ax, y: sy - 8, w: 2, h: 2 }; }
+    else if (f === 1) {
+      // de frente o braco vem para a frente (encurta) e abre para o lado
+      for (let i = 0; i < 4; i++) spans.push([sy + i, ax + out * i, ax + out * i + 1]);
+      hand = { x: Math.max(0, Math.min(22, ax + out * 4)), y: sy + 3, w: 2, h: 2 };
+    } else { for (let i = 0; i < 5; i++) spans.push([sy + i, ax + out * Math.floor(i / 2), ax + out * Math.floor(i / 2) + 1]); hand = { x: Math.max(0, Math.min(22, ax + out * 2)), y: sy + 5, w: 2, h: 2 }; }
+  }
+  // uma faixa por linha, sem buraco entre a primeira e a ultima (as mangas leem linha a linha)
+  const byRow = new Map();
+  for (const [y, x0, x1] of spans) {
+    if (y < 0 || y >= H) continue;
+    const r = byRow.get(y);
+    byRow.set(y, r ? [Math.min(r[0], x0), Math.max(r[1], x1)] : [x0, x1]);
+  }
+  const ys = [...byRow.keys()].sort((p, q) => p - q);
+  for (let y = ys[0]; y <= ys[ys.length - 1]; y++) if (!byRow.has(y)) byRow.set(y, byRow.get(y - 1));
+  // tracos e mangas leem ate a 5a linha do braco (braco normal tem 6): braco curto ganha o ombro por cima
+  for (let top = ys[0]; byRow.size < 6 && top > 0; top--) { const [, x1] = byRow.get(top); byRow.set(top - 1, [x1 - 1, x1]); }
+  const clipped = [...byRow.entries()].sort((p, q) => p[0] - q[0]).map(([y, [x0, x1]]) => [y, Math.max(0, x0), Math.min(W - 1, x1)]);
+  const arm = makePart(a.name, clipped, a.tag, { front: a.front, back: a.back, hand, side: a.side });
+  const i = P.arms.indexOf(a);
+  P.arms[i] = arm;
+  P.holdArm = arm;
+  handParts(P);
+  P.lunge = f === 1 ? 1 : 0;
 }

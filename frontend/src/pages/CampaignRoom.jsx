@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fxFromRoll, fxFromHit } from '../lib/fx/sync';
+import { swing } from '../lib/avatar/swing';
 import { normalizeRules, playerRights, rightBlock, VISION_RADII } from '../lib/tableRules';
 import { loadSummary } from '../lib/load';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
@@ -282,6 +283,7 @@ export default function CampaignRoom() {
               fxAttacks.current.set(p.rollId, atk);
               if (fxAttacks.current.size > 20) fxAttacks.current.delete(fxAttacks.current.keys().next().value);
               if (atk.phase === 'full') fxRef.current?.play(atk); else fxRef.current?.attack(atk);
+              swing(atk.fromId);
             }
           }
           if (p.messageId && !p.secret) {

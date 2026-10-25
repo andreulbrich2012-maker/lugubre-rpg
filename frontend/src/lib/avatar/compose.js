@@ -85,9 +85,9 @@ function traitColors(t) {
   return { a: colorHex(t.hornColor || 'osso'), b: colorHex(t.markColor || 'ouro'), c: colorHex(t.coat || 'castanho') };
 }
 
-// Grade completa: linhas = direcoes (down,left,right,up); colunas = idle(2) + walk(4).
-export const SHEET_LAYOUT = { dirs: DIRECTIONS, anims: [['idle', 2], ['walk', 4]], cols: 6, rows: 4, w: W, h: H };
-export function sheetFrameIndex(anim, f) { return anim === 'walk' ? 2 + (f % 4) : f % 2; }
+// Grade completa: linhas = direcoes (down,left,right,up); colunas = idle(2) + walk(4) + attack(3).
+export const SHEET_LAYOUT = { dirs: DIRECTIONS, anims: [['idle', 2], ['walk', 4], ['attack', 3]], cols: 9, rows: 4, w: W, h: H };
+export function sheetFrameIndex(anim, f) { return anim === 'walk' ? 2 + (f % 4) : anim === 'attack' ? 6 + (f % 3) : f % 2; }
 
 export function renderSheetPixels(appearance) {
   const app = repairAppearance(appearance);

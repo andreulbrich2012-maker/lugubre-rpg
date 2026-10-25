@@ -772,7 +772,7 @@ export default function Board({
                   </span>
                 ) : sprite ? (
                   <span key={fx?.n} className={`vtt-sprite ${fx?.n && fx?.hit ? 'hit-shake' : ''}`} style={{ width: size * 1.05, height: size * 1.4 }}>
-                    <AvatarSprite appearance={sprite} mapStyle={scene.tiles?.style} direction={wpos?.dir || motion[t.id]?.dir || 'down'} moving={wpos ? wpos.moving : Boolean(motion[t.id]?.moving)} scale={4} style={{ width: '100%', height: '100%' }} title={t.name} />
+                    <AvatarSprite swingId={t.id} appearance={sprite} mapStyle={scene.tiles?.style} direction={wpos?.dir || motion[t.id]?.dir || 'down'} moving={wpos ? wpos.moving : Boolean(motion[t.id]?.moving)} scale={4} style={{ width: '100%', height: '100%' }} title={t.name} />
                   </span>
                 ) : (
                   <span key={fx?.n} className={`vtt-token-face ${fx?.n && fx?.hit ? 'hit-shake' : ''}`}>

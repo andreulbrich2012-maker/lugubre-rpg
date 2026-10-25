@@ -91,12 +91,12 @@ describe('composicao', () => {
     }
   });
 
-  it('cada raca tem padrao valido e a folha tem 6x4 quadros', () => {
+  it('cada raca tem padrao valido e a folha tem 9x4 quadros (parado, andando, golpe)', () => {
     for (const r of RACES) {
       const app = applyRace(defaultAppearance(), r.id);
       expect(isValidAppearance(app), r.id).toBe(true);
       const sheet = renderSheetPixels(app);
-      expect(sheet.width).toBe(6 * W);
+      expect(sheet.width).toBe(9 * W);
       expect(sheet.height).toBe(4 * H);
     }
   });

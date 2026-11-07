@@ -1,5 +1,5 @@
 // Rotas v2 da sala de campanha: feed de eventos, notas, ficha para o mestre,
-// mesa virtual (cenas, NPCs, tokens, itens pegaveis), rolagens, acertos e ping.
+// mesa virtual (cenas, NPCs, tokens), rolagens, acertos, ping e mapas por IA.
 // Registradas no mesmo router de campaign.routes.js (uma autenticacao por requisicao).
 import crypto from 'crypto';
 import { z } from 'zod';
@@ -7,15 +7,9 @@ import { pool, query } from '../db/pool.js';
 import { assertCampaignMaster, requireCampaignMember } from '../utils/campaignAccess.js';
 import { emitEvent, emitSplit, latestEventId, listEvents } from '../utils/events.js';
 import { boolish, httpError, parseJson, requireDatabase } from '../utils/http.js';
-import { buildingDoor, buildingLook, contentSchema, dracmasToCoins, MAX_CONTENTS, playerItem, playerTiles, validateTiles } from '../utils/tiles.js';
-import { assertRight, inventoryLimits, normalizeRules, tableRulesSchema } from '../utils/tableRules.js';
-import { AskMaster, claimRequest, createRequest, listPending, REQUEST_ACTION, requestView, setRequestStatus } from '../utils/actionRequests.js';
-import { inventoryLimitError, roundKg, unitWeight } from '../utils/itemWeight.js';
-import { STATS_LOCKED } from '../utils/sheetLocks.js';
+import { checkMapRateLimit, generateMap, validateTiles } from '../utils/mapgen.js';
 import { parseDiceFormula, rollDiceFormula, SKILL_DEFINITIONS } from '../utils/rules.js';
 import { enrich } from './character.routes.js';
-import { registerCampaignSeaRoutes } from './campaign.sea.js';
-import { advanceWorld, expireRentalsSoon } from '../utils/economy/rentals.js';
 
 const MAX_MAP_URL = 3_500_000;
 const mapUrlSchema = z.string().max(MAX_MAP_URL, 'Mapa muito grande (máximo ~3,5 MB).').refine(
@@ -43,9 +37,8 @@ const sceneFields = {
   grid_size: int(10, 400),
   grid_offset_x: int(-2000, 2000),
   grid_offset_y: int(-2000, 2000),
-  // mapa em tiles de ate 1000x1000 celulas com grid_size ate 400 px
-  width: int(100, 400000),
-  height: int(100, 400000),
+  width: int(100, 20000),
+  height: int(100, 20000),
   show_grid: boolish,
   fog_enabled: boolish,
   fog_reveals: z.array(rectSchema).max(1000),
@@ -75,8 +68,8 @@ const npcPatchSchema = z.object(npcFields).partial();
 const tokenFields = {
   name: z.string().trim().max(120),
   image_url: imageUrlSchema.nullable(),
-  x: z.coerce.number().min(-500000).max(500000),
-  y: z.coerce.number().min(-500000).max(500000),
+  x: z.coerce.number().min(-100000).max(100000),
+  y: z.coerce.number().min(-100000).max(100000),
   size: z.coerce.number().min(0.25).max(20),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable(),
   hidden: boolish,
@@ -121,16 +114,14 @@ const hitSchema = z.object({
 const vitalsSchema = z.object({
   life_current: z.coerce.number().int().optional(),
   sanity_current: z.coerce.number().int().optional(),
-  mana_current: z.coerce.number().int().optional(),
-  spell: z.string().max(120).optional() // nome da magia lancada (gasto de mana do proprio jogador)
+  mana_current: z.coerce.number().int().optional()
 });
-const pickupSchema = z.object({
-  itemId: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/),
-  // recipiente: contentId tira so aquele item de dentro; sem ele leva o recipiente inteiro
-  contentId: z.string().regex(/^[A-Za-z0-9_-]{1,40}$/).optional(),
-  characterId: z.string().uuid().optional()
+const mapGenerateSchema = z.object({
+  description: z.string().trim().min(3).max(1500),
+  cols: int(4, 80),
+  rows: int(4, 80),
+  catalog: z.string().trim().min(1).max(6000)
 });
-const PICKUP_RANGE = 1.5; // passos (centro do token ate o centro da celula do item)
 
 const MOVE_TOLERANCE = 0.25;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -147,40 +138,14 @@ function updateSet(body, columns, jsonColumns = []) {
 
 // ---------- visibilidade ----------
 // Jogador recebe a mesma cena (so a ativa); a nevoa e aplicada no cliente.
-// master=false: o jogador nao recebe itens escondidos nem a nota secreta do mestre.
-function sceneView(scene, master = true) {
-  const tiles = parseJson(scene.tiles, null);
+function sceneView(scene) {
   return {
     ...scene,
     fog_reveals: parseJson(scene.fog_reveals, []),
     initiative: parseJson(scene.initiative, []),
-    tiles: master ? tiles : playerTiles(tiles),
+    tiles: parseJson(scene.tiles, null),
     turn_state: parseJson(scene.turn_state, {})
   };
-}
-
-// Cenas que o jogador ve: a que esta no ar e os interiores das construcoes dela (e interiores
-// dentro de interiores). O jogador navega entre elas entrando e saindo pelas portas.
-async function playerSceneIds(campaignId) {
-  const { rows } = await query(
-    `with recursive vis as (
-       select id, 0 as depth from campaign_scenes where campaign_id = $1 and (is_active
-         -- mar de uma viagem em andamento (o convés do barco e "interior" dele)
-         or id in (select sea_scene_id from campaign_voyages where campaign_id = $1 and status in ('sailing', 'paused')))
-       union all
-       select s.id, vis.depth + 1 from campaign_scenes s join vis on s.parent_scene_id = vis.id where vis.depth < 4
-     ) select id from vis`,
-    [campaignId]
-  );
-  return new Set(rows.map((row) => row.id));
-}
-async function visibleToPlayers(scene) {
-  return scene.is_active || (await playerSceneIds(scene.campaign_id)).has(scene.id);
-}
-
-export async function loadRules(campaignId) {
-  const { rows } = await query('select table_rules from campaigns where id = $1', [campaignId]);
-  return normalizeRules(parseJson(rows[0]?.table_rules, {}));
 }
 
 // ---------- combate ----------
@@ -237,12 +202,8 @@ async function playerCombatTurn(campaignId, userId) {
   return { scene, state, token };
 }
 
-// economia: NPC com aparencia em pixel art e mercador (loja ligada ao NPC do token)
-export const TOKEN_SELECT = `select t.*, ch.owner_id as character_owner_id, ch.life_current as character_life_current, ch.life_max as character_life_max,
-  ch.appearance as character_appearance, npc.appearance as npc_appearance,
-  (select s.id from campaign_shops s where t.npc_id is not null and s.npc_id = t.npc_id order by s.created_at limit 1) as shop_id,
-  (select s.visible_to_players from campaign_shops s where t.npc_id is not null and s.npc_id = t.npc_id order by s.created_at limit 1) as shop_visible
-  from campaign_tokens t left join characters ch on ch.id = t.character_id left join campaign_npcs npc on npc.id = t.npc_id`;
+const TOKEN_SELECT = `select t.*, ch.owner_id as character_owner_id, ch.life_current as character_life_current, ch.life_max as character_life_max
+  from campaign_tokens t left join characters ch on ch.id = t.character_id`;
 
 // master: tudo; jogador: sem tokens ocultos, sem PV de npc/monstro, PV do proprio personagem.
 export function tokenView(token, { master = false, userId = null } = {}) {
@@ -274,12 +235,6 @@ export function tokenView(token, { master = false, userId = null } = {}) {
     down: hp.hp_max != null && Number(hp.hp_current) <= 0,
     conditions: parseJson(token.conditions, []),
     controlled_by: token.controlled_by,
-    // boneco em pixel art no modo jogo; so vem quando a consulta trouxe a ficha (senao o
-    // upsert do cliente apagaria a aparencia que ele ja tem)
-    ...('character_appearance' in token ? { appearance: isCharacter ? parseJson(token.character_appearance, null) : parseJson(token.npc_appearance, null) } : {}),
-    // NPC andando (lib/economy/wander.js) e mercador (abre a loja com E)
-    ...('wander' in token ? { wander: parseJson(token.wander, null) } : {}),
-    ...('shop_id' in token ? { shop_id: token.shop_id && (master || token.shop_visible) ? token.shop_id : null } : {}),
     updated_at: token.updated_at
   };
 }
@@ -293,7 +248,7 @@ async function loadToken(campaignId, tokenId) {
 async function loadScene(campaignId, sceneId, master) {
   const { rows } = await query('select * from campaign_scenes where id = $1 and campaign_id = $2', [sceneId, campaignId]);
   const scene = rows[0];
-  if (!scene || (!master && !(await visibleToPlayers(scene)))) throw httpError('Cena não encontrada.', 404);
+  if (!scene || (!master && !scene.is_active)) throw httpError('Cena não encontrada.', 404);
   return scene;
 }
 
@@ -314,7 +269,7 @@ async function emitTokenMoved(campaignId, token, userId) {
 }
 
 // ---------- fichas ----------
-export async function sharedInCampaign(campaignId, characterId) {
+async function sharedInCampaign(campaignId, characterId) {
   const { rowCount } = await query(
     'select 1 from campaign_members where campaign_id = $1 and coalesce(shared_character_id, character_id) = $2',
     [campaignId, characterId]
@@ -347,11 +302,9 @@ export function registerCampaignV2Routes(router) {
   }
   router.use('/:id', (req, res, next) => {
     // recursos v2 dependem do Postgres
-    if (/^\/(events|notes|characters|scenes|npcs|tokens|rolls|ping|pin|cursor|maps|action-requests|boats|voyages)(\/|$)/.test(req.path)) requireDatabase();
+    if (/^\/(events|notes|characters|scenes|npcs|tokens|rolls|ping|maps)(\/|$)/.test(req.path)) requireDatabase();
     next();
   });
-  // barcos e viagens pelo mar (campaign.sea.js); funcoes declaradas mais abaixo (hoisting)
-  const sea = registerCampaignSeaRoutes(router, { loadScene, loadToken, tokenView, moveTokenToScene, emitSceneUpdated, asking, ownsToken, loadRules, TOKEN_SELECT });
 
   // ===== feed de eventos =====
   router.get('/:id/events', async (req, res) => {
@@ -361,7 +314,6 @@ export function registerCampaignV2Routes(router) {
     }
     const after = Number(req.query.after);
     if (!Number.isSafeInteger(after) || after < 0) throw httpError('Parâmetro after inválido.');
-    expireRentalsSoon(req.params.id); // alugueis vencidos voltam sozinhos
     const events = await listEvents(req.params.id, req.user.id, master, after);
     res.json({ events, cursor: events.length ? events[events.length - 1].id : after });
   });
@@ -372,40 +324,6 @@ export function registerCampaignV2Routes(router) {
     const payload = { userId: req.user.id, name: req.user.name, color: member?.color || '#d6a65f', x: body.x, y: body.y, sceneId: body.sceneId || null };
     await emitEvent(req.params.id, 'ping', payload, 'all', req.user.id);
     res.status(201).json(payload);
-  });
-
-  // Pin com pergunta: qualquer membro marca um ponto do mapa ("tem algo aqui?") e ele fica ate
-  // o autor ou o mestre tirar. Vive nos eventos da mesa (sem tabela): quem entra depois nao ve.
-  router.post('/:id/pin', async (req, res) => {
-    const { member } = await requireCampaignMember(req.params.id, req.user);
-    const body = z.object({ x: z.coerce.number(), y: z.coerce.number(), sceneId: z.string().uuid(), text: z.string().max(140).optional() }).parse(req.body);
-    const payload = { op: 'add', id: crypto.randomUUID(), userId: req.user.id, name: req.user.name, color: member?.color || '#d6a65f', x: Math.round(body.x), y: Math.round(body.y), sceneId: body.sceneId, text: (body.text || '').trim() };
-    await emitEvent(req.params.id, 'pin', payload, 'all', req.user.id);
-    res.status(201).json(payload);
-  });
-  router.delete('/:id/pin/:pinId', async (req, res) => {
-    const { master } = await requireCampaignMember(req.params.id, req.user);
-    const body = z.object({ sceneId: z.string().uuid() }).parse(req.query);
-    const pinId = z.string().uuid().parse(req.params.pinId);
-    // so o autor ou o mestre tiram: o autor fica no evento que criou o pin
-    const { rows } = await query(
-      `select payload->>'userId' as user_id from campaign_events
-        where campaign_id = $1 and type = 'pin' and payload->>'op' = 'add' and payload->>'id' = $2
-        order by id desc limit 1`,
-      [req.params.id, pinId]
-    );
-    if (!rows[0]) throw httpError('Pin não encontrado.', 404);
-    if (!master && rows[0].user_id !== req.user.id) throw httpError('Só quem marcou ou o mestre pode tirar este pin.', 403);
-    await emitEvent(req.params.id, 'pin', { op: 'remove', id: pinId, sceneId: body.sceneId }, 'all', req.user.id);
-    res.status(204).end();
-  });
-
-  // Cursor do mestre: os jogadores veem onde ele aponta (o cliente manda no maximo ~3x por segundo).
-  router.post('/:id/cursor', async (req, res) => {
-    await assertCampaignMaster(req.params.id, req.user);
-    const body = z.object({ x: z.coerce.number(), y: z.coerce.number(), sceneId: z.string().uuid(), off: z.boolean().optional() }).parse(req.body);
-    await emitEvent(req.params.id, 'cursor', { x: Math.round(body.x), y: Math.round(body.y), sceneId: body.sceneId, off: Boolean(body.off), name: req.user.name }, 'all', req.user.id);
-    res.status(204).end();
   });
 
   // ===== notas =====
@@ -497,12 +415,6 @@ export function registerCampaignV2Routes(router) {
     const { master } = await requireCampaignMember(req.params.id, req.user);
     const character = await accessibleCharacter(req.params.id, req.params.characterId, req.user, master);
     const body = vitalsSchema.parse(req.body);
-    if (!master && (await loadRules(req.params.id)).sheet.stats === 'mestre') {
-      // regra 'mestre': o jogador so gasta a mana certa de uma magia que ele tem (lancar magia na mesa)
-      const spell = body.spell && parseJson(character.spells, []).find((entry) => entry.name === body.spell);
-      const onlyMana = body.life_current === undefined && body.sanity_current === undefined && body.mana_current !== undefined;
-      if (!spell || !onlyMana || Number(character.mana) - body.mana_current !== Number(spell.manaCost || 0)) throw httpError(STATS_LOCKED, 403);
-    }
     const life = clamp(body.life_current ?? character.life_current, 0, Number(character.life_max));
     const sanity = clamp(body.sanity_current ?? character.sanity_current, 0, Number(character.sanity_max));
     const mana = clamp(body.mana_current ?? character.mana, 0, Number(character.mana_max || character.mana));
@@ -573,42 +485,23 @@ export function registerCampaignV2Routes(router) {
     if (body.map_kind === 'tiles' && body.tiles === null) throw httpError('Mapa em tiles precisa do campo tiles.');
   }
 
-  function sceneEventPayload(scene, master = true) {
-    const { map_url: mapUrl, ...rest } = sceneView(scene, master);
+  function sceneEventPayload(scene) {
+    const { map_url: mapUrl, ...rest } = sceneView(scene);
     return { scene: { ...rest, has_map_url: Boolean(mapUrl) } };
-  }
-  // Mesma atualizacao de cena em duas versoes (jogador sem itens escondidos); interior da cena
-  // no ar tambem vai para os jogadores.
-  async function emitSceneUpdated(campaignId, scene, extra, userId) {
-    if (await visibleToPlayers(scene)) {
-      await emitSplit(campaignId, 'scene:updated', { ...sceneEventPayload(scene, false), ...extra }, { ...sceneEventPayload(scene, true), ...extra }, userId);
-    } else {
-      await emitEvent(campaignId, 'scene:updated', { ...sceneEventPayload(scene, true), ...extra }, 'master', userId);
-    }
   }
 
   router.get('/:id/scenes', async (req, res) => {
     const { master } = await requireCampaignMember(req.params.id, req.user);
-    const { rows } = await query('select * from campaign_scenes where campaign_id = $1 order by position, created_at', [req.params.id]);
-    const allowed = master ? null : await playerSceneIds(req.params.id);
-    res.json(rows.filter((scene) => master || allowed.has(scene.id)).map((scene) => sceneView(scene, master)));
-  });
-
-  // Cena onde esta o personagem do jogador (interior ou a cena no ar): a tela dele segue o token.
-  router.get('/:id/scenes/mine', async (req, res) => {
-    await requireCampaignMember(req.params.id, req.user);
-    const allowed = await playerSceneIds(req.params.id);
     const { rows } = await query(
-      `${TOKEN_SELECT} where t.campaign_id = $1 and t.kind = 'character' and (ch.owner_id = $2 or t.controlled_by = $2) order by t.updated_at desc`,
-      [req.params.id, req.user.id]
+      `select * from campaign_scenes where campaign_id = $1 ${master ? '' : 'and is_active'} order by position, created_at`,
+      [req.params.id]
     );
-    const token = rows.find((row) => allowed.has(row.scene_id));
-    res.json({ sceneId: token?.scene_id || null });
+    res.json(rows.map((scene) => sceneView(scene)));
   });
 
   router.get('/:id/scenes/:sceneId', async (req, res) => {
     const { master } = await requireCampaignMember(req.params.id, req.user);
-    res.json(sceneView(await loadScene(req.params.id, req.params.sceneId, master), master));
+    res.json(sceneView(await loadScene(req.params.id, req.params.sceneId, master)));
   });
 
   router.post('/:id/scenes', async (req, res) => {
@@ -623,7 +516,7 @@ export function registerCampaignV2Routes(router) {
        values ($${set.keys.length + 1}, ${set.keys.map((_, index) => `$${index + 1}`).join(', ')}, $${set.keys.length + 2}) returning *`,
       [...set.values, req.params.id, count.rows[0].total === 0]
     );
-    await emitSceneUpdated(req.params.id, rows[0], {}, req.user.id);
+    await emitEvent(req.params.id, 'scene:updated', sceneEventPayload(rows[0]), rows[0].is_active ? 'all' : 'master', req.user.id);
     res.status(201).json(sceneView(rows[0]));
   });
 
@@ -638,7 +531,7 @@ export function registerCampaignV2Routes(router) {
       [...set.values, req.params.sceneId, req.params.id]
     );
     if (!rows[0]) throw httpError('Cena não encontrada.', 404);
-    await emitSceneUpdated(req.params.id, rows[0], { changed: set.keys, map_changed: set.keys.includes('map_url') }, req.user.id);
+    await emitEvent(req.params.id, 'scene:updated', { ...sceneEventPayload(rows[0]), changed: set.keys, map_changed: set.keys.includes('map_url') }, rows[0].is_active ? 'all' : 'master', req.user.id);
     res.json(sceneView(rows[0]));
   });
 
@@ -825,8 +718,7 @@ export function registerCampaignV2Routes(router) {
       if (!mine || token.hidden) throw httpError('Token não encontrado.', 404);
       if (keys.some((key) => key !== 'x' && key !== 'y')) throw httpError('Você só pode mover seus tokens.', 403);
       const scene = (await query('select * from campaign_scenes where id = $1', [token.scene_id])).rows[0];
-      if (!scene || !(await visibleToPlayers(scene)) || scene.mode === 'prep') throw httpError('A mesa está em preparação: só o mestre move os tokens.', 409);
-      assertRight(await loadRules(req.params.id), req.user.id, 'move', { turnTokenIds: [token.id], inCombat: scene.mode === 'combat' });
+      if (!scene?.is_active || scene.mode === 'prep') throw httpError('A mesa está em preparação: só o mestre move os tokens.', 409);
       if (scene.mode === 'combat') {
         const state = parseJson(scene.turn_state, {});
         if (state.tokenId !== token.id) throw httpError('Não é o seu turno.', 409);
@@ -858,26 +750,11 @@ export function registerCampaignV2Routes(router) {
   router.post('/:id/rolls', async (req, res) => {
     const { master, member } = await requireCampaignMember(req.params.id, req.user);
     const body = rollSchema.parse(req.body);
-    await asking(res, req.params.id, req.user.id, () => doRoll({ campaignId: req.params.id, user: req.user, master, member }, body), (roll) => res.status(201).json(roll));
-  });
-
-  // Rolagem (tambem usada quando o mestre aprova um ataque pedido: approved = true).
-  async function doRoll({ campaignId, user, master, member }, body, approved = false) {
     if (body.secret && !master) throw httpError('Só o mestre pode fazer rolagens secretas.', 403);
     // combate: ataque/pericia so no proprio turno e 1 acao; dano so depois de um ataque no turno
     let combat = null;
-    let ask = false;
     if (!master && body.kind !== 'free') {
-      // regras do mestre: poderes/ataques travados e "vez de alguem" fora do combate
-      const mine = (await query(
-        `${TOKEN_SELECT} where t.campaign_id = $1 and (t.controlled_by = $2 or ch.owner_id = $2)`,
-        [campaignId, user.id]
-      )).rows.map((token) => token.id);
-      const inCombat = (await query(`select 1 from campaign_scenes where campaign_id = $1 and is_active and mode = 'combat'`, [campaignId])).rowCount > 0;
-      const mode = assertRight(await loadRules(campaignId), user.id, body.kind === 'attack' || body.kind === 'damage' ? 'attack' : null, { turnTokenIds: mine, inCombat });
-      // modo 'pedir': so o ataque pede (o dano vem depois do ataque que o mestre ja deixou)
-      ask = mode === 'pedir' && body.kind === 'attack' && !approved;
-      combat = await playerCombatTurn(campaignId, user.id);
+      combat = await playerCombatTurn(req.params.id, req.user.id);
       if (combat) {
         const { state } = combat;
         if (body.kind === 'damage' && (!state.attacked || state.damage_rolled)) throw httpError('Role o ataque antes do dano neste turno.', 409);
@@ -886,7 +763,7 @@ export function registerCampaignV2Routes(router) {
     }
 
     let character = null;
-    if (body.characterId) character = await accessibleCharacter(campaignId, body.characterId, user, master);
+    if (body.characterId) character = await accessibleCharacter(req.params.id, body.characterId, req.user, master);
 
     let formula = body.formula;
     let label = body.label;
@@ -906,21 +783,14 @@ export function registerCampaignV2Routes(router) {
 
     let target = null;
     if (body.targetTokenId) {
-      target = await loadToken(campaignId, body.targetTokenId);
+      target = await loadToken(req.params.id, body.targetTokenId);
       if (target.hidden && !master) throw httpError('Token não encontrado.', 404);
-    }
-    if (ask) {
-      const who = character?.character_name || user.name;
-      throw new AskMaster({
-        kind: 'attack', sceneId: target?.scene_id || null, characterId: character?.id || null, payload: body,
-        summary: `${who} quer atacar ${target?.name || 'sem alvo'}${body.powerName ? ` com ${body.powerName}` : ''}`
-      });
     }
     const rollId = crypto.randomUUID();
     const roll = {
       rollId,
-      userId: user.id,
-      userName: user.name,
+      userId: req.user.id,
+      userName: req.user.name,
       characterId: character?.id || null,
       characterName: character?.character_name || null,
       label: label || body.powerName || formula,
@@ -942,19 +812,19 @@ export function registerCampaignV2Routes(router) {
       const { rows } = await query(
         `insert into messages (campaign_id, user_id, character_id, content, message_type, meta)
          values ($1,$2,$3,$4,'roll',$5) returning id`,
-        [campaignId, user.id, character?.id || member?.shared_character_id || null, `${roll.label}: ${formula} = ${roll.total}`, JSON.stringify(roll)]
+        [req.params.id, req.user.id, character?.id || member?.shared_character_id || null, `${roll.label}: ${formula} = ${roll.total}`, JSON.stringify(roll)]
       );
       roll.messageId = rows[0].id;
     }
-    await emitEvent(campaignId, 'roll', roll, body.secret ? 'master' : 'all', user.id);
+    await emitEvent(req.params.id, 'roll', roll, body.secret ? 'master' : 'all', req.user.id);
     if (combat) {
       const state = body.kind === 'damage'
         ? { ...combat.state, damage_rolled: true }
         : { ...combat.state, action_used: true, attacked: body.kind === 'attack' };
-      await emitCombat(campaignId, await saveCombat(campaignId, combat.scene.id, { turn_state: state }), user.id);
+      await emitCombat(req.params.id, await saveCombat(req.params.id, combat.scene.id, { turn_state: state }), req.user.id);
     }
-    return roll;
-  }
+    res.status(201).json(roll);
+  });
 
   // ===== acertos / dano / cura (so mestre) =====
   router.post('/:id/tokens/:tokenId/hit', async (req, res) => {
@@ -991,507 +861,15 @@ export function registerCampaignV2Routes(router) {
     res.json({ ...common, amount: body.amount, hp_current: hpCurrent, hp_max: hpMax });
   });
 
-  // ===== regras da mesa (o mestre controla) =====
-  router.get('/:id/rules', async (req, res) => {
-    await requireCampaignMember(req.params.id, req.user);
-    res.json(await loadRules(req.params.id));
-  });
-  router.put('/:id/rules', async (req, res) => {
+  // ===== mapa em tiles gerado por IA =====
+  router.post('/:id/maps/generate', async (req, res) => {
     await assertCampaignMaster(req.params.id, req.user);
-    const rules = normalizeRules(tableRulesSchema.parse(req.body));
-    const before = await loadRules(req.params.id);
-    await query('update campaigns set table_rules = $1, updated_at = now() where id = $2', [JSON.stringify(rules), req.params.id]);
-    await emitEvent(req.params.id, 'rules:updated', { rules }, 'all', req.user.id);
-    await advanceWorld(req.params.id, before, rules); // relogio do mundo: conta os dias dos alugueis
-    res.json(rules);
-  });
-
-  // Edita o mapa de uma cena dentro de uma transacao (cena travada) e avisa todo mundo.
-  async function editTiles(campaignId, sceneId, userId, fn) {
-    const client = await pool.connect();
-    let scene;
-    try {
-      await client.query('begin');
-      scene = (await client.query('select * from campaign_scenes where id = $1 and campaign_id = $2 for update', [sceneId, campaignId])).rows[0];
-      if (!scene) throw httpError('Cena não encontrada.', 404);
-      const tiles = parseJson(scene.tiles, null);
-      if (!tiles?.layers) throw httpError('Esta cena não tem mapa em pixel art.', 409);
-      const next = validateTiles(await fn(tiles, scene, client));
-      scene = (await client.query('update campaign_scenes set tiles = $1, updated_at = now() where id = $2 returning *', [JSON.stringify(next), scene.id])).rows[0];
-      await client.query('commit');
-    } catch (error) {
-      await client.query('rollback');
-      throw error;
-    } finally {
-      client.release();
+    const body = mapGenerateSchema.parse(req.body);
+    if (!process.env.ANTHROPIC_API_KEY && !process.env.GROQ_API_KEY) {
+      const message = 'Geração por IA não configurada no servidor. Use o prompt pronto e cole o resultado.';
+      return res.status(503).json({ error: message, message });
     }
-    await emitSceneUpdated(campaignId, scene, { changed: ['tiles'] }, userId);
-    return scene;
-  }
-
-  const buildingPatchSchema = z.object({
-    name: z.string().trim().max(60).optional(),
-    roof: z.enum(['telha', 'telha-azul', 'palha', 'palha-escura', 'ardosia', 'ardosia-verde', 'madeira', 'madeira-escura']).optional(),
-    wall: z.enum(['madeira', 'pedra', 'tijolo', 'enxaimel']).optional(),
-    locked: z.boolean().optional(),
-    interior: z.string().uuid().nullable().optional(),
-    ...buildingLook
-  });
-  router.patch('/:id/scenes/:sceneId/buildings/:buildingId', async (req, res) => {
-    await assertCampaignMaster(req.params.id, req.user);
-    const body = buildingPatchSchema.parse(req.body);
-    const scene = await editTiles(req.params.id, req.params.sceneId, req.user.id, (tiles) => {
-      const list = tiles.buildings || [];
-      if (!list.some((b) => b.id === req.params.buildingId)) throw httpError('Construção não encontrada.', 404);
-      return { ...tiles, buildings: list.map((b) => (b.id === req.params.buildingId ? { ...b, ...body } : b)) };
-    });
-    res.json(sceneView(scene));
-  });
-
-  const ITEM_EDIT = z.object({
-    name: z.string().trim().min(1).max(60).optional(),
-    description: z.string().max(200).optional(),
-    quantity: z.number().int().min(1).max(999).optional(),
-    weight: z.number().min(0).max(1000).optional(),
-    category: z.string().optional(),
-    dracmas: z.number().int().min(0).max(100000).optional(),
-    pickable: z.boolean().optional(),
-    hidden: z.boolean().optional(),
-    note: z.string().max(300).optional(),
-    icon: z.string().regex(/^[a-z0-9_-]{1,60}$/).nullable().optional(),
-    container: z.boolean().optional(),
-    locked: z.boolean().optional(),
-    contents: z.array(contentSchema).max(MAX_CONTENTS, `No máximo ${MAX_CONTENTS} itens dentro de um recipiente.`).optional()
-  });
-  router.patch('/:id/scenes/:sceneId/items/:mapItemId', async (req, res) => {
-    await assertCampaignMaster(req.params.id, req.user);
-    const body = ITEM_EDIT.parse(req.body);
-    const scene = await editTiles(req.params.id, req.params.sceneId, req.user.id, (tiles) => {
-      const list = tiles.items || [];
-      if (!list.some((it) => it.id === req.params.mapItemId)) throw httpError('Item não encontrado.', 404);
-      return {
-        ...tiles,
-        items: list.map((it) => {
-          if (it.id !== req.params.mapItemId) return it;
-          const next = { ...it, ...body };
-          if (body.icon === null) delete next.icon;
-          return next;
-        })
-      };
-    });
-    res.json(sceneView(scene));
-  });
-
-  // Interior gerado: sala com paredes do material da fachada, piso, porta embaixo no meio.
-  // O mestre decora depois no editor (Mapa em pixel art / IA) como qualquer cena.
-  function interiorMap(b) {
-    const wallCode = { madeira: 'M', pedra: '#', tijolo: 'B', enxaimel: 'B' }[b.wall || 'enxaimel'] || 'B';
-    const floor = { madeira: '=', pedra: '_', tijolo: '=', enxaimel: '=' }[b.wall || 'enxaimel'] || '=';
-    const cols = Math.max(10, Math.min(30, b.w * 2));
-    const rows = Math.max(8, Math.min(22, b.h * 2));
-    const door = Math.floor(cols / 2);
-    const ground = Array.from({ length: rows }, (_, y) => Array.from({ length: cols }, (__, x) => {
-      if (y === rows - 1 && x === door) return 'D';
-      return x === 0 || y === 0 || x === cols - 1 || y === rows - 1 ? wallCode : floor;
-    }).join(''));
-    const objects = Array.from({ length: rows }, () => ' '.repeat(cols));
-    // tapete na frente da porta e uma tocha de cada lado: a sala nao comeca vazia
-    const put = (x, y, ch) => { objects[y] = objects[y].slice(0, x) + ch + objects[y].slice(x + 1); };
-    put(door, rows - 2, 'r');
-    put(1, 1, 'i'); put(cols - 2, 1, 'i');
-    return { cols, rows, layers: { ground, objects }, items: [], buildings: [] };
-  }
-
-  router.post('/:id/scenes/:sceneId/buildings/:buildingId/interior', async (req, res) => {
-    await assertCampaignMaster(req.params.id, req.user);
-    const parent = await loadScene(req.params.id, req.params.sceneId, true);
-    const tiles = parseJson(parent.tiles, null);
-    const building = (tiles?.buildings || []).find((b) => b.id === req.params.buildingId);
-    if (!building) throw httpError('Construção não encontrada.', 404);
-    if (building.interior) {
-      const exists = await query('select 1 from campaign_scenes where id = $1 and campaign_id = $2', [building.interior, req.params.id]);
-      if (exists.rowCount) throw httpError('Esta construção já tem interior.', 409);
-    }
-    // o cliente manda o interior pronto (gerador de interiores do catalogo); sem ele, sala simples
-    const map = req.body?.tiles ? validateTiles(req.body.tiles) : interiorMap(building);
-    const count = await query('select count(*)::int as total from campaign_scenes where campaign_id = $1', [req.params.id]);
-    const { rows } = await query(
-      `insert into campaign_scenes (campaign_id, name, map_kind, tiles, grid_size, width, height, position, mode, move_speed, parent_scene_id, parent_building_id, is_active)
-       values ($1,$2,'tiles',$3,$4,$5,$6,$7,$8,$9,$10,$11,false) returning *`,
-      [req.params.id, `${building.name || 'Construção'} (interior)`, JSON.stringify(map), parent.grid_size, map.cols * parent.grid_size, map.rows * parent.grid_size,
-        count.rows[0].total, parent.mode, parent.move_speed, parent.id, building.id]
-    );
-    const interior = rows[0];
-    await emitSceneUpdated(req.params.id, interior, {}, req.user.id);
-    await editTiles(req.params.id, parent.id, req.user.id, (t) => ({ ...t, buildings: t.buildings.map((b) => (b.id === building.id ? { ...b, interior: interior.id } : b)) }));
-    res.status(201).json(sceneView(interior));
-  });
-
-  // ===== mapa-item: o mestre entrega o mapa da cena; quem tem o item abre o mapa completo =====
-  const worldTiles = (tiles) => {
-    const t = playerTiles(parseJson(tiles, null));
-    if (!t) return t;
-    // o mapa mostra o lugar, nao o saque: sem itens no chao
-    return { ...t, items: [] };
-  };
-  router.post('/:id/scenes/:sceneId/give-map', async (req, res) => {
-    await assertCampaignMaster(req.params.id, req.user);
-    const scene = await loadScene(req.params.id, req.params.sceneId, true);
-    if (scene.map_kind !== 'tiles') throw httpError('Só dá para entregar mapa de cena em pixel art.', 409);
-    const body = z.object({ characterIds: z.array(z.string().uuid()).max(50).optional(), name: z.string().trim().min(1).max(60).optional() }).parse(req.body || {});
-    const members = await query('select distinct coalesce(shared_character_id, character_id) as cid from campaign_members where campaign_id = $1 and coalesce(shared_character_id, character_id) is not null', [req.params.id]);
-    const ids = members.rows.map((r) => r.cid).filter((cid) => !body.characterIds || body.characterIds.includes(cid));
-    const given = [];
-    for (const cid of ids) {
-      const row = (await query('select id, inventory from characters where id = $1', [cid])).rows[0];
-      if (!row) continue;
-      await query('insert into campaign_map_grants (campaign_id, scene_id, character_id) values ($1, $2, $3) on conflict do nothing', [req.params.id, scene.id, cid]);
-      const inventory = parseJson(row.inventory, []);
-      if (inventory.some((it) => it?.mapSceneId === scene.id)) continue;
-      inventory.push({ id: crypto.randomUUID(), name: body.name || `Mapa de ${scene.name}`.slice(0, 60), quantity: 1, weight: 0.1, category: 'Achados', description: 'Abra para ver o mapa completo e os pontos principais.', defenseBonus: 0, icon: 'mapa', mapSceneId: scene.id });
-      await query('update characters set inventory = $1, updated_at = now() where id = $2', [JSON.stringify(inventory), cid]);
-      await emitEvent(req.params.id, 'character:updated', { characterId: cid }, 'all', req.user.id);
-      given.push(cid);
-    }
-    res.json({ given: given.length });
-  });
-  router.get('/:id/scenes/:sceneId/worldmap', async (req, res) => {
-    const { master, member } = await requireCampaignMember(req.params.id, req.user);
-    const scene = await loadScene(req.params.id, req.params.sceneId, true);
-    if (!master) {
-      const cid = member?.shared_character_id || member?.character_id;
-      // permissao gravada no servidor quando o mestre entregou o mapa (o item no inventario e so o atalho)
-      const grant = cid ? await query('select 1 from campaign_map_grants where scene_id = $1 and character_id = $2 and campaign_id = $3', [scene.id, cid, req.params.id]) : { rowCount: 0 };
-      if (!grant.rowCount) throw httpError('Você não tem o mapa deste lugar.', 403);
-    }
-    res.json({ id: scene.id, name: scene.name, tiles: master ? { ...parseJson(scene.tiles, null), items: [] } : worldTiles(scene.tiles) });
-  });
-
-  // ===== portas: entrar e sair das construcoes (interior e outra cena) =====
-  const doorSchema = z.object({ tokenId: z.string().uuid().optional() });
-  const DOOR_REACH = 1.6;
-  const tokenCell = (token, grid) => ({
-    x: (Number(token.x) + (Number(token.size || 1) * grid) / 2) / grid,
-    y: (Number(token.y) + (Number(token.size || 1) * grid) / 2) / grid
-  });
-
-  // Token que vai passar pela porta: o indicado (mestre) ou o personagem do jogador nesta cena.
-  async function doorToken(req, scene, master, body) {
-    if (body.tokenId) {
-      const token = await loadToken(req.params.id, body.tokenId);
-      if (token.scene_id !== scene.id) throw httpError('Esse token não está nesta cena.', 409);
-      if (!master && !ownsToken(token, req.user.id)) throw httpError('Token não encontrado.', 404);
-      return token;
-    }
-    const mine = (await query(`${TOKEN_SELECT} where t.scene_id = $1 and t.kind = 'character' and (ch.owner_id = $2 or t.controlled_by = $2)`, [scene.id, req.user.id])).rows;
-    if (!mine.length) throw httpError('Coloque seu personagem no mapa primeiro.', 409);
-    return mine[0];
-  }
-
-  async function moveTokenToScene(campaignId, token, target, cell, userId) {
-    const grid = target.grid_size || 70;
-    const x = cell.x * grid;
-    const y = cell.y * grid;
-    if (token.character_id) await query('delete from campaign_tokens where scene_id = $1 and character_id = $2 and id <> $3', [target.id, token.character_id, token.id]);
-    await query('update campaign_tokens set scene_id = $1, x = $2, y = $3, updated_at = now() where id = $4', [target.id, x, y, token.id]);
-    await emitEvent(campaignId, 'token:removed', { tokenId: token.id, sceneId: token.scene_id }, 'all', userId);
-    const moved = await loadToken(campaignId, token.id);
-    await emitTokenUpdated(campaignId, moved, userId);
-    await emitEvent(campaignId, 'token:scene', { tokenId: token.id, characterId: token.character_id || null, ownerId: token.character_owner_id || token.controlled_by || null, from: token.scene_id, to: target.id }, token.hidden ? 'master' : 'all', userId);
-    return moved;
-  }
-
-  router.post('/:id/scenes/:sceneId/buildings/:buildingId/enter', async (req, res) => {
-    const { master } = await requireCampaignMember(req.params.id, req.user);
-    const body = doorSchema.parse(req.body || {});
-    await asking(res, req.params.id, req.user.id, () => doEnter(req, master, req.params.sceneId, req.params.buildingId, body), (out) => res.json(out));
-  });
-
-  // req: so campaignId (req.params.id) e o usuario (req.user); approved = o mestre ja deixou
-  async function doEnter(req, master, sceneId, buildingId, body, approved = false) {
-    const scene = await loadScene(req.params.id, sceneId, master);
-    const tiles = parseJson(scene.tiles, null);
-    const building = (tiles?.buildings || []).find((b) => b.id === buildingId);
-    if (!building) throw httpError('Construção não encontrada.', 404);
-    const token = await doorToken(req, scene, master, body);
-    if (!master) {
-      if (scene.mode === 'prep') throw httpError('A mesa está em preparação.', 409);
-      if (building.locked) throw httpError('A porta está trancada.', 409);
-      const mode = assertRight(await loadRules(req.params.id), req.user.id, 'doors', { turnTokenIds: [token.id], inCombat: scene.mode === 'combat' });
-      const door = buildingDoor(tiles, building);
-      const at = tokenCell(token, scene.grid_size || 70);
-      if (Math.hypot(at.x - (door.x + 0.5), at.y - (door.y + 0.5)) > DOOR_REACH) throw httpError('Chegue mais perto da porta.', 409);
-      if (!building.interior) throw httpError('Esta construção ainda não tem interior.', 409);
-      if (mode === 'pedir' && !approved) {
-        throw new AskMaster({
-          kind: 'enter', sceneId: scene.id, tokenId: token.id, characterId: token.character_id || null,
-          payload: { buildingId: building.id, tokenId: token.id }, summary: `${token.name} quer entrar em ${building.name || 'uma construção'}`
-        });
-      }
-    }
-    if (!building.interior) throw httpError('Esta construção ainda não tem interior.', 409);
-    const interior = (await query('select * from campaign_scenes where id = $1 and campaign_id = $2', [building.interior, req.params.id])).rows[0];
-    if (!interior) throw httpError('O interior desta construção foi apagado.', 404);
-    const inner = parseJson(interior.tiles, null);
-    const exitDoor = inner ? buildingDoor(inner, { x: 0, y: 0, w: inner.cols, h: inner.rows }) : { x: 1, y: 2 };
-    // aparece logo dentro da porta (uma celula para dentro da sala)
-    const spawn = { x: exitDoor.x, y: Math.max(0, exitDoor.y - 1) };
-    const moved = await moveTokenToScene(req.params.id, token, interior, spawn, req.user.id);
-    return { token: tokenView(moved, { master, userId: req.user.id }), sceneId: interior.id };
-  }
-
-  router.post('/:id/scenes/:sceneId/exit', async (req, res) => {
-    const { master } = await requireCampaignMember(req.params.id, req.user);
-    const body = doorSchema.parse(req.body || {});
-    await asking(res, req.params.id, req.user.id, () => doExit(req, master, req.params.sceneId, body), (out) => res.json(out));
-  });
-
-  async function doExit(req, master, sceneId, body, approved = false) {
-    const scene = await loadScene(req.params.id, sceneId, master);
-    if (!scene.parent_scene_id) throw httpError('Esta cena não é interior de uma construção.', 409);
-    const parent = (await query('select * from campaign_scenes where id = $1 and campaign_id = $2', [scene.parent_scene_id, req.params.id])).rows[0];
-    if (!parent) throw httpError('A cena de fora foi apagada.', 404);
-    const token = await doorToken(req, scene, master, body);
-    const inner = parseJson(scene.tiles, null);
-    if (!master) {
-      const mode = assertRight(await loadRules(req.params.id), req.user.id, 'doors', { turnTokenIds: [token.id], inCombat: scene.mode === 'combat' });
-      const door = inner ? buildingDoor(inner, { x: 0, y: 0, w: inner.cols, h: inner.rows }) : null;
-      const at = tokenCell(token, scene.grid_size || 70);
-      if (door && Math.hypot(at.x - (door.x + 0.5), at.y - (door.y + 0.5)) > DOOR_REACH) throw httpError('Chegue mais perto da porta.', 409);
-      if (mode === 'pedir' && !approved) {
-        throw new AskMaster({
-          kind: 'exit', sceneId: scene.id, tokenId: token.id, characterId: token.character_id || null,
-          payload: { tokenId: token.id }, summary: `${token.name} quer sair de ${scene.name}`
-        });
-      }
-    }
-    const outer = parseJson(parent.tiles, null);
-    const building = (outer?.buildings || []).find((b) => b.id === scene.parent_building_id);
-    const door = building ? buildingDoor(outer, building) : { x: 0, y: 0 };
-    // aparece do lado de fora, na frente da porta
-    const spawn = { x: door.x, y: Math.min((outer?.rows || door.y + 2) - 1, door.y + 1) };
-    const moved = await moveTokenToScene(req.params.id, token, parent, spawn, req.user.id);
-    return { token: tokenView(moved, { master, userId: req.user.id }), sceneId: parent.id };
-  }
-
-  // ===== pegar item do mapa =====
-  // Tudo numa transacao com a cena travada (FOR UPDATE): dois jogadores clicando juntos,
-  // so o primeiro leva; o segundo ve "Ja pegaram esse item.".
-  router.post('/:id/scenes/:sceneId/pickup', async (req, res) => {
-    const { master } = await requireCampaignMember(req.params.id, req.user);
-    const body = pickupSchema.parse(req.body);
-    await asking(res, req.params.id, req.user.id, () => doPickup(req, master, req.params.sceneId, body), (out) => res.status(201).json(out));
-  });
-
-  async function doPickup(req, master, sceneId, body, approved = false) {
-    if (master && !body.characterId) throw httpError('Escolha para qual personagem entregar o item.');
-    const client = await pool.connect();
-    let result;
-    try {
-      await client.query('begin');
-      const scene = (await client.query('select * from campaign_scenes where id = $1 and campaign_id = $2 for update', [sceneId, req.params.id])).rows[0];
-      if (!scene || (!master && !(await visibleToPlayers(scene)))) throw httpError('Cena não encontrada.', 404);
-      if (scene.mode === 'prep') throw httpError('A mesa está em preparação.', 409);
-      const tiles = parseJson(scene.tiles, null);
-      const items = Array.isArray(tiles?.items) ? tiles.items : [];
-      const item = items.find((entry) => entry.id === body.itemId);
-      if (!item || (!master && item.hidden)) throw httpError('Já pegaram esse item.', 409);
-      // recipiente (mochila, bau): da para tirar um item de dentro mesmo se o recipiente nao for pegavel
-      const isContainer = Boolean(item.container || item.contents?.length);
-      let content = null;
-      if (body.contentId) {
-        if (!isContainer) throw httpError('Este item não é um recipiente.', 409);
-        if (item.locked && !master) throw httpError('Está trancado.', 409);
-        content = (item.contents || []).find((entry) => entry.id === body.contentId);
-        if (!content) throw httpError('Já tiraram esse item daí.', 409);
-      } else {
-        if (item.pickable === false && !master) throw httpError('Este item não pode ser pego.', 409);
-        if (isContainer && item.locked && !master) throw httpError('Está trancado.', 409);
-      }
-      const rules = await loadRules(req.params.id);
-
-      let characterId = body.characterId;
-      let combatState = null;
-      if (!master) {
-        const mine = (await client.query(
-          `${TOKEN_SELECT} where t.scene_id = $1 and t.kind = 'character' and (ch.owner_id = $2 or t.controlled_by = $2)`,
-          [scene.id, req.user.id]
-        )).rows.filter((token) => !body.characterId || token.character_id === body.characterId);
-        if (!mine.length) throw httpError('Coloque seu personagem no mapa para pegar itens.', 409);
-        const grid = scene.grid_size || 70;
-        const distance = (token) => Math.hypot(
-          (Number(token.x) + (Number(token.size || 1) * grid) / 2) / grid - (item.x + 0.5),
-          (Number(token.y) + (Number(token.size || 1) * grid) / 2) / grid - (item.y + 0.5)
-        );
-        const token = mine.sort((a, b) => distance(a) - distance(b))[0];
-        const mode = assertRight(rules, req.user.id, 'pickup', { turnTokenIds: [token.id], inCombat: scene.mode === 'combat' });
-        if (scene.mode === 'combat') {
-          const state = parseJson(scene.turn_state, {});
-          if (state.tokenId !== token.id) throw httpError('Não é o seu turno.', 409);
-          if (state.action_used) throw httpError('Você já usou sua ação neste turno.', 409);
-          combatState = { ...state, action_used: true };
-        }
-        if (distance(token) > PICKUP_RANGE + 1e-6) throw httpError('Chegue mais perto para pegar.', 409);
-        if (mode === 'pedir' && !approved) {
-          const what = (it) => (it.dracmas > 0 ? `${it.dracmas} dracmas` : `${it.name}${it.quantity > 1 ? ` (${it.quantity})` : ''}`);
-          throw new AskMaster({
-            kind: 'pickup', sceneId: scene.id, tokenId: token.id, characterId: token.character_id,
-            payload: { itemId: item.id, ...(content ? { contentId: content.id } : {}), ...(body.characterId ? { characterId: body.characterId } : {}) },
-            summary: `${token.name} quer pegar ${content ? `${what(content)} de ${item.name}` : what(item)}`
-          });
-        }
-        characterId = token.character_id;
-      } else if (!(await sharedInCampaign(req.params.id, characterId))) {
-        throw httpError('Esse personagem não está nesta campanha.', 404);
-      }
-
-      const character = (await client.query('select id, owner_id, character_name, inventory, wallet from characters where id = $1 for update', [characterId])).rows[0];
-      if (!character) throw httpError('Ficha não encontrada.', 404);
-      let inventory = parseJson(character.inventory, []);
-      const wallet = { bronze: 0, silver: 0, platinum: 0, gold: 0, ...parseJson(character.wallet, {}) };
-      // mesmo formato de item da ficha (character.routes.js normalizeItem); peso 0 vira o sugerido
-      const toEntry = (it) => ({
-        id: crypto.randomUUID(), name: it.name, quantity: it.quantity || 1, weight: roundKg(unitWeight(it)),
-        category: it.category || 'Achados', description: it.description || '', defenseBonus: 0, ...(it.icon ? { icon: it.icon } : {})
-      });
-      // dinheiro vai para a bolsa (ja trocado nas moedas maiores); o resto vira item da ficha
-      let dracmas = 0;
-      const entries = [];
-      if (content) {
-        if (content.dracmas > 0) dracmas += content.dracmas;
-        else entries.push(toEntry(content));
-      } else if (isContainer) {
-        const inner = item.contents || [];
-        dracmas += Number(item.dracmas || 0) + inner.reduce((sum, entry) => sum + Number(entry.dracmas || 0), 0);
-        entries.push({ ...toEntry(item), container: true, contents: inner.filter((entry) => !(entry.dracmas > 0)).map(toEntry) });
-      } else if (item.dracmas > 0) {
-        dracmas += item.dracmas;
-      } else {
-        entries.push(toEntry(item));
-      }
-      // limite de peso e de itens que o mestre definiu (vale tambem quando o mestre entrega)
-      const full = inventoryLimitError(inventory, entries, inventoryLimits(rules, character.owner_id));
-      if (full) throw httpError(full, 409);
-      if (dracmas > 0) {
-        for (const [coin, amount] of Object.entries(dracmasToCoins(dracmas))) wallet[coin] = Number(wallet[coin] || 0) + amount;
-      }
-      inventory = [...inventory, ...entries];
-      const received = entries.length ? { kind: 'item', ...entries[0], ...(dracmas ? { dracmas } : {}) } : { kind: 'dracmas', dracmas, name: (content || item).name };
-      await client.query('update characters set inventory = $1, wallet = $2, updated_at = now() where id = $3', [JSON.stringify(inventory), JSON.stringify(wallet), character.id]);
-      const nextItems = content
-        ? items.map((entry) => (entry.id === item.id ? { ...entry, contents: (entry.contents || []).filter((c) => c.id !== content.id) } : entry))
-        : items.filter((entry) => entry.id !== item.id);
-      const sceneFieldsUpdate = combatState ? ', turn_state = $3' : '';
-      const updatedScene = (await client.query(
-        `update campaign_scenes set tiles = $1${sceneFieldsUpdate}, updated_at = now() where id = $2 returning *`,
-        combatState ? [JSON.stringify({ ...tiles, items: nextItems }), scene.id, JSON.stringify(combatState)] : [JSON.stringify({ ...tiles, items: nextItems }), scene.id]
-      )).rows[0];
-      const label = (it) => (it.dracmas > 0 ? `${it.dracmas} dracmas (${it.name})` : `${it.name}${it.quantity > 1 ? ` ×${it.quantity}` : ''}`);
-      const what = content ? `${label(content)} de ${item.name}`
-        : isContainer ? `${item.name}${item.contents?.length ? ` com ${item.contents.length} ${item.contents.length === 1 ? 'item' : 'itens'} dentro` : ''}`
-          : label(item);
-      const messageText = `${character.character_name} pegou ${what}`;
-      const message = (await client.query(
-        `insert into messages (campaign_id, user_id, character_id, content, message_type, meta)
-         values ($1,$2,$3,$4,'event',$5) returning id, message_type, meta, campaign_id, user_id, character_id, content, created_at, updated_at`,
-        [req.params.id, req.user.id, character.id, messageText, JSON.stringify({ event: 'pickup', sceneId: scene.id, itemId: item.id, ...(content ? { contentId: content.id } : {}) })]
-      )).rows[0];
-      await client.query('commit');
-      result = { item: content || item, received, character, inventory, wallet, updatedScene, combatState, message };
-    } catch (error) {
-      await client.query('rollback');
-      throw error;
-    } finally {
-      client.release();
-    }
-
-    const { updatedScene } = result;
-    // scene:updated leve: so o id da cena e a lista nova de itens (nao manda o mapa inteiro de novo)
-    {
-      const all = parseJson(updatedScene.tiles, {}).items || [];
-      const payload = (items) => ({ scene: { id: updatedScene.id }, changed: ['items'], items });
-      if (await visibleToPlayers(updatedScene)) await emitSplit(req.params.id, 'scene:updated', payload(playerTiles({ items: all }).items), payload(all), req.user.id);
-      else await emitEvent(req.params.id, 'scene:updated', payload(all), 'master', req.user.id);
-    }
-    await emitEvent(req.params.id, 'message:created', { message: { ...result.message, account_name: req.user.name, character_name: result.character.character_name } }, 'all', req.user.id);
-    await emitEvent(req.params.id, 'character:updated', { characterId: result.character.id }, 'all', req.user.id);
-    if (result.combatState) await emitCombat(req.params.id, updatedScene, req.user.id);
-    return {
-      item: master ? result.item : playerItem(result.item),
-      received: result.received,
-      character: { id: result.character.id, inventory: result.inventory, wallet: result.wallet }
-    };
-  }
-
-  // ===== pedidos ao mestre (modo 'pedir') =====
-  // Erro AskMaster vira pedido: 202 { requested, request } para o jogador e evento para o mestre.
-  async function asking(res, campaignId, userId, fn, done) {
-    let out;
-    try {
-      out = await fn();
-    } catch (error) {
-      if (!error.askMaster) throw error;
-      const request = await createRequest(campaignId, userId, error.askMaster);
-      return res.status(202).json({ requested: true, request, message: 'Pedido enviado ao mestre…' });
-    }
-    return done(out);
-  }
-
-  router.get('/:id/action-requests', async (req, res) => {
-    const { master } = await requireCampaignMember(req.params.id, req.user);
-    const list = await listPending(req.params.id);
-    res.json(master ? list : list.filter((r) => r.userId === req.user.id));
-  });
-
-  const decideSchema = z.object({ decision: z.enum(['approve', 'deny']), always: boolish.optional().default(false) });
-  router.post('/:id/action-requests/:requestId', async (req, res) => {
-    await assertCampaignMaster(req.params.id, req.user);
-    if (!z.string().uuid().safeParse(req.params.requestId).success) throw httpError('Pedido não encontrado.', 404);
-    const body = decideSchema.parse(req.body || {});
-    const claimed = await claimRequest(req.params.id, req.params.requestId, body.decision === 'approve' ? 'approved' : 'denied');
-    if (!claimed.row) {
-      if (claimed.missing) throw httpError('Pedido não encontrado.', 404);
-      throw httpError(claimed.status === 'expired' ? 'O pedido expirou.' : 'Esse pedido já foi decidido.', claimed.status === 'expired' ? 410 : 409);
-    }
-    const row = claimed.row;
-    const view = requestView(row);
-    if (body.decision === 'deny') {
-      await emitEvent(req.params.id, 'action:decided', { ...view, message: 'O mestre não deixou.' }, row.user_id, req.user.id);
-      return res.json({ request: view });
-    }
-    // "permitir sempre": a excecao deste jogador vira livre para esta acao
-    if (body.always) {
-      const rules = await loadRules(req.params.id);
-      const action = REQUEST_ACTION[row.kind];
-      const own = rules.players[row.user_id] || {};
-      const next = normalizeRules({ ...rules, players: { ...rules.players, [row.user_id]: { ...own, actions: { ...(own.actions || {}), [action]: 'livre' } } } });
-      await query('update campaigns set table_rules = $1, updated_at = now() where id = $2', [JSON.stringify(next), req.params.id]);
-      await emitEvent(req.params.id, 'rules:updated', { rules: next }, 'all', req.user.id);
-    }
-    // o servidor refaz a acao como o jogador, conferindo alcance, turno e regras de agora
-    const requester = (await query('select id, name, email, role from users where id = $1', [row.user_id])).rows[0];
-    const asPlayer = { params: { id: req.params.id }, user: { ...requester, role: 'player' } };
-    const payload = parseJson(row.payload, {});
-    let result;
-    try {
-      if (!requester) throw httpError('O jogador saiu da campanha.', 409);
-      const member = await requireCampaignMember(req.params.id, asPlayer.user);
-      if (member.master) throw httpError('Esse pedido é do mestre.', 409);
-      if (row.kind === 'pickup') result = await doPickup(asPlayer, false, row.scene_id, payload, true);
-      else if (row.kind === 'trade') result = await (await import('./campaign.economy.js')).doTrade(asPlayer, payload, true);
-      else if (row.kind === 'enter' && payload.boatId) result = await sea.doBoard(asPlayer, false, payload, true);
-      else if (row.kind === 'exit' && payload.boatId) result = await sea.doLeave(asPlayer, false, payload, true);
-      else if (row.kind === 'enter') result = await doEnter(asPlayer, false, row.scene_id, payload.buildingId, { tokenId: payload.tokenId }, true);
-      else if (row.kind === 'exit') result = await doExit(asPlayer, false, row.scene_id, { tokenId: payload.tokenId }, true);
-      else result = { roll: await doRoll({ campaignId: req.params.id, user: asPlayer.user, master: false, member: member.member }, rollSchema.parse(payload), true) };
-    } catch (error) {
-      if (error.askMaster) throw error;
-      await setRequestStatus(row.id, 'denied');
-      const message = error.status ? error.message : 'Não deu certo.';
-      await emitEvent(req.params.id, 'action:decided', { ...view, status: 'denied', failed: true, message: `O mestre deixou, mas não deu: ${message}` }, row.user_id, req.user.id);
-      throw httpError(`Não deu: ${message}`, error.status && error.status < 500 ? 409 : 500);
-    }
-    await emitEvent(req.params.id, 'action:decided', { ...view, result: row.kind === 'attack' ? { roll: result.roll } : { sceneId: result.sceneId || null, received: result.received || null } }, row.user_id, req.user.id);
-    res.json({ request: view, result });
+    checkMapRateLimit(req.user.id);
+    res.json(await generateMap(body));
   });
 }

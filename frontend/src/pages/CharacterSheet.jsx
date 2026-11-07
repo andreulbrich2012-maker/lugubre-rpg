@@ -6,25 +6,8 @@ import RollGlass from '../components/character-sheet/RollGlass';
 import { primordialByName } from '../components/glass/primordiais';
 import CharacterSheetMobile from '../components/character-sheet/CharacterSheetMobile';
 import CharacterSheetLoading from '../components/character-sheet/CharacterSheetLoading';
-import AppearancePanel from '../components/avatar/AppearancePanel';
-import ItemIcon from '../components/icons/ItemIcon';
-import SpellIcon from '../components/icons/SpellIcon';
-import { ITEM_ICONS } from '../lib/icons/items.js';
-import { WEAPON_ICONS } from '../lib/icons/weapons.js';
-
-// Opcoes do seletor de icone, agrupadas por categoria (montado uma vez so).
-const ICON_GROUPS = (() => {
-  const groups = new Map();
-  for (const [id, spec] of [...Object.entries(ITEM_ICONS), ...Object.entries(WEAPON_ICONS)]) {
-    const cat = spec.cat || 'Armas';
-    if (!groups.has(cat)) groups.set(cat, []);
-    groups.get(cat).push([id, spec.label || id]);
-  }
-  return [...groups.entries()];
-})();
 import { ResourceStepper } from '../components/character-sheet/ResourceStepper';
 import { api } from '../lib/api';
-import { unitWeight } from '../lib/itemWeight';
 import { calculateResourceAdjustment, normalizeResourcePair } from '../lib/characterVitals';
 
 const attributes = [
@@ -395,7 +378,6 @@ export default function CharacterSheet() {
   return (
     <main className="min-h-[calc(100vh-64px)] overflow-x-hidden pb-24 lg:px-4 lg:py-5">
       {creationNotice && <div className="fixed left-1/2 top-20 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 pane px-4 py-3 text-center text-sm text-bone " role="status">{creationNotice}</div>}
-      <AppearancePanel sheet={sheet} className="m-3 lg:hidden" onSaved={(data) => { sheetRef.current = { ...sheetRef.current, appearance: data.appearance }; setSheet((cur) => ({ ...cur, appearance: data.appearance })); }} />
       <CharacterSheetMobile
         sheet={sheet}
         draft={draft}
@@ -436,7 +418,6 @@ export default function CharacterSheet() {
               <InfoBlock label="Jogador" value={sheet.player_name} subLabel="Classe" subValue={sheet.class_name || 'Sem classe'} />
             </div>
           </header>
-          <AppearancePanel sheet={sheet} onSaved={(data) => { sheetRef.current = { ...sheetRef.current, appearance: data.appearance }; setSheet((cur) => ({ ...cur, appearance: data.appearance })); }} />
 
           <Panel id="sheet-attributes">
             <h2 className="text-center font-display text-2xl text-bone">Atributos</h2>
@@ -601,7 +582,7 @@ function InventoryPanel({ inventory, wallet, editing, draft, setDraft, onAdd, on
 
   function addItem() {
     if (!item.name.trim()) return;
-    setDraft({ ...draft, inventory: [...draft.inventory, { ...item, weight: unitWeight(item), id: crypto.randomUUID?.() || `${Date.now()}` }] });
+    setDraft({ ...draft, inventory: [...draft.inventory, { ...item, id: crypto.randomUUID?.() || `${Date.now()}` }] });
     setItem(blankItem);
   }
 
@@ -629,14 +610,11 @@ function InventoryPanel({ inventory, wallet, editing, draft, setDraft, onAdd, on
           {visibleInventory.length ? visibleInventory.map((item, index) => (
             <li key={item.id || `${item.name}-${index}`} className="field !mt-0 min-h-11">
               <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
-                <div className="flex min-w-0 items-start gap-3">
-                <ItemIcon item={item} size={32} className="mt-0.5" />
                 <div className="min-w-0">
                   <span className="break-words text-bone">{Number(item.quantity ?? 1)}x {item.name}</span>
                   <span className="ml-2 text-xs text-mist">peso {Number(item.weight || 0)}</span>
                   <span className="badge ml-2 text-ember">{item.category || 'Outros'}</span>
                   {item.description && <p className="mt-1 text-xs text-mist">{item.description}</p>}
-                </div>
                 </div>
                 <Button type="button" variant="ghost" className="min-h-11 justify-center" onClick={() => onEdit(item)}><Edit size={16} className="inline" /> Editar</Button>
                 <button type="button" className="inline-flex min-h-11 items-center justify-center gap-2 border-[3px] border-lead px-3 text-bone soft-motion hover:bg-blood" onClick={() => onDelete(item)} aria-label="Excluir item"><Trash2 size={16} /> Excluir</button>
@@ -854,7 +832,7 @@ function PowerCard({ item, field, editing, index, onRoll, onEdit, onDelete, onUp
           <div className="min-w-0">
             <div className="flex items-start gap-3">
               <div className="grid h-16 w-16 shrink-0 place-items-center overflow-hidden border-[3px] border-lead bg-glass text-sm font-bold text-bone" style={isSpell && primordialByName[item.element] ? { background: `color-mix(in srgb, ${primordialByName[item.element].color} 75%, #000)` } : undefined}>
-                {item.image ? <img src={item.image} alt={`Imagem de ${item.name}`} className="h-full w-full object-cover" /> : <SpellIcon power={{ ...item, type: isSpell ? 'magia' : 'poder' }} size={48} />}
+                {item.image ? <img src={item.image} alt={`Imagem de ${item.name}`} className="h-full w-full object-cover" /> : (isSpell ? String(item.element || 'Ér').slice(0, 2) : 'AT')}
               </div>
               <div className="min-w-0 flex-1">
                 <h4 className="break-words font-display text-2xl leading-tight text-bone">{item.name}</h4>
@@ -985,31 +963,14 @@ function ItemModal({ state, onClose, onSave }) {
           <NumberField label="Quantidade" value={form.quantity ?? 1} onChange={(quantity) => setForm({ ...form, quantity })} />
           <NumberField label="Peso" value={form.weight ?? 0} onChange={(weight) => setForm({ ...form, weight })} />
         </div>
-        <div className="flex items-end gap-3">
-          {/* icone automatico pelo nome/categoria/descricao, ou o escolhido no seletor abaixo */}
-          <span className="grid h-14 w-14 shrink-0 place-items-center border-[3px] border-lead bg-glass" title={form.icon ? 'Ícone escolhido' : 'Ícone automático'}>
-            <ItemIcon item={form} size={32} />
-          </span>
-          <label className="block min-w-0 flex-1 text-sm text-mist">
-            Nome do item
-            <input className="field min-h-11" value={form.name || ''} onChange={(event) => setForm({ ...form, name: event.target.value })} autoFocus />
-          </label>
-        </div>
+        <label className="block text-sm text-mist">
+          Nome do item
+          <input className="field min-h-11" value={form.name || ''} onChange={(event) => setForm({ ...form, name: event.target.value })} autoFocus />
+        </label>
         <label className="block text-sm text-mist">
           Categoria
           <select className="field min-h-11" value={form.category || 'Outros'} onChange={(event) => setForm({ ...form, category: event.target.value })}>
             {itemCategories.filter((category) => category !== 'Todos os itens').map((category) => <option key={category} value={category}>{category}</option>)}
-          </select>
-        </label>
-        <label className="block text-sm text-mist">
-          Ícone
-          <select className="field min-h-11" value={form.icon || ''} onChange={(event) => setForm({ ...form, icon: event.target.value || undefined })}>
-            <option value="">Automático (pelo nome)</option>
-            {ICON_GROUPS.map(([cat, list]) => (
-              <optgroup key={cat} label={cat}>
-                {list.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-              </optgroup>
-            ))}
           </select>
         </label>
         <label className="block text-sm text-mist">

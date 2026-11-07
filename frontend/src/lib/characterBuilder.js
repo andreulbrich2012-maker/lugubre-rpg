@@ -1,5 +1,3 @@
-import { unitWeight } from './itemWeight.js';
-
 const requiredNumbers = [
   'level',
   'lifeCurrent',
@@ -13,22 +11,22 @@ const requiredNumbers = [
 
 export function validateCharacterDraft(form, catalog) {
   if (!form.playerName?.trim()) return { step: 0, message: 'Informe o nome do jogador.' };
-  if (!form.characterName?.trim()) return { step: 0, message: 'Informe o nome do personagem.' };
-  if (!form.raceId) return { step: 1, message: 'Escolha uma raça.' };
-  if (!catalog.races.some((item) => item.id === form.raceId)) return { step: 1, message: 'A raça selecionada não está mais disponível. Escolha outra opção.' };
-  if (!form.classId) return { step: 2, message: 'Escolha uma classe.' };
-  if (!catalog.classes.some((item) => item.id === form.classId)) return { step: 2, message: 'A classe selecionada não está mais disponível. Escolha outra opção.' };
-  if (!form.originId && !form.origin?.trim()) return { step: 2, message: 'Escolha uma origem.' };
-  if (form.originId && !catalog.origins.some((item) => item.id === form.originId)) return { step: 2, message: 'A origem selecionada não está mais disponível. Escolha outra opção.' };
+  if (!form.characterName?.trim()) return { step: 1, message: 'Informe o nome do personagem.' };
+  if (!form.raceId) return { step: 3, message: 'Escolha uma raça.' };
+  if (!catalog.races.some((item) => item.id === form.raceId)) return { step: 3, message: 'A raça selecionada não está mais disponível. Escolha outra opção.' };
+  if (!form.classId) return { step: 4, message: 'Escolha uma classe.' };
+  if (!catalog.classes.some((item) => item.id === form.classId)) return { step: 4, message: 'A classe selecionada não está mais disponível. Escolha outra opção.' };
+  if (!form.originId && !form.origin?.trim()) return { step: 5, message: 'Escolha uma origem.' };
+  if (form.originId && !catalog.origins.some((item) => item.id === form.originId)) return { step: 5, message: 'A origem selecionada não está mais disponível. Escolha outra opção.' };
 
   if (requiredNumbers.some((field) => !Number.isFinite(Number(form[field])))) {
-    return { step: 4, message: 'A ficha contém um valor numérico inválido.' };
+    return { step: 8, message: 'A ficha contém um valor numérico inválido.' };
   }
   if (Number(form.lifeMax) < 1 || Number(form.sanityMax) < 1 || Number(form.manaMax) < 0) {
-    return { step: 4, message: 'Os valores máximos da ficha são inválidos.' };
+    return { step: 8, message: 'Os valores máximos da ficha são inválidos.' };
   }
   if (Number(form.lifeCurrent) < 0 || Number(form.sanityCurrent) < 0 || Number(form.mana) < 0) {
-    return { step: 4, message: 'Vida, Sanidade e Mana não podem ser negativas.' };
+    return { step: 8, message: 'Vida, Sanidade e Mana não podem ser negativas.' };
   }
   return null;
 }
@@ -50,8 +48,7 @@ export function buildCharacterPayload(form, { includeSkills = false } = {}) {
     inventory: (form.inventory || []).map((item) => ({
       ...item,
       quantity: Number(item.quantity ?? 1),
-      // peso 0 ou vazio vira o peso sugerido pelo nome (lib/itemWeight.js)
-      weight: unitWeight(item),
+      weight: Number(item.weight || 0),
       defenseBonus: Number(item.defenseBonus || 0)
     }))
   };

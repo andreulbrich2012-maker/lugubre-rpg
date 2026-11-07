@@ -21,11 +21,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { boolish, sendError, uuidParam } from '../utils/http.js';
 import { assertCampaignMaster, dbMember, isMaster, requireCampaignMember } from '../utils/campaignAccess.js';
 import { emitEvent } from '../utils/events.js';
-import { inventoryLimitError, roundKg, unitWeight } from '../utils/itemWeight.js';
-import { inventoryLimits } from '../utils/tableRules.js';
 import { registerCampaignV2Routes } from './campaign.v2.js';
-import { registerCampaignMasterRoutes } from './campaign.master.js';
-import { registerCampaignEconomyRoutes } from './campaign.economy.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -296,11 +292,6 @@ router.post('/', async (req, res) => {
   res.status(201).json(await createLocalCampaign(req.user.id, { ...body, invite_code: inviteCode }));
 });
 
-// registra que a ficha foi mostrada nesta campanha (base da trava da mesa; ver utils/sheetLocks.js)
-async function linkCharacter(campaignId, characterId) {
-  await tryQuery('insert into campaign_character_links (campaign_id, character_id) values ($1, $2) on conflict do nothing', [campaignId, characterId]);
-}
-
 router.post('/join', async (req, res) => {
   try {
     const body = z.object({ inviteCode: z.string().min(4), characterId: z.string().uuid().optional().nullable() }).parse(req.body);
@@ -317,7 +308,6 @@ router.post('/join', async (req, res) => {
            updated_at = now()`,
         [campaign.rows[0].id, req.user.id, body.characterId || null, memberColor(req.user.id)]
       );
-      if (body.characterId) await linkCharacter(campaign.rows[0].id, body.characterId);
       await emitEvent(campaign.rows[0].id, 'members:changed', { userId: req.user.id, action: 'joined' }, 'all', req.user.id);
       return res.json(campaign.rows[0]);
     }
@@ -460,7 +450,6 @@ router.put('/:id/members/me/character', async (req, res) => {
     if (result) {
       if (!result.rowCount) return res.status(403).json({ message: 'Você não participa desta campanha.' });
       const characterId = body.characterId || null;
-      if (characterId) await linkCharacter(req.params.id, characterId);
       await emitEvent(req.params.id, 'character:shared', { userId: req.user.id, characterId }, 'all', req.user.id);
       await emitEvent(req.params.id, 'members:changed', { userId: req.user.id, action: 'character' }, 'all', req.user.id);
       return res.json({
@@ -914,24 +903,15 @@ async function decidePurchase(req, status) {
         throw error;
       }
       const inventory = parseJsonField(character.rows[0].inventory, []);
-      // peso 0 na loja vira o peso sugerido pelo nome; o limite do mestre vale para compras tambem
-      const bought = {
+      inventory.push({
         id: crypto.randomUUID(),
         quantity: request.quantity,
-        weight: roundKg(unitWeight({ name: request.item_name, description: request.item_description, weight: Number(request.weight || 0) })),
+        weight: Number(request.weight || 0),
         name: request.item_name,
         category: 'Compras',
         description: request.item_description || '',
         defenseBonus: 0
-      };
-      const rules = await client.query('select table_rules from campaigns where id=$1', [req.params.id]);
-      const full = inventoryLimitError(inventory, [bought], inventoryLimits(parseJsonField(rules.rows[0]?.table_rules, {}), request.user_id));
-      if (full) {
-        const error = new Error(full);
-        error.status = 409;
-        throw error;
-      }
-      inventory.push(bought);
+      });
       await client.query(
         'update characters set wallet=$1, inventory=$2, updated_at=now() where id=$3',
         [toJson(walletFromTotal(total - request.total_price)), toJson(inventory), request.character_id]
@@ -984,7 +964,5 @@ router.put('/:id/purchase-requests/:requestId/deny', async (req, res) => {
 });
 
 registerCampaignV2Routes(router);
-registerCampaignMasterRoutes(router);
-registerCampaignEconomyRoutes(router);
 
 export default router;

@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool, tryQuery } from '../db/pool.js';
 import { applySchema } from '../db/schemaRunner.js';
-import { DEFAULT_FILE as RULEBOOK_FILE, seedRules } from '../db/seedRules.js';
+import { DEFAULT_FILE as RULEBOOK_FILE, parseRulebook, seedRules } from '../db/seedRules.js';
 import {
   createLocalCatalogItem,
   createLocalDeveloperPost,
@@ -672,6 +672,39 @@ router.post('/system/migrate', async (req, res) => {
   const statements = await applySchema(pool);
   const rules = await seedRules(pool, await fs.readFile(RULEBOOK_FILE, 'utf8'));
   res.json({ statements, rules });
+});
+
+// 07/11 (pedido do Andre): o site volta a ter so o conteudo original. Magias, poderes e monstros
+// acrescentados depois sao OCULTADOS (deleted_at), nao apagados: os dados ficam guardados no banco.
+// Secoes do livro que sairam do .md (listas desse conteudo, mapa) sao removidas; as criadas pelo admin ficam.
+const ORIGINAL_POWERS = ['benção de éter', 'raio sombrio', 'golpe guardião'];
+const ORIGINAL_MONSTERS = ['guardião de cinzas', 'goblin', 'peregrino sem face'];
+
+router.post('/system/remove-extra-content', async (req, res) => {
+  if (!process.env.DATABASE_URL) return res.status(503).json({ message: 'Banco de dados não configurado.' });
+  if (req.body?.confirm !== 'REMOVER') return res.status(400).json({ message: 'Confirmação ausente.' });
+  const powers = await pool.query(
+    'update power_library set deleted_at = now() where deleted_at is null and lower(name) <> all($1::text[])',
+    [ORIGINAL_POWERS]
+  );
+  const monsters = await pool.query(
+    'update monsters set deleted_at = now() where deleted_at is null and lower(name) <> all($1::text[])',
+    [ORIGINAL_MONSTERS]
+  );
+  const keep = parseRulebook(await fs.readFile(RULEBOOK_FILE, 'utf8')).map((section) => section.slug);
+  let rulesRemoved = 0;
+  // Apaga das folhas para a raiz (parent_id e "on delete restrict").
+  for (let round = 0; round < 10; round += 1) {
+    const { rowCount } = await pool.query(
+      `delete from rule_sections s
+       where s.seed_hash is not null and s.slug <> all($1::text[])
+         and not exists (select 1 from rule_sections c where c.parent_id = s.id)`,
+      [keep]
+    );
+    rulesRemoved += rowCount;
+    if (!rowCount) break;
+  }
+  res.json({ powersHidden: powers.rowCount, monstersHidden: monsters.rowCount, rulesRemoved });
 });
 
 export default router;

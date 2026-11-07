@@ -10,6 +10,7 @@ export default function AdminSystemPage() {
   const [progress, setProgress] = useState('');
   const [backedUp, setBackedUp] = useState(false);
   const [result, setResult] = useState(null);
+  const [cleanup, setCleanup] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -61,6 +62,20 @@ export default function AdminSystemPage() {
     }
   }
 
+  async function removeExtra() {
+    setBusy(true);
+    setError('');
+    try {
+      const { data } = await api.post('/admin/system/remove-extra-content', { confirm: 'REMOVER' }, { timeout: 70000 });
+      setCleanup(data);
+      load();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Não deu para remover. Nada se perdeu.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="gothic-panel max-w-3xl p-5">
       <h2 className="flex items-center gap-2 font-display text-3xl text-bone"><Database size={24} className="text-ember" /> Banco de dados</h2>
@@ -83,9 +98,16 @@ export default function AdminSystemPage() {
               <Button className="mt-3" onClick={migrate} disabled={busy || !backedUp}><ShieldCheck size={16} /> Atualizar banco</Button>
               {!backedUp && <p className="mt-2 text-sm text-mist">Libera depois da cópia de segurança.</p>}
             </li>
+            <li className={`border-[3px] border-lead p-4 ${backedUp ? '' : 'opacity-60'}`}>
+              <p className="font-bold text-bone">3. Voltar ao conteúdo original</p>
+              <p className="text-sm text-mist">Oculta do site as magias, poderes e monstros acrescentados depois (ficam guardados no banco) e tira do livro as seções que saíram.</p>
+              <Button variant="ghost" className="mt-3" onClick={removeExtra} disabled={busy || !backedUp}>Ocultar conteúdo acrescentado</Button>
+              {!backedUp && <p className="mt-2 text-sm text-mist">Libera depois da cópia de segurança.</p>}
+            </li>
           </ol>
         </>
       )}
+      {cleanup && <p className="mt-4 lit border-[3px] border-lead p-3">Pronto: {cleanup.powersHidden} magias/poderes e {cleanup.monstersHidden} monstros ocultados; {cleanup.rulesRemoved} seções do livro removidas.</p>}
       {progress && <p className="mt-4 text-sm text-ember" aria-live="polite">{progress}</p>}
       {result && <p className="mt-4 lit border-[3px] border-lead p-3">Banco atualizado: {result.statements} comandos aplicados, livro com {result.rules?.total} seções ({result.rules?.inserted} novas).</p>}
       {error && <p className="mt-4 text-red-200" role="alert">{error}</p>}

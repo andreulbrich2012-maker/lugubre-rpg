@@ -84,7 +84,7 @@ function Hero() {
           <div>
             <p className="max-w-md text-lg text-mist">
               O RPG dark fantasy Lúgubre inteiro no navegador: fichas que guardam cada ferida, campanhas com
-              mesa virtual e dados, e o livro de regras 0.5 Beta para consultar no meio da sessão.
+              chat, diário e loja, e o livro de regras 0.5 Beta para consultar no meio da sessão.
             </p>
             <div className="mt-5 min-h-[4.5rem] border-t-[3px] border-lead pt-3" aria-live="polite">
               {p ? (
@@ -114,7 +114,7 @@ function Nave() {
         <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr] lg:items-end">
           <h2 id="nave-title" className="font-display text-5xl leading-none text-bone sm:text-6xl">A mesa inteira,<br />sem sair da página.</h2>
           <p className="max-w-xl text-lg text-mist lg:justify-self-end">
-            Mexa nos vidros abaixo: é assim que a ficha, o dado e o mapa se comportam numa sessão de verdade.
+            Mexa nos vidros abaixo: é assim que a ficha, o dado e a campanha se comportam numa sessão de verdade.
             O mestre guarda o segredo; os jogadores veem o efeito.
           </p>
         </div>
@@ -125,8 +125,8 @@ function Nave() {
           <Lanceta title="Dado de vidro" caption="Teste = 1d20 + atributo + treino. O mestre decide se acertou e quanto doeu; ninguém vê a vida do monstro." tall>
             <DadoDemo />
           </Lanceta>
-          <Lanceta title="Mesa virtual" caption="Mapa em pixel art (feito à mão ou por IA) ou imagem sua. Movimento livre, com WASD ou arrastando.">
-            <MesaDemo />
+          <Lanceta title="Campanha" caption="Chat, notas privadas ou para o grupo, fichas visíveis ao mestre, diário e loja num lugar só.">
+            <CampanhaDemo />
           </Lanceta>
         </div>
         <p className="mt-6 text-sm text-mist">Exemplos ilustrativos. A sua mesa usa as suas fichas.</p>
@@ -238,41 +238,21 @@ function DadoDemo() {
   );
 }
 
-function MesaDemo() {
-  const boardRef = useRef(null);
-  const [tokens, setTokens] = useState([
-    { id: 'kael', label: 'K', name: 'Kael', x: 0.18, y: 0.55, color: '#a4781a' },
-    { id: 'lys', label: 'L', name: 'Lys', x: 0.32, y: 0.72, color: '#2a7c86' },
-    { id: 'gorak', label: 'O', name: 'Orc', x: 0.74, y: 0.22, color: '#7a1630' }
-  ]);
-  const drag = useRef(null);
-
+function CampanhaDemo() {
+  const linhas = [
+    ['Mestre', '#a4781a', 'A névoa engole a estrada. Algo respira entre as árvores.'],
+    ['Kael', '#2a7c86', '/ação acende a lanterna e saca a adaga'],
+    ['Lys', '#7a1630', 'Eu fico atrás dele. Alguém trouxe corda?']
+  ];
   return (
-    <div
-      ref={boardRef}
-      className="mesa-demo relative aspect-[7/6] w-full max-w-xs touch-none border-4 border-lead"
-      onPointerMove={(event) => {
-        if (!drag.current) return;
-        const rect = boardRef.current.getBoundingClientRect();
-        const x = Math.max(0.08, Math.min(0.92, (event.clientX - rect.left) / rect.width));
-        const y = Math.max(0.08, Math.min(0.92, (event.clientY - rect.top) / rect.height));
-        setTokens((list) => list.map((t) => (t.id === drag.current ? { ...t, x, y } : t)));
-      }}
-      onPointerUp={() => { drag.current = null; }}
-      onPointerLeave={() => { drag.current = null; }}
-    >
-      {tokens.map((t) => (
-        <button
-          key={t.id}
-          type="button"
-          aria-label={`Token ${t.name}`}
-          onPointerDown={(event) => { event.currentTarget.releasePointerCapture?.(event.pointerId); drag.current = t.id; }}
-          className="absolute grid h-[16%] w-[14%] -translate-x-1/2 -translate-y-1/2 cursor-grab place-items-center rounded-full border-[3px] border-lead font-display text-xl text-bone active:cursor-grabbing"
-          style={{ left: `${t.x * 100}%`, top: `${t.y * 100}%`, background: `radial-gradient(circle at 35% 30%, color-mix(in srgb, ${t.color} 60%, #fff), ${t.color} 60%, #000)` }}
-        >
-          {t.label}
-        </button>
+    <div className="w-full max-w-xs space-y-2">
+      {linhas.map(([nome, cor, texto]) => (
+        <div key={nome} className="border-[3px] border-lead bg-black/40 px-3 py-2">
+          <p className="text-sm font-bold" style={{ color: cor }}>{nome}</p>
+          <p className={`text-sm ${texto.startsWith('/ação') ? 'italic text-ember' : 'text-bone/90'}`}>{texto.replace('/ação ', '')}</p>
+        </div>
       ))}
+      <p className="border-[3px] border-dashed border-lead px-3 py-2 text-xs text-mist">Nota só para o mestre: “a criatura é o irmão do Kael”.</p>
     </div>
   );
 }

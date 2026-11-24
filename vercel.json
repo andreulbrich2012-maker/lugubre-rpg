@@ -6,7 +6,7 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 60,
-      "includeFiles": "{backend/src/db/schema.sql,docs/livro/livro-0.5-beta-v2.md}"
+      "includeFiles": "{backend/src/db/schema.sql,docs/livro/livro-0.8.md}"
     }
   },
   "headers": [

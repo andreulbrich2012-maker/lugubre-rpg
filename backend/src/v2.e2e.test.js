@@ -10,7 +10,7 @@ import { normalizeTiles, resetMapRateLimit } from './utils/mapgen.js';
 
 const app = createApp();
 const hasDb = Boolean(process.env.DATABASE_URL);
-const bookPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../docs/livro/livro-0.5-beta-v2.md');
+const bookPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../docs/livro/livro-0.8.md');
 
 const as = (token) => ({
   get: (url) => request(app).get(url).set('Authorization', `Bearer ${token}`),
@@ -58,12 +58,12 @@ describe('utilitarios v2 (sem banco)', () => {
     const sections = parseRulebook(await fs.readFile(bookPath, 'utf8'));
     const slugs = sections.map((section) => section.slug);
     expect(new Set(slugs).size).toBe(slugs.length);
-    for (const slug of ['sobre-esta-edicao', 'bem-vindo-a-lugubre', 'o-mundo-de-lugubre', 'criacao-de-personagem', 'regras-do-sistema', 'magias-e-poderes', 'equipamentos', 'criaturas', 'guia-do-mestre', 'referencia-e-desenvolvimento', 'caos', 'gaia', 'ponto', 'erebo', 'nix', 'tartaro', 'eter', 'ananque', 'elementos-caos']) {
+    for (const slug of ['sobre-esta-edicao', 'bem-vindo-a-lugubre', 'o-mundo-de-lugubre', 'criacao-de-personagem', 'classes', 'regras', 'magias-e-poderes', 'equipamentos', 'criaturas', 'guia-do-mestre', 'aventuras-prontas', 'referencia-e-ficha', 'caos', 'gaia', 'ponto', 'erebo', 'nix', 'tartaro', 'eter', 'hemera', 'magias-e-poderes-caos', 'sylvar', 'nocthar']) {
       expect(slugs).toContain(slug);
     }
     const root = sections[0];
     expect(root.slug).toBe('sobre-esta-edicao');
-    expect(root.body_md).toContain('Este documento reorganiza');
+    expect(root.body_md).toContain('Livro de Regras 0.8');
     // capitulares juntas ao paragrafo (nada de "E" sozinho numa linha)
     expect(sections.some((section) => /\n[A-ZÁÉÍÓÚÂÊÔÃÕ]\n/.test(`\n${section.body_md}\n`))).toBe(false);
   });
@@ -287,7 +287,7 @@ describe.skipIf(!hasDb)('API v2 com Postgres', () => {
     expect(second.inserted).toBe(0);
 
     const { body: index } = await request(app).get('/api/rules').expect(200);
-    expect(index.meta.version).toBe('0.5 Beta');
+    expect(index.meta.version).toBe('0.8');
     expect(index.sections[0].slug).toBe('sobre-esta-edicao');
     expect(index.sections.length).toBeGreaterThan(150);
 
@@ -312,6 +312,6 @@ describe.skipIf(!hasDb)('API v2 com Postgres', () => {
     expect((await request(app).get('/api/rules/caos')).body.body_md).toContain('Nota do admin.');
     await seedRules(pool, markdown, { force: true });
     expect((await request(app).get('/api/rules/caos')).body.body_md).not.toContain('Nota do admin.');
-    await admin.put('/api/admin/rules-meta', { version: '0.5 Beta' }).expect(200);
+    await admin.put('/api/admin/rules-meta', { version: '0.8' }).expect(200);
   });
 });

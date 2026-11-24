@@ -278,10 +278,12 @@ describe('fluxo principal da API', () => {
       'sobrevivencia',
       'tatica',
       'tecnologia',
-      'vontade'
+      'vontade',
+      'criacao',
+      'negociacao'
     ];
-    const defaultRaceNames = ['Humano', 'Elfo', 'Elfo Negro', 'Anão', 'Tiefling', 'Halfling', 'Genasi', 'Kenku', 'Orc', 'Aasimar'];
-    const defaultOriginNames = ['Sobrevivente', 'Nobre', 'Criminoso', 'Pesquisador', 'Caçador', 'Soldado', 'Religioso', 'Mercador'];
+    const defaultRaceNames = ['Humano', 'Sylvar', 'Nocthar', 'Durkar', 'Abissiano', 'Lumerin', 'Primordiano', 'Kenku', 'Gorak', 'Celestiano'];
+    const defaultOriginNames = ['Sobrevivente', 'Nobre', 'Criminoso', 'Pesquisador', 'Caçador', 'Soldado', 'Religioso', 'Mercador', 'Artífice', 'Órfão Determinado'];
 
     expect(officialSkills.body.map((item) => item.key)).toEqual(expect.arrayContaining(defaultSkillKeys));
     expect(officialRaces.body.map((item) => item.name)).toEqual(expect.arrayContaining(defaultRaceNames));
@@ -517,15 +519,15 @@ describe('fluxo principal da API', () => {
 
     const expectedRaceAttributes = {
       Humano: { forca: 2, agilidade: 2, presenca: 2, intelecto: 2, vigor: 2 },
-      Elfo: { forca: 1, agilidade: 2, presenca: 2, intelecto: 3, vigor: 2 },
-      'Elfo Negro': { forca: 1, agilidade: 3, presenca: 2, intelecto: 2, vigor: 2 },
-      Anão: { forca: 3, agilidade: 1, presenca: 2, intelecto: 2, vigor: 2 },
-      Tiefling: { forca: 2, agilidade: 2, presenca: 1, intelecto: 3, vigor: 2 },
-      Halfling: { forca: 2, agilidade: 1, presenca: 3, intelecto: 2, vigor: 2 },
-      Genasi: { forca: 2, agilidade: 2, presenca: 2, intelecto: 2, vigor: 2 },
+      Sylvar: { forca: 1, agilidade: 2, presenca: 2, intelecto: 3, vigor: 2 },
+      Nocthar: { forca: 1, agilidade: 3, presenca: 2, intelecto: 2, vigor: 2 },
+      Durkar: { forca: 3, agilidade: 1, presenca: 2, intelecto: 2, vigor: 2 },
+      Abissiano: { forca: 2, agilidade: 2, presenca: 1, intelecto: 3, vigor: 2 },
+      Lumerin: { forca: 2, agilidade: 1, presenca: 3, intelecto: 2, vigor: 2 },
+      Primordiano: { forca: 2, agilidade: 2, presenca: 2, intelecto: 2, vigor: 2 },
       Kenku: { forca: 2, agilidade: 3, presenca: 2, intelecto: 2, vigor: 1 },
-      Orc: { forca: 3, agilidade: 2, presenca: 2, intelecto: 1, vigor: 2 },
-      Aasimar: { forca: 2, agilidade: 2, presenca: 3, intelecto: 2, vigor: 1 }
+      Gorak: { forca: 3, agilidade: 2, presenca: 2, intelecto: 1, vigor: 2 },
+      Celestiano: { forca: 2, agilidade: 2, presenca: 3, intelecto: 2, vigor: 1 }
     };
     const classId = officialClasses.body.find((item) => item.name === 'Cavaleiro')?.id || officialClasses.body[0].id;
     const defaultOriginId = officialOrigins.body.find((item) => item.name === 'Sobrevivente')?.id || officialOrigins.body[0].id;
@@ -610,7 +612,7 @@ describe('fluxo principal da API', () => {
 
     expect(character.body.attributes.forca).toBe(5);
     expect(character.body.skills[skill.body.key]).toBe(5);
-    expect(character.body.total_defense).toBe(11);
+    expect(character.body.total_defense).toBe(13); // livro 0.8: 10 + AGI 2 + couraça 1
     expect(character.body.life_current).toBe(63);
     expect(character.body.sanity_current).toBe(52);
     expect(character.body.mana_max).toBe(10);

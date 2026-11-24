@@ -371,7 +371,7 @@ export default function CharacterSheet() {
   const inventory = editing ? draft.inventory : sheet.inventory || [];
   const attacks = editing ? draft.attacks : sheet.attacks || [];
   const spells = editing ? draft.spells : sheet.spells || [];
-  const totalDefense = (editing ? draft.defense : sheet.defense) + inventory.reduce((sum, item) => sum + Number(item.defenseBonus || 0), 0);
+  const totalDefense = (editing ? draft.defense : sheet.defense) + Number(sheet.attributes?.agilidade || 0) + inventory.reduce((sum, item) => sum + Number(item.defenseBonus || 0), 0);
   const skillsCatalog = sheet.skills_catalog || [];
   const origin = sheet.origin_name || sheet.origin || 'Sem origem';
   const referenceWarnings = sheet.reference_warnings || [];
@@ -437,10 +437,9 @@ export default function CharacterSheet() {
             <ResourceStepper type="mana" label="Mana" current={draft.mana} max={draft.manaMax} status={vitalSaveStatus.mana} onAdjust={(field, delta) => adjustVital('mana', field, delta)} onRetry={() => persistVital('mana', true)} />
           </section>
 
-          <section className="grid grid-cols-3 gap-2">
+          <section className="grid grid-cols-2 gap-2">
             <Metric label="Defesa" value={totalDefense} />
-            <Metric label="Bloqueio" value="10" />
-            <Metric label="Esquiva" value={sheet.dodge} />
+            <Metric label="Esquiva (1d20+)" value={`+${sheet.dodge}`} />
           </section>
 
           <InventoryPanel

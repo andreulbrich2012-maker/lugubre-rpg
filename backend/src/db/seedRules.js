@@ -8,9 +8,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export const DEFAULT_FILE = path.resolve(__dirname, '../../../docs/livro/livro-0.5-beta-v2.md');
+export const DEFAULT_FILE = path.resolve(__dirname, '../../../docs/livro/livro-0.8.md');
 const ROOT_TITLE = 'Sobre esta edição';
-export const RULEBOOK_VERSION = '0.5 Beta';
+export const RULEBOOK_VERSION = '0.8';
 
 export function slugify(title) {
   return String(title)
@@ -87,9 +87,11 @@ export function sectionHash(section) {
 
 // Secoes que mudaram de nome no livro: a linha antiga ganha o slug novo (sem apagar nada),
 // senao o site mostraria as duas (ex.: "Sylvar" e "Elfo"). Edicao do admin continua protegida.
+// Livro 0.8: as racas voltam aos nomes proprios e dois capitulos mudaram de nome.
 export const SLUG_RENAMES = {
-  sylvar: 'elfo', nocthar: 'elfo-negro', durkar: 'anao', lumerin: 'halfling',
-  gorak: 'orc', celestiano: 'aasimar', abissiano: 'tiefling', primordiano: 'genasi'
+  elfo: 'sylvar', 'elfo-negro': 'nocthar', anao: 'durkar', halfling: 'lumerin',
+  orc: 'gorak', aasimar: 'celestiano', tiefling: 'abissiano', genasi: 'primordiano',
+  'regras-do-sistema': 'regras', 'referencia-e-desenvolvimento': 'referencia-e-ficha'
 };
 
 export async function seedRules(pool, markdown, { force = false } = {}) {
@@ -106,7 +108,7 @@ export async function seedRules(pool, markdown, { force = false } = {}) {
     `select s.*, p.slug as parent_slug from rule_sections s left join rule_sections p on p.id = s.parent_id`
   )).rows.map((row) => [row.slug, row]));
   const ids = new Map([...existing.values()].map((row) => [row.slug, row.id]));
-  const stats = { total: sections.length, inserted: 0, updated: 0, unchanged: 0, protected: 0 };
+  const stats = { total: sections.length, inserted: 0, updated: 0, unchanged: 0, protected: 0, removed: 0 };
 
   for (const section of sections) {
     const hash = sectionHash(section);
@@ -140,10 +142,37 @@ export async function seedRules(pool, markdown, { force = false } = {}) {
     stats.updated += 1;
   }
 
+  // Secoes que sairam do livro: apaga as que vieram do seed e o admin nao mexeu (com --force, todas).
+  // Da mais funda para a raiz, e so quando nao sobrou filha (parent_id e "on delete restrict").
+  const stale = [...existing.values()]
+    .filter((row) => !wanted.has(row.slug) && row.seed_hash)
+    .sort((a, b) => b.level - a.level);
+  for (const row of stale) {
+    const current = { title: row.title, body_md: row.body_md, parentSlug: row.parent_slug, position: row.position, level: row.level };
+    if (!force && sectionHash(current) !== row.seed_hash) {
+      stats.protected += 1;
+      continue;
+    }
+    const { rowCount } = await pool.query(
+      'delete from rule_sections where id = $1 and not exists (select 1 from rule_sections c where c.parent_id = $1)',
+      [row.id]
+    );
+    stats.removed += rowCount;
+  }
+
+  // A versao mostrada no site muda quando o livro do seed muda (seed_version), ou com --force.
+  // Se o admin trocou a versao a mao, ela so e sobrescrita quando chega um livro novo.
+  const seeded = (await pool.query(`select value from rulebook_meta where "key" = 'seed_version'`)).rows[0]?.value;
+  const newBook = seeded !== RULEBOOK_VERSION;
   await pool.query(
     `insert into rulebook_meta ("key", value) values ('version', $1)
      on conflict ("key") do update set value = case when $2 then excluded.value else rulebook_meta.value end`,
-    [RULEBOOK_VERSION, force]
+    [RULEBOOK_VERSION, force || newBook]
+  );
+  await pool.query(
+    `insert into rulebook_meta ("key", value) values ('seed_version', $1)
+     on conflict ("key") do update set value = excluded.value`,
+    [RULEBOOK_VERSION]
   );
   return stats;
 }
@@ -158,7 +187,7 @@ if (isMain) {
   const { pool } = await import('./pool.js');
   try {
     const stats = await seedRules(pool, await fs.readFile(file, 'utf8'), { force: args.includes('--force') });
-    console.log(`Livro de regras: ${stats.total} secoes (${stats.inserted} novas, ${stats.updated} atualizadas, ${stats.unchanged} iguais, ${stats.protected} protegidas por edicao do admin).`);
+    console.log(`Livro de regras: ${stats.total} secoes (${stats.inserted} novas, ${stats.updated} atualizadas, ${stats.unchanged} iguais, ${stats.protected} protegidas por edicao do admin, ${stats.removed} removidas).`);
   } finally {
     await pool.end();
   }

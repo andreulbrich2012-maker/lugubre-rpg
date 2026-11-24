@@ -9,19 +9,21 @@ import { PRIMORDIAIS } from '../components/glass/primordiais';
 import { api } from '../lib/api';
 import { useAuth } from '../store/authStore';
 
-// Capitulos do livro de regras 0.5 Beta, na ordem do livro.
+// Capitulos do livro de regras 0.8, na ordem do livro.
 const CHAPTERS = [
   ['bem-vindo-a-lugubre', 'Bem-vindo a Lúgubre', 'O que é, como jogar e como usar o livro.'],
   ['o-mundo-de-lugubre', 'O Mundo de Lúgubre', 'Os Oito Primordiais, a Ruptura, os Oito Reinos e a O.P.E.R.A.'],
-  ['criacao-de-personagem', 'Criação de Personagem', 'Atributos, Vida, Sanidade, Mana, perícias, raças e origens.'],
-  ['regras-do-sistema', 'Regras do Sistema', 'Dados e testes, ataques e crítico, Defesa e Esquiva, combate.'],
+  ['criacao-de-personagem', 'Criação de Personagem', 'Atributos por raça, Vida, Sanidade, Mana, 30 perícias e 22 origens.'],
+  ['classes', 'Classes', 'As sete classes, com papel na mesa, equipamento inicial e progressão.'],
+  ['regras', 'Regras', 'Dados e testes, ataques e crítico, Defesa e Esquiva, combate.'],
   ['magias-e-poderes', 'Magias e Poderes', 'Os oito elementos e o custo de cada feitiço.'],
   ['equipamentos', 'Equipamentos', 'Armas, armaduras, inventário e moedas.'],
-  ['criaturas', 'Criaturas', 'O bestiário inicial, por elemento e dificuldade.'],
+  ['criaturas', 'Criaturas', 'O bestiário, por elemento e dificuldade.'],
   ['guia-do-mestre', 'Guia do Mestre', 'Como conduzir a mesa e decidir o que o dado não decide.'],
-  ['referencia-e-desenvolvimento', 'Referência e Desenvolvimento', 'Tabelas rápidas e o que ainda está em teste no beta.']
+  ['aventuras-prontas', 'Aventuras Prontas', 'Aventuras para a primeira sessão, prontas para jogar.'],
+  ['referencia-e-ficha', 'Referência e Ficha', 'Referência rápida, glossário, ficha e o que mudou no 0.8.']
 ];
-const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX'];
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
 
 function formatDate(value) {
   if (!value) return '';
@@ -84,7 +86,7 @@ function Hero() {
           <div>
             <p className="max-w-md text-lg text-mist">
               O RPG dark fantasy Lúgubre inteiro no navegador: fichas que guardam cada ferida, campanhas com
-              chat, diário e loja, e o livro de regras 0.5 Beta para consultar no meio da sessão.
+              chat, diário e loja, e o livro de regras 0.8 para consultar no meio da sessão.
             </p>
             <div className="mt-5 min-h-[4.5rem] border-t-[3px] border-lead pt-3" aria-live="polite">
               {p ? (
@@ -119,7 +121,7 @@ function Nave() {
           </p>
         </div>
         <div className="mt-14 grid gap-6 lg:grid-cols-3">
-          <Lanceta title="Ficha viva" caption="Atributos começam em 2. Esquiva = 15 − Agilidade. Cada ajuste fica salvo para a próxima sessão.">
+          <Lanceta title="Ficha viva" caption="Atributos vêm da raça. Esquiva = 1d20 + Agilidade + Reflexos. Cada ajuste fica salvo para a próxima sessão.">
             <FichaDemo />
           </Lanceta>
           <Lanceta title="Dado de vidro" caption="Teste = 1d20 + atributo + treino. O mestre decide se acertou e quanto doeu; ninguém vê a vida do monstro." tall>
@@ -151,13 +153,13 @@ function Lanceta({ title, caption, children, tall }) {
 }
 
 function FichaDemo() {
-  const attrs = [['Força', 2], ['Agilidade', 4], ['Presença', 2], ['Intelecto', 3], ['Vigor', 2]];
+  const attrs = [['Força', 1], ['Agilidade', 3], ['Presença', 2], ['Intelecto', 2], ['Vigor', 2]];
   const [vida, setVida] = useState(41);
   const max = 63;
   return (
     <div className="w-full max-w-xs">
       <p className="font-display text-2xl text-bone">Kael Vorn</p>
-      <p className="text-sm text-mist">Elfo Negro · Alquimista · nível 3</p>
+      <p className="text-sm text-mist">Nocthar · Alquimista · nível 3</p>
       <dl className="mt-4 grid grid-cols-5 gap-1 text-center">
         {attrs.map(([name, value]) => (
           <div key={name} className="border-2 border-lead bg-black/40 py-2">
@@ -168,7 +170,7 @@ function FichaDemo() {
       </dl>
       <div className="mt-4 flex items-center justify-between text-sm">
         <span className="text-mist">Esquiva</span>
-        <span className="tabular text-bone">15 − 4 = <strong className="text-ember">11</strong></span>
+        <span className="tabular text-bone">1d20 + 3 + 5 = <strong className="text-ember">+8</strong></span>
       </div>
       <div className="mt-3">
         <div className="flex items-center justify-between text-sm">
@@ -264,7 +266,7 @@ function Livro() {
         <div className="lg:sticky lg:top-28 lg:self-start">
           <h2 id="livro-title" className="font-display text-5xl leading-none text-bone sm:text-6xl">O livro está no site.</h2>
           <p className="mt-5 max-w-md text-lg text-mist">
-            O Livro de Regras 0.5 Beta inteiro, organizado e pesquisável. Quando o livro muda, o site muda junto:
+            O Livro de Regras 0.8 inteiro, organizado e pesquisável. Quando o livro muda, o site muda junto:
             as regras ficam guardadas no banco, não presas no código.
           </p>
           <Link to="/regras" className="mt-8 inline-block"><Button className="px-6">Abrir o livro <ArrowRight size={18} /></Button></Link>
@@ -342,7 +344,7 @@ function Rodape() {
       <div className="mx-auto flex max-w-7xl flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="font-display text-3xl text-ember">Lúgubre RPG</p>
-          <p className="mt-1 text-sm text-mist">Livro de regras 0.5 Beta · 2026</p>
+          <p className="mt-1 text-sm text-mist">Livro de regras 0.8 · 2026</p>
         </div>
         <nav className="flex flex-wrap gap-x-6 gap-y-2" aria-label="Rodapé">
           {links.map(([label, href]) => (href.startsWith('http')

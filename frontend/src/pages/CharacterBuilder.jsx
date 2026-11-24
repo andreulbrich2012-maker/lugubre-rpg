@@ -250,8 +250,7 @@ function OriginStep({ catalog, form, setForm }) {
 }
 
 function AttributePreview({ attributes, selectedRace }) {
-  const modifiers = selectedRace?.attribute_modifiers || {};
-  return <div><p className="text-sm text-mist">Atributos calculados</p><p className="mt-3 max-w-2xl text-sm text-mist">Todos começam em 2 e são fechados automaticamente pela raça. Nesta etapa você apenas confere o resultado final.</p><div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">{attributeKeys.map((key) => <div key={key} className="pane p-4 text-center text-sm text-mist"><span>{attributeLabels[key]}</span><div className="tabular mt-2 font-display text-5xl text-bone">{attributes[key]}</div><span className="text-xs text-ember">Base 2 {Number(modifiers[key] || 0) >= 0 ? '+' : ''}{Number(modifiers[key] || 0)}</span></div>)}</div></div>;
+  return <div><p className="text-sm text-mist">Atributos calculados</p><p className="mt-3 max-w-2xl text-sm text-mist">No livro 0.8 os atributos vêm prontos da raça. Nesta etapa você apenas confere o resultado.</p><div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">{attributeKeys.map((key) => <div key={key} className="pane p-4 text-center text-sm text-mist"><span>{attributeLabels[key]}</span><div className="tabular mt-2 font-display text-5xl text-bone">{attributes[key]}</div></div>)}</div></div>;
 }
 
 function Inventory({ form, setForm }) {
@@ -272,8 +271,8 @@ function SheetPreview({ form, attributes, catalog }) {
   const race = catalog.races.find((item) => item.id === form.raceId)?.name || 'Raça';
   const klass = catalog.classes.find((item) => item.id === form.classId)?.name || 'Classe';
   const origin = catalog.origins.find((item) => item.id === form.originId)?.name || form.origin || 'Origem';
-  const totalDefense = form.defense + form.inventory.reduce((sum, item) => sum + Number(item.defenseBonus || 0), 0);
-  return <div><h2 className="font-display text-3xl text-bone">{form.characterName || 'Personagem'}</h2><p className="text-sm text-mist">{form.playerName || 'Jogador'} · {origin}</p><p className="mt-1 text-sm text-mist">{race} · {klass}</p><div className="mt-5 grid grid-cols-1 gap-3 text-center sm:grid-cols-3"><Stat label="Vida" value={`${form.lifeCurrent}/${form.lifeMax}`} /><Stat label="Sanidade" value={`${form.sanityCurrent}/${form.sanityMax}`} /><Stat label="Mana" value={`${form.mana}/${form.manaMax || form.mana}`} /></div><div className="mt-3 grid grid-cols-1 gap-3 text-center"><Stat label="Defesa" value={totalDefense} /></div><div className="mt-5 grid grid-cols-2 gap-2 min-[420px]:grid-cols-5">{attributeKeys.map((key) => <Stat key={key} label={attributeLabels[key]} value={attributes[key]} />)}</div><p className="tabular mt-4 text-center text-sm text-mist">Esquiva {15 - attributes.agilidade}</p></div>;
+  const totalDefense = form.defense + Number(attributes.agilidade || 0) + form.inventory.reduce((sum, item) => sum + Number(item.defenseBonus || 0), 0);
+  return <div><h2 className="font-display text-3xl text-bone">{form.characterName || 'Personagem'}</h2><p className="text-sm text-mist">{form.playerName || 'Jogador'} · {origin}</p><p className="mt-1 text-sm text-mist">{race} · {klass}</p><div className="mt-5 grid grid-cols-1 gap-3 text-center sm:grid-cols-3"><Stat label="Vida" value={`${form.lifeCurrent}/${form.lifeMax}`} /><Stat label="Sanidade" value={`${form.sanityCurrent}/${form.sanityMax}`} /><Stat label="Mana" value={`${form.mana}/${form.manaMax || form.mana}`} /></div><div className="mt-3 grid grid-cols-1 gap-3 text-center"><Stat label="Defesa" value={totalDefense} /></div><div className="mt-5 grid grid-cols-2 gap-2 min-[420px]:grid-cols-5">{attributeKeys.map((key) => <Stat key={key} label={attributeLabels[key]} value={attributes[key]} />)}</div><p className="tabular mt-4 text-center text-sm text-mist">Esquiva 1d20+{attributes.agilidade} · Defesa = 10 + AGI + armadura + escudo</p></div>;
 }
 
 function Stat({ label, value }) {

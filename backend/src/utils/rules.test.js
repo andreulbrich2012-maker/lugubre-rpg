@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyRaceModifiers, baseAttributes, baseSkills, calculateDefense, calculateDodge, parseDiceFormula, rollDiceFormula } from './rules.js';
+import { applyRaceModifiers, baseAttributes, baseSkills, calculateDefense, calculateDodge, parseDiceFormula, rollDiceFormula, SKILL_KEYS } from './rules.js';
 
 describe('regras de ficha', () => {
   it('inicia atributos em 2 e perícias em 0', () => {
@@ -11,9 +11,18 @@ describe('regras de ficha', () => {
     expect(applyRaceModifiers(baseAttributes(), { agilidade: 2, vigor: -1 })).toMatchObject({ agilidade: 4, vigor: 1 });
   });
 
-  it('calcula esquiva e defesa total', () => {
-    expect(calculateDodge({ agilidade: 4 })).toBe(11);
-    expect(calculateDefense(10, [{ defenseBonus: 2 }, { defenseBonus: 1 }])).toBe(13);
+  it('calcula esquiva e defesa total (livro 0.8)', () => {
+    // Esquiva = 1d20 + AGI + Reflexos; aqui so o bonus fixo
+    expect(calculateDodge({ agilidade: 3 }, { reflexos: 5 })).toBe(8);
+    expect(calculateDodge({ agilidade: 2 })).toBe(2);
+    // Defesa = 10 + AGI + armadura + escudo
+    expect(calculateDefense(10, [{ defenseBonus: 2 }, { defenseBonus: 1 }], { agilidade: 3 })).toBe(16);
+    expect(calculateDefense(10, [])).toBe(10);
+  });
+
+  it('tem as 30 pericias do livro 0.8', () => {
+    expect(SKILL_KEYS).toHaveLength(30);
+    expect(SKILL_KEYS).toEqual(expect.arrayContaining(['criacao', 'negociacao']));
   });
 
   it('aceita formulas seguras e rejeita entradas invalidas ou extremas', () => {

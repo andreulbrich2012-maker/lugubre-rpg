@@ -440,18 +440,28 @@ create unique index if not exists classes_name_unique on classes (lower(name));
 create unique index if not exists origins_name_unique on origins (lower(name));
 create unique index if not exists monsters_name_unique on monsters (lower(name));
 
+-- livro 0.8: as racas voltam aos nomes proprios. Renomeia a linha antiga (mesmo id, os personagens continuam ligados).
+update races set name = 'Sylvar' where lower(name) = lower('Elfo') and not exists (select 1 from races where lower(name) = lower('Sylvar'));
+update races set name = 'Nocthar' where lower(name) = lower('Elfo Negro') and not exists (select 1 from races where lower(name) = lower('Nocthar'));
+update races set name = 'Durkar' where lower(name) = lower('Anão') and not exists (select 1 from races where lower(name) = lower('Durkar'));
+update races set name = 'Lumerin' where lower(name) = lower('Halfling') and not exists (select 1 from races where lower(name) = lower('Lumerin'));
+update races set name = 'Gorak' where lower(name) = lower('Orc') and not exists (select 1 from races where lower(name) = lower('Gorak'));
+update races set name = 'Celestiano' where lower(name) = lower('Aasimar') and not exists (select 1 from races where lower(name) = lower('Celestiano'));
+update races set name = 'Abissiano' where lower(name) = lower('Tiefling') and not exists (select 1 from races where lower(name) = lower('Abissiano'));
+update races set name = 'Primordiano' where lower(name) = lower('Genasi') and not exists (select 1 from races where lower(name) = lower('Primordiano'));
+
 insert into races (name, image, attribute_modifiers)
 values
   ('Humano', '', '{}'),
-  ('Elfo', '', '{"forca":-1,"intelecto":1}'),
-  ('Elfo Negro', '', '{"forca":-1,"agilidade":1}'),
-  ('Anão', '', '{"forca":1,"agilidade":-1}'),
-  ('Tiefling', '', '{"presenca":-1,"intelecto":1}'),
-  ('Halfling', '', '{"agilidade":-1,"presenca":1}'),
-  ('Genasi', '', '{}'),
+  ('Sylvar', '', '{"forca":-1,"intelecto":1}'),
+  ('Nocthar', '', '{"forca":-1,"agilidade":1}'),
+  ('Durkar', '', '{"forca":1,"agilidade":-1}'),
+  ('Abissiano', '', '{"presenca":-1,"intelecto":1}'),
+  ('Lumerin', '', '{"agilidade":-1,"presenca":1}'),
+  ('Primordiano', '', '{}'),
   ('Kenku', '', '{"agilidade":1,"vigor":-1}'),
-  ('Orc', '', '{"forca":1,"intelecto":-1}'),
-  ('Aasimar', '', '{"vigor":-1,"presenca":1}'),
+  ('Gorak', '', '{"forca":1,"intelecto":-1}'),
+  ('Celestiano', '', '{"vigor":-1,"presenca":1}'),
   -- as 4 que faltavam no livro 0.5 (atributos do livro: base 2 + ajuste)
   ('Centauro', '', '{"intelecto":-1,"vigor":1}'),
   ('Minotauro', '', '{"forca":1,"intelecto":-1}'),
@@ -462,23 +472,31 @@ on conflict ((lower(name))) do update set
   attribute_modifiers = excluded.attribute_modifiers,
   deleted_at = null;
 
-update characters c
-set attributes = '{"forca":3,"agilidade":1,"presenca":2,"intelecto":2,"vigor":2}'::jsonb,
-    updated_at = now()
-from races r
-where c.race_id = r.id
-  and r.name = 'Anão';
-
+-- livro 0.8: as 22 origens do livro (treino +5 em duas pericias)
 insert into origins (name, description, skill_modifiers)
 values
-  ('Sobrevivente', 'Escapou de terras hostis e aprendeu a resistir quando tudo desaba.', '{"atletismo":5,"vontade":5}'),
-  ('Nobre', 'Cresceu entre intrigas, títulos e ameaças ditas em voz baixa.', '{"enganacao":5,"intimidacao":5}'),
-  ('Criminoso', 'Conhece becos, fechaduras e o valor do silêncio.', '{"crime":5,"furtividade":5}'),
-  ('Pesquisador', 'Procura respostas em cadáveres, arquivos e vestígios proibidos.', '{"investigacao":5,"medicina":5}'),
-  ('Caçador', 'Rastreia presas e perigos antes que eles percebam sua presença.', '{"percepcao":5,"pontaria":5}'),
-  ('Soldado', 'Foi treinado para sobreviver ao caos da linha de frente.', '{"atletismo":5,"reflexos":5}'),
-  ('Religioso', 'Carrega ritos, fé e cuidado contra horrores do mundo.', '{"vontade":5,"medicina":5}'),
-  ('Mercador', 'Aprendeu a ler pessoas e vender verdades convenientes.', '{"enganacao":5,"percepcao":5}')
+  ('Alquimista', 'Você passou anos entre frascos, fumaça e livros manchados. Sabe preparar remédios e, se precisar, venenos.', '{"ciencias":5,"medicina":5}'),
+  ('Aprendiz da O.P.E.R.A.', 'Você estudou numa academia da Ordem, mas ainda não fez o Juramento do Véu. Conhece protocolos, mapas e relatórios.', '{"ciencias":5,"investigacao":5}'),
+  ('Artífice', 'Você constrói coisas: fechaduras, relógios, bestas, mecanismos estranhos copiados de ruínas titânicas.', '{"criacao":5,"tecnologia":5}'),
+  ('Artista Itinerante', 'Você viajou de cidade em cidade com uma trupe, cantando, atuando ou contando histórias. Sabe agradar plateias difíceis.', '{"artes":5,"diplomacia":5}'),
+  ('Caçador', 'Você cresceu na mata, vivendo do que o arco trazia para casa.', '{"pontaria":5,"percepcao":5}'),
+  ('Caçador de Relíquias', 'Você explorou ruínas atrás de tesouros e voltou com algumas cicatrizes e quase nenhum ouro.', '{"percepcao":5,"investigacao":5}'),
+  ('Criminoso', 'Você roubou, contrabandeou ou mentiu para sobreviver. Ainda tem contatos, e dívidas.', '{"crime":5,"furtividade":5}'),
+  ('Domador', 'Você treinou cavalos, cães de caça ou criaturas mais estranhas. Animais confiam em você.', '{"adestramento":5,"sobrevivencia":5}'),
+  ('Escudeiro', 'Você serviu um cavaleiro, carregando armas, cuidando de cavalos e aprendendo a apanhar sem cair.', '{"luta":5,"fortitude":5}'),
+  ('Estrategista', 'Você aprendeu a ler mapas de guerra, a contar tropas e a prever movimentos. Talvez tenha servido a um nobre ou a um exército.', '{"tatica":5,"atualidades":5}'),
+  ('Ferreiro', 'Você trabalhou na forja, com braços fortes e ouvidos acostumados ao martelo.', '{"atletismo":5,"profissao":5}'),
+  ('Gladiador', 'Você lutou em arenas para a diversão de outros, por dinheiro ou por liberdade.', '{"luta":5,"acrobacia":5}'),
+  ('Marinheiro', 'Você passou anos no convés, entre cordas, tempestades e portos estranhos.', '{"atletismo":5,"percepcao":5}'),
+  ('Mercador', 'Você viveu de comprar barato e vender caro, aprendendo a ler pessoas como se lê uma balança.', '{"enganacao":5,"percepcao":5}'),
+  ('Nobre', 'Você nasceu com nome, terras ou ao menos a lembrança delas. Sabe se portar e sabe fazer os outros abaixarem a cabeça.', '{"enganacao":5,"intimidacao":5}'),
+  ('Ocultista', 'Você estudou o proibido: grimórios, sinais de Tártaro, nomes de criaturas.', '{"ocultismo":5,"religiao":5}'),
+  ('Órfão Determinado', 'Você cresceu sozinho, nas ruas ou na estrada, e aprendeu a ver o perigo antes que ele visse você.', '{"percepcao":5,"sobrevivencia":5}'),
+  ('Pesquisador', 'Você dedicou a vida ao estudo, examinando corpos, plantas e fenômenos.', '{"medicina":5,"investigacao":5}'),
+  ('Religioso', 'Você viveu num templo, como acólito, monge ou servo. Conhece orações, curas e o silêncio.', '{"vontade":5,"medicina":5}'),
+  ('Sobrevivente', 'Algo terrível aconteceu com você, e você ainda está aqui.', '{"vontade":5,"atletismo":5}'),
+  ('Sobrevivente de Guerra', 'Você viu sua vila ou seu reino cair numa guerra. Aprendeu a se esconder, a fugir e a encontrar comida em terra arrasada.', '{"percepcao":5,"sobrevivencia":5}'),
+  ('Soldado', 'Você serviu em um exército ou numa guarda de cidade, com disciplina, ordens e marchas longas.', '{"reflexos":5,"atletismo":5}')
 on conflict ((lower(name))) do update set description = excluded.description, skill_modifiers = excluded.skill_modifiers;
 
 insert into skills ("key", name, attribute)
@@ -489,6 +507,7 @@ values
   ('atletismo', 'Atletismo', 'forca'),
   ('atualidades', 'Atualidades', 'intelecto'),
   ('ciencias', 'Ciências', 'intelecto'),
+  ('criacao', 'Criação', 'intelecto'),
   ('crime', 'Crime', 'agilidade'),
   ('diplomacia', 'Diplomacia', 'presenca'),
   ('enganacao', 'Enganação', 'presenca'),
@@ -500,6 +519,7 @@ values
   ('investigacao', 'Investigação', 'intelecto'),
   ('luta', 'Luta', 'forca'),
   ('medicina', 'Medicina', 'intelecto'),
+  ('negociacao', 'Negociação', 'intelecto'),
   ('ocultismo', 'Ocultismo', 'intelecto'),
   ('percepcao', 'Percepção', 'presenca'),
   ('pilotagem', 'Pilotagem', 'agilidade'),
@@ -732,4 +752,4 @@ create table if not exists rulebook_meta (
   "key" text primary key,
   value text not null default ''
 );
-insert into rulebook_meta ("key", value) values ('version', '0.5 Beta') on conflict ("key") do nothing;
+insert into rulebook_meta ("key", value) values ('version', '0.8') on conflict ("key") do nothing;

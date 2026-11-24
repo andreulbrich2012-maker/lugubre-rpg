@@ -356,8 +356,8 @@ export async function enrich(row, catalogs = null) {
     race_name: row.race_name || raceRef?.name,
     class_name: row.class_name || classRef?.name,
     origin_name: row.origin_name || originRef?.name || row.origin,
-    dodge: calculateDodge(attributes),
-    total_defense: calculateDefense(row.defense, inventory)
+    dodge: calculateDodge(attributes, skills),
+    total_defense: calculateDefense(row.defense, inventory, attributes)
   };
 }
 

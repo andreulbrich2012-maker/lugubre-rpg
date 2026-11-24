@@ -156,7 +156,7 @@ export default function Dashboard() {
             <div className="lit grid h-11 w-11 place-items-center border-[3px] border-lead text-ember"><Sparkles size={20} /></div>
             <div>
               <p className="font-display text-lg text-bone">Lúgubre RPG</p>
-              <p className="text-xs text-mist">v0.5.0 Beta</p>
+              <p className="text-xs text-mist">v0.8</p>
             </div>
           </div>
           <p className="mt-3 text-xs text-mist">O destino espera.</p>

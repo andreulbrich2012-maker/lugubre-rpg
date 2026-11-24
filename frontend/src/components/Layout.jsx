@@ -141,7 +141,7 @@ export default function Layout({ children }) {
 
       {location.pathname !== '/' && !onDashboard && (
         <footer className="mt-10 border-t-[4px] border-lead px-4 py-8 text-center text-sm text-mist">
-          <span className="font-display text-lg text-ember">Lúgubre RPG</span> · Livro de regras 0.5 Beta
+          <span className="font-display text-lg text-ember">Lúgubre RPG</span> · Livro de regras 0.8
         </footer>
       )}
 

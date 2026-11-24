@@ -6,6 +6,7 @@ export const SKILL_DEFINITIONS = [
   ['atletismo', 'Atletismo', 'forca'],
   ['atualidades', 'Atualidades', 'intelecto'],
   ['ciencias', 'Ciências', 'intelecto'],
+  ['criacao', 'Criação', 'intelecto'],
   ['crime', 'Crime', 'agilidade'],
   ['diplomacia', 'Diplomacia', 'presenca'],
   ['enganacao', 'Enganação', 'presenca'],
@@ -17,6 +18,7 @@ export const SKILL_DEFINITIONS = [
   ['investigacao', 'Investigação', 'intelecto'],
   ['luta', 'Luta', 'forca'],
   ['medicina', 'Medicina', 'intelecto'],
+  ['negociacao', 'Negociação', 'intelecto'],
   ['ocultismo', 'Ocultismo', 'intelecto'],
   ['percepcao', 'Percepção', 'presenca'],
   ['pilotagem', 'Pilotagem', 'agilidade'],
@@ -47,14 +49,16 @@ export function applyRaceModifiers(attributes, modifiers = {}) {
   }, {});
 }
 
-export function calculateDodge(attributes) {
-  return 15 - Number(attributes?.agilidade ?? 2);
+// Livro 0.8: Esquiva e uma reacao, 1d20 + AGI + Reflexos. Aqui fica o bonus fixo (AGI + treino em Reflexos).
+export function calculateDodge(attributes, skills = {}) {
+  return Number(attributes?.agilidade ?? 0) + Number(skills?.reflexos ?? 0);
 }
 
-export function calculateDefense(baseDefense, inventory = []) {
+// Livro 0.8: Defesa = 10 + AGI + armadura + escudo.
+export function calculateDefense(baseDefense, inventory = [], attributes = {}) {
   const items = Array.isArray(inventory) ? inventory : [];
   const bonus = items.reduce((sum, item) => sum + Number(item.defenseBonus ?? 0), 0);
-  return Number(baseDefense ?? 10) + bonus;
+  return Number(baseDefense ?? 10) + Number(attributes?.agilidade ?? 0) + bonus;
 }
 
 export function parseDiceFormula(formula) {

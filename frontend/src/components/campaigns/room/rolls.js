@@ -1,4 +1,4 @@
-// Calculo das rolagens da mesa igual ao da ficha: 1d20 + atributo da pericia + treino + outros (livro 0.5 Beta).
+// Calculo das rolagens da mesa igual ao da ficha: 1d20 + atributo da pericia + treino + outros (livro 0.8).
 
 function norm(text = '') {
   return String(text).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
